@@ -5,14 +5,28 @@
 #import "Window_Creation";
 #import "Math";
 
-Simp    :: #import "Simp";
+#import,dir "ThirdParty/JaiBox2D";
+#load "Box2D_DebugDraw_Simp.jai";
+
+// @Cleanup This is b2Mul in Box2D, it is not output by JaiBox2D/generate.jai, maybe because older versions of Bindings_Generator didn't do that
+apply_transform :: (transform: b2Transform, point: Vector2) -> Vector2 {
+    result : Vector2 = ---;
+    result.x = (transform.q.c * point.x - transform.q.s * point.y) + transform.p.x;
+    result.y = (transform.q.s * point.x + transform.q.c * point.y) + transform.p.y;
+    return result;
+}
+
+#load "carpet.jai";
+
+Simp :: #import "Simp";
 Texture :: Simp.Texture;
 
-GAME_EXTENTS :: Vector2.{10., 10.};
+GAME_EXTENTS :: Vector2.{10., 10.}; // half-width/height in meters
 ASPECT :: #run GAME_EXTENTS.x / GAME_EXTENTS.y;
 VPIXELS :: 640;
-METERS_TO_PIXELS :: #run VPIXELS / GAME_EXTENTS.y;
-PIXELS_TO_METERS :: #run 1 / METERS_TO_PIXELS;
+METERS_TO_PIXELS :: #run cast(float)VPIXELS / (2 * GAME_EXTENTS.y);
+PIXELS_TO_METERS :: #run 1. / METERS_TO_PIXELS;
+
 window_width  : s32 = cast(s32) (VPIXELS * ASPECT);
 window_height : s32 = VPIXELS;
 
@@ -42,21 +56,32 @@ Ball :: struct {
     center : Vector2;
     radius : float = BALL_RADIUS;
     velocity : Vector2;
-    color : Vector4;
+    color := Vector4.{0, 1, 0, 1};
+
+    // We get the transform from the physics simulation via this pointer
+    // Note: The body shape is collision geometry not render geometry
+    body : *b2Body;
 }
 
 live_balls : [..] *Ball;
-ball_spawn_countdown := 0;
+ball_spawn_countdown := 0.;
 
 Player :: struct {
     center : Vector2;
     extents : Vector2 = PADDLE_EXTENTS;
     color : Vector4;
+
+    // Note: The body shape is collision geometry not render geometry
+    body : *b2Body;
 }
 
 player1 : Player;
 
 sky_map : Texture;
+
+world : *b2World;
+landscape : *b2Body;
+
 
 init_textures :: () {
     make_texture :: (name: string) -> Texture, bool {
@@ -73,26 +98,83 @@ init_textures :: () {
 
 // Converts game units (meters) to pixels for rendering
 world_to_screen :: (meters : Vector2) -> Vector2 {
-    return meters * METERS_TO_PIXELS;
+    return (GAME_EXTENTS + meters) * METERS_TO_PIXELS;
 }
 
-draw_ball_at :: (using ball : Ball) {
-    p0 : Vector2 = world_to_screen(center - Vector2.{radius, radius});
-    p2 : Vector2 = world_to_screen(center + Vector2.{radius, radius});
-    p1 : Vector2 = .{p2.x, p0.y};
-    p3 : Vector2 = .{p0.x, p2.y};
-
-    Simp.immediate_quad(p0, p1, p2, p3, color); // @TODO Make the ball a circle
+countdown :: (value_pointer: *float) {
+    value := value_pointer.*;
+    value -= current_dt;
+    if value < 0 {
+        value = 0; // @Think Does this give consistent countdowns?
+    }
+    value_pointer.* = value;
 }
 
-draw_player_at :: (using player : Player) {
+draw_background :: () {
+    Simp.set_shader_for_images(*sky_map);
+
+    sky_color := Vector4.{1,1,1,1};
+
+    Simp.immediate_quad(0, 0, xx window_width, xx window_height, sky_color);
+}
+
+draw_ball_at :: (using ball: Ball) {
+    Simp.set_shader_for_color(true);
+
+    lo, hi : Vector2 = center - Vector2.{radius, radius}, center + Vector2.{radius, radius};
+
+    v : [4]Vector2;
+    v[0] = lo;
+    v[1] = Vector2.{hi.x, lo.y};
+    v[2] = hi;
+    v[3] = Vector2.{lo.x, hi.y};
+
+    transform : b2Transform = b2Body.GetTransform(ball.body);
+    for * v {
+        it.* = world_to_screen(apply_transform(transform, it));
+    }
+
+    Simp.immediate_quad(v[0], v[1], v[2], v[3], color);
+}
+
+draw_player_at :: (using player: Player) {
+    Simp.set_shader_for_color();
+
+    // lo, hi : Vector2 = center - extents, center + extents;
+
+    // v : [4]Vector2;
+    // v[0] = lo;
+    // v[1] = Vector2.{hi.x, lo.y};
+    // v[2] = hi;
+    // v[3] = Vector2.{lo.x, hi.y};
+
+    // transform : b2Transform = b2Body.GetTransform(body);
+    // for * v {
+    //     it.* = world_to_screen(apply_transform(transform, it));
+    // }
+
+    // Simp.immediate_quad(v[0], v[1], v[2], v[3], color);
+
     p0 : Vector2 = world_to_screen(center - extents);
     p2 : Vector2 = world_to_screen(center + extents);
     p1 : Vector2 = .{p2.x, p0.y};
     p3 : Vector2 = .{p0.x, p2.y};
 
-    Simp.immediate_quad(p0, p1, p2, p3, color); // nocommit Fix color
+    Simp.immediate_quad(p0, p1, p2, p3, color);
 }
+
+// // @todo write a draw_b2Shape function?
+// draw_b2PolygonShape :: (shape : b2PolygonShape, color : Vector4) {
+//     Simp.set_shader_for_color();
+
+//     triangle_count := shape.m_count - 2; 
+//     o := Vector3.{xy=world_to_screen(shape.m_vertices[0]), z=0};
+//     for t : 0..triangle_count-1 {
+//         a := Vector3.{xy=world_to_screen(shape.m_vertices[t + 1]), z=0};
+//         b := Vector3.{xy=world_to_screen(shape.m_vertices[t + 2]), z=0};
+//         Simp.immediate_triangle(o, a, b, color, color, color);
+//     }
+// }
 
 simulate :: () {
     now := get_time();
@@ -103,57 +185,39 @@ simulate :: () {
 
     last_time = now;
 
-/*
-    update_sound_player(current_dt);
-
-    old_invincibility := ship_invincibility_countdown;
-
-    countdown(*ship_shot_cooldown);
-    countdown(*ship_invincibility_countdown);
-    countdown(*ship_v_shot_stability_countdown);
-    countdown(*ship_penetrating_countdown);
-
-    if ship_v_shot_stability_countdown <= 0 {
-        ship_v_shot_angle_target = 0;
-
-        // We are shrinking.
-        if ship_v_shot_angle_current > ship_v_shot_angle_target {
-            d_angle := SHIP_V_SHOT_SHRINK_DEGREES_PER_SECOND * current_dt;
-            ship_v_shot_angle_current -= d_angle;
-            if ship_v_shot_angle_current < 0  ship_v_shot_angle_current = 0;
-        }
-    } else {
-        // We are growing.
-        if ship_v_shot_angle_current < ship_v_shot_angle_target {
-            ship_v_shot_angle_current += SHIP_V_SHOT_EXPAND_DEGREES_PER_SECOND * current_dt;
-            if ship_v_shot_angle_current > ship_v_shot_angle_target  ship_v_shot_angle_current = ship_v_shot_angle_target;
-        }
-    }
-
-    if ship_invincibility_countdown <= 0 && old_invincibility > 0 {
-        play_sound(sound_shield_end);
-    }
-
-    if respawn_countdown >= 0 {
-        respawn_countdown -= current_dt;
-        if respawn_countdown < 0 {
-            lives -= 1;
-
-            if lives < 0 {
-                should_quit_game = true;
-            } else {
-                init_ship_position();
-                ship_destroyed = false;
-            }
-        }
-    }
-*/
+    countdown(*ball_spawn_countdown);
 
     if !live_balls {
         if ball_spawn_countdown <= 0 {
             ball : *Ball = New(Ball);
-            ball.center = .5 * GAME_EXTENTS;
-            ball.velocity = Vector2.{-GAME_EXTENTS.x / 2.0, -GAME_EXTENTS.y / 3.0}; 
+            ball_density := 1.; // kg/m^3
+
+            start_position := Vector2.{0., 0.}; // pitch center
+            // start_linear_velocity := Vector2.{-GAME_EXTENTS.x / 2.0, -GAME_EXTENTS.y / 3.0};
+            start_linear_velocity := Vector2.{.0, -GAME_EXTENTS.y / 3.0};
+            start_rotation_radians := 3.;
+
+            body_def : b2BodyDef;
+            b2BodyDef.Constructor(*body_def);
+            body_def.type = .b2_dynamicBody;
+            body_def.position = start_position;
+            body_def.linearVelocity = start_linear_velocity;
+            ball.body = b2World.CreateBody(world, *body_def);
+
+            shape : b2PolygonShape;
+            b2PolygonShape.Constructor(*shape);
+            b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, start_position, start_rotation_radians);
+
+            // @Incomplete Use this when we set friction/restitution etc
+            // fixture_def : b2FixtureDef;
+            // b2FixtureDef.Constructor(*fixture_def);
+            // fixture_def.shape = *shape;
+            // fixture_def.density = ball_density;
+            // fixture_def.friction = .30;
+            // b2Body.CreateFixture(ball.body, *fixture_def);
+
+            b2Body.CreateFixture(ball.body, *shape, ball_density);
+
             array_add(*live_balls, ball);
         }
     }
@@ -161,11 +225,15 @@ simulate :: () {
     for event : events_this_frame {
         if event.type == .QUIT {
             should_quit_game = true;
-            break;
         }
 
-        if event.key_code == .ESCAPE
-            if event.key_pressed should_quit_game = true;
+        if event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed {
+            should_quit_game = true;
+        }
+
+        if should_quit_game {
+            break;
+        }
 
         if event.type == .KEYBOARD {
             key := event.key_code;
@@ -199,23 +267,25 @@ simulate :: () {
 
     player1.center += dx * PADDLE_SPEED * current_dt;
 
-    x0 := player1.extents.x;
-    x1 := GAME_EXTENTS.x - player1.extents.x;
-    y0 := player1.extents.y;
-    y1 := GAME_EXTENTS.y;
+    x0 := -GAME_EXTENTS.x + player1.extents.x;
+    x1 :=  GAME_EXTENTS.x - player1.extents.x;
+    y0 := -GAME_EXTENTS.y + player1.extents.y;
+    y1 :=  GAME_EXTENTS.y - player1.extents.y;
 
     Clamp(*player1.center.x, x0, x1);
     Clamp(*player1.center.y, y0, y1);
 
+    b2World.Step(world, current_dt, 6, 2);
+
     // simulate_spawns();
-    simulate_balls();
+    // simulate_balls();
     // simulate_invaders();
     // simulate_pickups();
 
     // for live_emitters update_emitter(it, current_dt);
 }
 
-simulate_balls :: () {
+simulate_balls :: () #deprecated "Replaced with Box2D simulation" {
     // Return true if the ball should be destroyed
     // @todo :Physics Do something smarter here, and support spin etc
     simulate_ball :: (ball: *Ball) -> bool {
@@ -254,6 +324,7 @@ simulate_balls :: () {
             // it.emitter.producing = false;
             remove it;
             free(it);
+            ball_spawn_countdown = 2.;
         }
     }
 }
@@ -270,7 +341,36 @@ main :: () {
 
     init_textures();
 
-    player1.center = Vector2.{GAME_EXTENTS.x / 2., 2 * player1.extents.y};
+    world = New(b2World);
+    b2World.Constructor(world, Vector2.{0., 0.}); // nocommit Zero gravity in this game
+    box2d_debug_draw : *b2Draw = create_box2d_debug_draw();
+    b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.shapeBit);
+    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.jointBit);
+    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.centerOfMassBit);
+
+    b2World.SetDebugDraw(world, box2d_debug_draw);
+
+    { // Create landscape aka play area
+        // extents := Vector2.{GAME_EXTENTS.x, 1.}; //Vector2.{GAME_EXTENTS.x / 8., GAME_EXTENTS.y / 10.};
+        extents := .25 * GAME_EXTENTS;
+        center := Vector2.{0., -.75 * GAME_EXTENTS.y};
+        angle := 0.; 
+
+        body_def : b2BodyDef;
+        b2BodyDef.Constructor(*body_def);
+        body_def.position = center;
+        body_def.angle = 0.;
+        landscape = b2World.CreateBody(world, *body_def);
+
+        // Shape coordinates are local to the body
+        shape : b2PolygonShape;
+        b2PolygonShape.Constructor(*shape);
+        // b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, center, angle);
+        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+        b2Body.CreateFixture(landscape, *shape, 0.);
+    }
+
+    player1.center = Vector2.{0., -GAME_EXTENTS.y + player1.extents.y};
     player1.color = Vector4.{.3, .2, 0, 1};
 
     while !should_quit_game {
@@ -282,57 +382,39 @@ main :: () {
 
         simulate();
 
-        { // Draw the sky background.
-            Simp.set_shader_for_images(*sky_map);
+        draw_background();
 
-            sky_color := Vector4.{1,1,1,1};
+        /*
+        draw_b2PolygonShape(test_ground_shape, Vector4.{0, 0, 1, 1}); // nocommit We should be drawing via the body, to get the fixture, and then get the shape from that
 
-            Simp.immediate_quad(0, 0, xx window_width, xx window_height, sky_color);
+        {
+            fixture : *b2Fixture = b2Body.GetFixtureList(test_physics_ball);
+            while fixture != null {
+                shape : *b2Shape = b2Fixture.GetShape(fixture);
+                if shape.m_type == {
+                    case .polygon;
+                        draw_b2PolygonShape(cast(*b2PolygonShape)shape, Vector4.{1, 0, 1, 1});
+                    case;
+                        print("Error\n");
+                }
+                fixture = b2Fixture.GetNext(fixture);
+            }
+        }
+        */
+
+        for live_balls {
+            draw_ball_at(it);
         }
 
-        Simp.set_shader_for_color();
-
-        for live_balls
-            draw_ball_at(it);
-
-        // if !ship_destroyed
         draw_player_at(player1);
+
+        // Draws the physics/collision geometry
+        b2World.DebugDraw(world);
 
         Simp.swap_buffers(window);
 
         // memory_visualizer_per_frame_update();
     }
-}
 
-
-printv :: (a : Code, loc := #caller_location) #expand {
-
-    get_ident_name :: (code : Code) -> string {
-        #import "Compiler";
-        root := compiler_get_nodes(code);
-        assert(root.kind == .IDENT);
-        ident := cast(*Code_Ident) root;
-        return ident.name;
-    }
-
-    new_context := context;
-
-    //format_float := *new_context.print_style.default_format_float;
-    //format_float.mode = .SCIENTIFIC;
-    //format_float.width = 10;
-
-    format_struct := *new_context.print_style.default_format_struct;
-    format_struct.use_long_form_if_more_than_this_many_members = 4;
-    format_struct.use_newlines_if_long_form = true;
-
-    //format_array := *new_context.print_style.default_format_array;
-    //format_array.stop_printing_after_this_many_elements = 10;
-
-    push_context new_context {
-#if true {
-    print("%:% % = %\n", loc.fully_pathed_filename, loc.line_number, #run get_ident_name(a), #insert a);
-} else {
-    print("% = %\n", #run get_ident_name(a), #insert a);
-}
-    }
+    free(box2d_debug_draw);
 }
