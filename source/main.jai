@@ -47,7 +47,7 @@ data_folder: string;
 NUM_LIVES :: 2;
 BALL_RADIUS :: .2;
 PADDLE_EXTENTS :: Vector2.{.25, .10};
-PADDLE_SPEED :: #run (GAME_EXTENTS.x / 1.0);
+PADDLE_SPEED :: #run (GAME_EXTENTS.x / 3.0);
 
 lives := NUM_LIVES;
 
@@ -139,21 +139,6 @@ draw_ball_at :: (using ball: Ball) {
 
 draw_player_at :: (using player: Player) {
     Simp.set_shader_for_color();
-
-    // lo, hi : Vector2 = center - extents, center + extents;
-
-    // v : [4]Vector2;
-    // v[0] = lo;
-    // v[1] = Vector2.{hi.x, lo.y};
-    // v[2] = hi;
-    // v[3] = Vector2.{lo.x, hi.y};
-
-    // transform : b2Transform = b2Body.GetTransform(body);
-    // for * v {
-    //     it.* = world_to_screen(apply_transform(transform, it));
-    // }
-
-    // Simp.immediate_quad(v[0], v[1], v[2], v[3], color);
 
     p0 : Vector2 = world_to_screen(center - extents);
     p2 : Vector2 = world_to_screen(center + extents);
@@ -274,6 +259,7 @@ simulate :: () {
 
     Clamp(*player1.center.x, x0, x1);
     Clamp(*player1.center.y, y0, y1);
+    b2Body.SetTransform(player1.body, player1.center, 0.);
 
     b2World.Step(world, current_dt, 6, 2);
 
@@ -372,6 +358,19 @@ main :: () {
 
     player1.center = Vector2.{0., -GAME_EXTENTS.y + player1.extents.y};
     player1.color = Vector4.{.3, .2, 0, 1};
+    {
+        body_def : b2BodyDef;
+        b2BodyDef.Constructor(*body_def);
+        body_def.type = .b2_staticBody;
+        body_def.position = player1.center;
+        player1.body = b2World.CreateBody(world, *body_def);
+
+        shape : b2PolygonShape;
+        b2PolygonShape.Constructor(*shape);
+        b2PolygonShape.SetAsBox(*shape, player1.extents.x, player1.extents.y, .{}, 0.);
+
+        b2Body.CreateFixture(player1.body, *shape, 0.);
+    }
 
     while !should_quit_game {
         reset_temporary_storage();
