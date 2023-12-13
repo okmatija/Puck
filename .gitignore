@@ -1,3 +1,7 @@
 .build/
 *.exe
 *.pdb
+*.code-workspace
+
+# @hack This dll is copied from the source/ThirdParty/JaiBox2D folder, its probably better to copy it next to the exe during the build, or get something like rpath working on windows, see https://developercommunity.visualstudio.com/t/support-rpath-for-binaries-during-development/566616 and https://nibblestew.blogspot.com/2019/05/emulating-rpath-on-windows-via-binary.html
+box2d.dll
