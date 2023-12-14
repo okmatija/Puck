@@ -180,7 +180,6 @@ simulate :: () {
             start_position := Vector2.{0., 0.}; // pitch center
             // start_linear_velocity := Vector2.{-GAME_EXTENTS.x / 2.0, -GAME_EXTENTS.y / 3.0};
             start_linear_velocity := Vector2.{.0, -GAME_EXTENTS.y / 3.0};
-            start_rotation_radians := 3.;
 
             body_def : b2BodyDef;
             b2BodyDef.Constructor(*body_def);
@@ -191,7 +190,7 @@ simulate :: () {
 
             shape : b2PolygonShape;
             b2PolygonShape.Constructor(*shape);
-            b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, start_position, start_rotation_radians);
+            b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
 
             // @Incomplete Use this when we set friction/restitution etc
             // fixture_def : b2FixtureDef;
@@ -327,12 +326,17 @@ main :: () {
 
     init_textures();
 
+
     world = New(b2World);
     b2World.Constructor(world, Vector2.{0., 0.}); // nocommit Zero gravity in this game
-    box2d_debug_draw : *b2Draw = create_box2d_debug_draw();
+
+    box2d_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
+    box2d_debug_draw := create_box2d_debug_draw_using_simp(box2d_debug_draw_transform);
+    defer free(box2d_debug_draw);
+
     b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.shapeBit);
     // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.jointBit);
-    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.centerOfMassBit);
+    b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.centerOfMassBit);
 
     b2World.SetDebugDraw(world, box2d_debug_draw);
 
@@ -414,6 +418,4 @@ main :: () {
 
         // memory_visualizer_per_frame_update();
     }
-
-    free(box2d_debug_draw);
 }

@@ -1,3 +1,13 @@
+to_radians :: (degrees : float) -> float {
+    scale :: PI / 180;
+    return degrees * scale;
+}
+
+to_degrees :: (radians : float) -> float {
+    scale :: 180 / PI;
+    return radians * scale;
+}
+
 printv :: (a : Code, loc := #caller_location) #expand {
 
     get_ident_name :: (code : Code) -> string {
