@@ -21,14 +21,29 @@ apply_transform :: (transform: b2Transform, point: Vector2) -> Vector2 {
 Simp :: #import "Simp";
 Texture :: Simp.Texture;
 
+// - Game coordinates are in meters
+// - Game origin, (0,0) is at the center of the window
+// - Game occupies a central vertical strip of the window, P1 at the bottom, P2 at the top
+// - Game playable area is padded left and right by GAME_PADDING
 GAME_EXTENTS :: Vector2.{10., 10.}; // half-width/height in meters
-ASPECT :: #run GAME_EXTENTS.x / GAME_EXTENTS.y;
-VPIXELS :: 640;
-METERS_TO_PIXELS :: #run cast(float)VPIXELS / (2 * GAME_EXTENTS.y);
-PIXELS_TO_METERS :: #run 1. / METERS_TO_PIXELS;
+GAME_PADDING :: 1.; // Applied to both sides of game
+WINDOW_HEIGHT_INITIAL :: 640;
+BALL_RADIUS_INITIAL :: .2;
+PADDLE_EXTENTS :: Vector2.{2.00, 0.25};
+PADDLE_SPEED :: #run (GAME_EXTENTS.x / 1.0);
 
-window_width  : s32 = cast(s32) (VPIXELS * ASPECT);
-window_height : s32 = VPIXELS;
+meters_to_pixels :: () -> float {
+    return window_height / (2. * GAME_EXTENTS.y);
+}
+
+pixels_to_meters :: () -> float {
+    return 1. / meters_to_pixels();
+}
+
+//App :: struct {
+window_height : s32 = WINDOW_HEIGHT_INITIAL;
+window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
+//}
 
 key_left  : u32;
 key_right : u32;
@@ -44,17 +59,10 @@ DT_MAX : float : 0.15;
 
 data_folder: string;
 
-NUM_LIVES :: 2;
-BALL_RADIUS :: .2;
-PADDLE_EXTENTS :: Vector2.{.25, .10};
-PADDLE_SPEED :: #run (GAME_EXTENTS.x / 3.0);
-
-lives := NUM_LIVES;
-
 
 Ball :: struct {
     center : Vector2;
-    radius : float = BALL_RADIUS;
+    radius : float = BALL_RADIUS_INITIAL;
     velocity : Vector2;
     color := Vector4.{0, 1, 0, 1};
 
@@ -98,7 +106,7 @@ init_textures :: () {
 
 // Converts game units (meters) to pixels for rendering
 world_to_screen :: (meters : Vector2) -> Vector2 {
-    return (GAME_EXTENTS + meters) * METERS_TO_PIXELS;
+    return (GAME_EXTENTS + Vector2.{GAME_PADDING, 0.} + meters) * meters_to_pixels();
 }
 
 countdown :: (value_pointer: *float) {
@@ -134,7 +142,7 @@ draw_ball_at :: (using ball: Ball) {
         it.* = world_to_screen(apply_transform(transform, it));
     }
 
-    Simp.immediate_quad(v[0], v[1], v[2], v[3], color);
+    Simp.immediate_quad(v[0], v[1], v[2], v[3], color); // nocommit
 }
 
 draw_player_at :: (using player: Player) {
@@ -186,21 +194,25 @@ simulate :: () {
             body_def.type = .b2_dynamicBody;
             body_def.position = start_position;
             body_def.linearVelocity = start_linear_velocity;
+
             ball.body = b2World.CreateBody(world, *body_def);
+            b2Body.SetSleepingAllowed(ball.body, false);
 
-            shape : b2PolygonShape;
-            b2PolygonShape.Constructor(*shape);
-            b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
+            // shape : b2PolygonShape;
+            // b2PolygonShape.Constructor(*shape);
+            // b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
 
-            // @Incomplete Use this when we set friction/restitution etc
-            // fixture_def : b2FixtureDef;
-            // b2FixtureDef.Constructor(*fixture_def);
-            // fixture_def.shape = *shape;
-            // fixture_def.density = ball_density;
-            // fixture_def.friction = .30;
-            // b2Body.CreateFixture(ball.body, *fixture_def);
+            shape : b2CircleShape;
+            b2CircleShape.Constructor(*shape);
+            shape.m_radius = ball.radius;
 
-            b2Body.CreateFixture(ball.body, *shape, ball_density);
+            fixture_def : b2FixtureDef;
+            b2FixtureDef.Constructor(*fixture_def);
+            fixture_def.shape = *shape;
+            fixture_def.density = ball_density;
+            fixture_def.friction = .30;
+            fixture_def.restitution = 1.;
+            b2Body.CreateFixture(ball.body, *fixture_def);
 
             array_add(*live_balls, ball);
         }
@@ -348,8 +360,6 @@ main :: () {
 
         body_def : b2BodyDef;
         b2BodyDef.Constructor(*body_def);
-        body_def.position = center;
-        body_def.angle = 0.;
         landscape = b2World.CreateBody(world, *body_def);
 
         // Shape coordinates are local to the body
@@ -358,6 +368,15 @@ main :: () {
         // b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, center, angle);
         b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
         b2Body.CreateFixture(landscape, *shape, 0.);
+
+        edge_shape : b2EdgeShape;
+        b2EdgeShape.Constructor(*edge_shape);
+
+        b2EdgeShape.SetTwoSided(*edge_shape, -GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y});
+        b2Body.CreateFixture(landscape, *edge_shape, 0.);
+
+        b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
+        b2Body.CreateFixture(landscape, *edge_shape, 0.);
     }
 
     player1.center = Vector2.{0., -GAME_EXTENTS.y + player1.extents.y};
@@ -365,7 +384,7 @@ main :: () {
     {
         body_def : b2BodyDef;
         b2BodyDef.Constructor(*body_def);
-        body_def.type = .b2_staticBody;
+        body_def.type = .b2_kinematicBody;
         body_def.position = player1.center;
         player1.body = b2World.CreateBody(world, *body_def);
 
@@ -373,7 +392,14 @@ main :: () {
         b2PolygonShape.Constructor(*shape);
         b2PolygonShape.SetAsBox(*shape, player1.extents.x, player1.extents.y, .{}, 0.);
 
-        b2Body.CreateFixture(player1.body, *shape, 0.);
+        fixture_def : b2FixtureDef;
+        b2FixtureDef.Constructor(*fixture_def);
+        fixture_def.shape = *shape;
+        fixture_def.density = .0;
+        fixture_def.friction = .2;
+        fixture_def.restitution = 1.;
+        b2Body.CreateFixture(player1.body, *fixture_def);
+        // b2Body.CreateFixture(player1.body, *shape, 0.);
     }
 
     while !should_quit_game {
@@ -405,11 +431,10 @@ main :: () {
         }
         */
 
-        for live_balls {
-            draw_ball_at(it);
-        }
-
-        draw_player_at(player1);
+        //for live_balls {
+        //    draw_ball_at(it);
+        //}
+        //draw_player_at(player1);
 
         // Draws the physics/collision geometry
         b2World.DebugDraw(world);

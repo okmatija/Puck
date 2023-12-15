@@ -32,8 +32,7 @@ create_box2d_debug_draw_using_simp :: (transform: (Vector2)->Vector3) -> *b2Draw
 
 #scope_file
 
-// nocommit The implementations here are ports of the C++ found in box2d/testbed/draw.cpp
-// nocommit Replace this with _ since we don't use that parameter
+// The implementations here are ports of the C++ found in box2d/testbed/draw.cpp
 
 Simp :: #import "Simp";
 simp : *Simp.Immediate_State;
@@ -41,10 +40,12 @@ simp : *Simp.Immediate_State;
 #import "Math";
 
 HALF_PI :: #run .5 * PI;
+
+// nocommit These should be configurable in Box2D_Debug_Draw
 CIRCLE_SEGMENTS :: 16;
 CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
 POINT_CIRCLE_SEGMENTS :: 4;
-POINT_CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
+POINT_CIRCLE_INCREMENT :: #run TAU / POINT_CIRCLE_SEGMENTS;
 SEGMENT_THICKNESS :: 1.; // Simp units aka pixels
 
 
@@ -202,42 +203,30 @@ draw_transform :: (this: *b2Draw, xf: *b2Transform) #cpp_method {
     }
 }
 
-draw_point :: (this: *b2Draw, p: *Vector2, size: float, color: *b2Color) #cpp_method {
+draw_point :: (this: *b2Draw, p: *Vector2, point_diameter: float, color: *b2Color) #cpp_method {
     new_context : Context;
     new_context.simp = simp;
     push_context new_context {
         Simp.set_shader_for_color(true);
         using draw := cast(*Box2D_Debug_Draw)this;
 
+        radius := point_diameter / 2.;
         sinInc := sin(POINT_CIRCLE_INCREMENT);
         cosInc := cos(POINT_CIRCLE_INCREMENT);
+
         v0 : Vector3 = transform(p.*);
         r1 : b2Vec2 = .{cosInc, sinInc};
-        v1 : Vector3 = transform(p.* + size * r1);
+        v1 : Vector3 = transform(p.*) + radius * Vector3.{xy=r1, z=v0.z};
         fill_color := Vector4.{0.5 * color.r, 0.5 * color.g, 0.5 * color.b, 0.5};
         for i : 0..POINT_CIRCLE_SEGMENTS-1 {
             // Perform rotation to avoid additional trigonometry.
             r2 : b2Vec2 = ---;
             r2.x = cosInc * r1.x - sinInc * r1.y;
             r2.y = sinInc * r1.x + cosInc * r1.y;
-            v2 : Vector3 = transform(p.* + size * r2);
+            v2 : Vector3 = transform(p.*) + radius * Vector3.{xy=r2, z=v0.z};
             Simp.immediate_triangle(v0, v1, v2, fill_color, fill_color, fill_color);
             r1 = r2;
             v1 = v2;
         }
     }
-}
-
-// @cleanup None of these should be generated?
-
-draw_segment :: (this: *b2Draw, p1: Vector2, p2: Vector2, color: b2Color) #cpp_method {
-    draw_segment(this, *p1, *p2, *color);
-}
-
-draw_transform :: (this: *b2Draw, xf: b2Transform) #cpp_method {
-    draw_transform(this, *xf);
-}
-
-draw_point :: (this: *b2Draw, p: Vector2, size: float, color: b2Color) #cpp_method {
-    draw_point(this, *p, size, *color);
 }
