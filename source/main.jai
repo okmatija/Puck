@@ -25,12 +25,23 @@ Texture :: Simp.Texture;
 // - Game origin, (0,0) is at the center of the window
 // - Game occupies a central vertical strip of the window, P1 at the bottom, P2 at the top
 // - Game playable area is padded left and right by GAME_PADDING
-GAME_EXTENTS :: Vector2.{10., 10.}; // half-width/height in meters
-GAME_PADDING :: 1.; // Applied to both sides of game
+GAME_EXTENTS :: Vector2.{10.0, 10.0}; // half-width/height in meters
+GAME_PADDING :: 3.0; // Applied to both sides of game
 WINDOW_HEIGHT_INITIAL :: 640;
-BALL_RADIUS_INITIAL :: .2;
+
+BALL_RADIUS_INITIAL :: 0.2;
+BALL_DENSITY :: 1.0;
+BALL_FRICTION :: 0.3;
+BALL_RESTITUTION :: 1.0;
+
+WALL_FRICTION :: 0.0;
+WALL_RESTITUTION :: 0.0;
+
 PADDLE_EXTENTS :: Vector2.{2.00, 0.25};
-PADDLE_SPEED :: #run (GAME_EXTENTS.x / 1.0);
+PADDLE_SPEED :: #run (GAME_EXTENTS.x / 0.35);
+PADDLE_DENSITY :: 1.;
+PADDLE_FRICTION :: .2;
+PADDLE_RESTITUTION :: 1.3;
 
 meters_to_pixels :: () -> float {
     return window_height / (2. * GAME_EXTENTS.y);
@@ -43,12 +54,8 @@ pixels_to_meters :: () -> float {
 //App :: struct {
 window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
+font : *Simp.Dynamic_Font;
 //}
-
-key_left  : u32;
-key_right : u32;
-key_up    : u32;
-key_down  : u32;
 
 should_ignore_input := false;
 should_quit_game :=    false;
@@ -66,6 +73,8 @@ Ball :: struct {
     velocity : Vector2;
     color := Vector4.{0, 1, 0, 1};
 
+    last_hit_player : int; // 1/2 => player1/player2
+
     // We get the transform from the physics simulation via this pointer
     // Note: The body shape is collision geometry not render geometry
     body : *b2Body;
@@ -79,17 +88,34 @@ Player :: struct {
     extents : Vector2 = PADDLE_EXTENTS;
     color : Vector4;
 
+    left : u32;
+    right : u32;
+    score : int;
+
     // Note: The body shape is collision geometry not render geometry
     body : *b2Body;
 }
 
 player1 : Player;
+player2 : Player;
 
 sky_map : Texture;
 
 world : *b2World;
 landscape : *b2Body;
 
+init_fonts :: () {
+    // So that we can load our font, set to path of running executable.
+    // @Incomplete: Pack a default font into Simp.
+    path := path_strip_filename(get_path_of_running_executable());
+
+    set_working_directory(path);
+    pixel_height := window_height / 24;
+
+    // @Cleanup: Don't have path + name be separate.
+    font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", pixel_height);
+    assert(font != null);
+}
 
 init_textures :: () {
     make_texture :: (name: string) -> Texture, bool {
@@ -160,7 +186,7 @@ draw_player_at :: (using player: Player) {
 // draw_b2PolygonShape :: (shape : b2PolygonShape, color : Vector4) {
 //     Simp.set_shader_for_color();
 
-//     triangle_count := shape.m_count - 2; 
+//     triangle_count := shape.m_count - 2;
 //     o := Vector3.{xy=world_to_screen(shape.m_vertices[0]), z=0};
 //     for t : 0..triangle_count-1 {
 //         a := Vector3.{xy=world_to_screen(shape.m_vertices[t + 1]), z=0};
@@ -183,17 +209,17 @@ simulate :: () {
     if !live_balls {
         if ball_spawn_countdown <= 0 {
             ball : *Ball = New(Ball);
-            ball_density := 1.; // kg/m^3
 
             start_position := Vector2.{0., 0.}; // pitch center
             // start_linear_velocity := Vector2.{-GAME_EXTENTS.x / 2.0, -GAME_EXTENTS.y / 3.0};
-            start_linear_velocity := Vector2.{.0, -GAME_EXTENTS.y / 3.0};
+            start_linear_velocity := Vector2.{.0, -GAME_EXTENTS.y / 1.0};
 
             body_def : b2BodyDef;
             b2BodyDef.Constructor(*body_def);
             body_def.type = .b2_dynamicBody;
             body_def.position = start_position;
             body_def.linearVelocity = start_linear_velocity;
+            body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast!
 
             ball.body = b2World.CreateBody(world, *body_def);
             b2Body.SetSleepingAllowed(ball.body, false);
@@ -209,9 +235,9 @@ simulate :: () {
             fixture_def : b2FixtureDef;
             b2FixtureDef.Constructor(*fixture_def);
             fixture_def.shape = *shape;
-            fixture_def.density = ball_density;
-            fixture_def.friction = .30;
-            fixture_def.restitution = 1.;
+            fixture_def.density = BALL_DENSITY;
+            fixture_def.friction = BALL_FRICTION;
+            fixture_def.restitution = BALL_RESTITUTION;
             b2Body.CreateFixture(ball.body, *fixture_def);
 
             array_add(*live_balls, ball);
@@ -232,98 +258,72 @@ simulate :: () {
         }
 
         if event.type == .KEYBOARD {
-            key := event.key_code;
+            if event.key_code == {
+                case #char "A"; player1.left =  event.key_pressed;
+                case #char "D"; player1.right = event.key_pressed;
 
-            if key == .ARROW_LEFT   key_left  = event.key_pressed;
-            if key == .ARROW_RIGHT  key_right = event.key_pressed;
-            if key == .ARROW_DOWN   key_down  = event.key_pressed;
-            if key == .ARROW_UP     key_up    = event.key_pressed;
+                case #char "J"; player2.left =  event.key_pressed;
+                case #char "L"; player2.right = event.key_pressed;
 
-            // if key == .SHIFT        shoot_button_down = cast(bool) event.key_pressed;
+                case #char "R";
+                    start_position := Vector2.{0., 0.}; // pitch center
+                    start_angle := 0.;
+                    start_linear_velocity := Vector2.{.0, -GAME_EXTENTS.y / 1.0};
+
+                    for live_balls {
+                        b2Body.SetLinearVelocity(it.body, start_linear_velocity);
+                        b2Body.SetAngularVelocity(it.body, 0.);
+                        b2Body.SetTransform(it.body, start_position, start_angle);
+                    }
+            }
         }
     }
 
-    // if shoot_button_down {
-    //     maybe_fire_bullets();
-    // }
+    apply_impulse_to_move_player :: (using player : Player) {
+        current_velocity := b2Body.GetLinearVelocity(body);
+        desired_velocity := 0.;
+        if left  desired_velocity = -PADDLE_SPEED;
+        if right desired_velocity =  PADDLE_SPEED;
 
-    // Put direction into a vector, then normalize, so that
-    // you don't move faster diagonally!
-    dx: Vector2;
-
-    // :Physics Use velocity constraints or impluses to move the player?
-    if key_up     dx.y += 1;
-    if key_left   dx.x -= 1;
-    if key_down   dx.y -= 1;
-    if key_right  dx.x += 1;
-
-    if length(dx) > 1 {
-        dx = unit_vector(dx);
+        velocity_change := desired_velocity - current_velocity.x;
+        impulse := b2Body.GetMass(body) * velocity_change;
+        b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
     }
 
-    player1.center += dx * PADDLE_SPEED * current_dt;
+    apply_impulse_to_move_player(player1);
+    apply_impulse_to_move_player(player2);
 
-    x0 := -GAME_EXTENTS.x + player1.extents.x;
-    x1 :=  GAME_EXTENTS.x - player1.extents.x;
-    y0 := -GAME_EXTENTS.y + player1.extents.y;
-    y1 :=  GAME_EXTENTS.y - player1.extents.y;
-
-    Clamp(*player1.center.x, x0, x1);
-    Clamp(*player1.center.y, y0, y1);
-    b2Body.SetTransform(player1.body, player1.center, 0.);
+    // // Apply a small force toward other player to prevent the ball getting stuck in a horizontal bounce
+    for ball : live_balls {
+        if ball.last_hit_player == {
+            case 1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
+            case 2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
+        }
+    }
 
     b2World.Step(world, current_dt, 6, 2);
 
-    // simulate_spawns();
-    // simulate_balls();
-    // simulate_invaders();
-    // simulate_pickups();
-
-    // for live_emitters update_emitter(it, current_dt);
-}
-
-simulate_balls :: () #deprecated "Replaced with Box2D simulation" {
-    // Return true if the ball should be destroyed
-    // @todo :Physics Do something smarter here, and support spin etc
-    simulate_ball :: (ball: *Ball) -> bool {
-        ball.center += ball.velocity * current_dt;
-
-        // Test against borders
-        // @todo @hack there are many bugs in this code
-        if ball.center.x < 0 {
-            ball.center.x = 0;
-            ball.velocity.x *= -1;
-        } else if ball.center.x > GAME_EXTENTS.x - ball.radius {
-            ball.center.x = GAME_EXTENTS.x - ball.radius;
-            ball.velocity.x *= -1;
-        } else if ball.center.y > GAME_EXTENTS.y - ball.radius {
-            // @todo :AddPlayer2 Remove this when we add player 2
-            ball.center.y = GAME_EXTENTS.y - ball.radius;
-            ball.velocity.y *= -1;
-        } else if
-            (ball.center.y - ball.radius <= player1.center.y + player1.extents.y) &&
-            (ball.center.x + ball.radius >= player1.center.x - player1.extents.x) &&
-            (ball.center.x - ball.radius <= player1.center.x + player1.extents.x)
-        {
-            // ball.center.y *= -1;
-            ball.velocity.y *= -1;
-        }
-
-
-        if ball.center.y < 0. return true;
-
-        return false;
+    for ball : live_balls {
+        ball.center = b2Body.GetPosition(ball.body);
+        ball.velocity = b2Body.GetLinearVelocity(ball.body);
     }
 
-    for live_balls {
-        done := simulate_ball(it);
-        if done {
-            // it.emitter.producing = false;
-            remove it;
-            free(it);
+    for ball : live_balls {
+        if ball.center.y > GAME_EXTENTS.y {
+            player1.score += 1;
+            remove ball;
+            free(ball);
+            ball_spawn_countdown = 2.;
+        }
+        if ball.center.y < -GAME_EXTENTS.y {
+            player2.score += 1;
+            remove ball;
+            free(ball);
             ball_spawn_countdown = 2.;
         }
     }
+
+    // for live_emitters update_emitter(it, current_dt);
 }
 
 main :: () {
@@ -336,6 +336,7 @@ main :: () {
     window := create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
     Simp.set_render_target(window);
 
+    init_fonts();
     init_textures();
 
 
@@ -348,7 +349,9 @@ main :: () {
 
     b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.shapeBit);
     // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.jointBit);
-    b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.centerOfMassBit);
+    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.aabbBit);
+    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.pairBit);
+    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.centerOfMassBit);
 
     b2World.SetDebugDraw(world, box2d_debug_draw);
 
@@ -356,51 +359,77 @@ main :: () {
         // extents := Vector2.{GAME_EXTENTS.x, 1.}; //Vector2.{GAME_EXTENTS.x / 8., GAME_EXTENTS.y / 10.};
         extents := .25 * GAME_EXTENTS;
         center := Vector2.{0., -.75 * GAME_EXTENTS.y};
-        angle := 0.; 
+        angle := 0.;
 
         body_def : b2BodyDef;
         b2BodyDef.Constructor(*body_def);
         landscape = b2World.CreateBody(world, *body_def);
 
         // Shape coordinates are local to the body
-        shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*shape);
-        // b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, center, angle);
-        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
-        b2Body.CreateFixture(landscape, *shape, 0.);
+
+        // Central box obstruction
+        // shape : b2PolygonShape;
+        // b2PolygonShape.Constructor(*shape);
+        // b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+        // b2Body.CreateFixture(landscape, *shape, 0.);
 
         edge_shape : b2EdgeShape;
         b2EdgeShape.Constructor(*edge_shape);
 
+        fixture_def : b2FixtureDef;
+        b2FixtureDef.Constructor(*fixture_def);
+        fixture_def.shape = *edge_shape;
+        fixture_def.density = 0.;
+        fixture_def.friction = WALL_FRICTION;
+        fixture_def.restitution = WALL_RESTITUTION;
+
         b2EdgeShape.SetTwoSided(*edge_shape, -GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y});
-        b2Body.CreateFixture(landscape, *edge_shape, 0.);
+        b2Body.CreateFixture(landscape, *fixture_def);
 
         b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
-        b2Body.CreateFixture(landscape, *edge_shape, 0.);
+        b2Body.CreateFixture(landscape, *fixture_def);
+
+        // // @temporary Remove this boundary when player 2 is implemented
+        // b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
+        // b2Body.CreateFixture(landscape, *edge_shape, 0.);
     }
 
-    player1.center = Vector2.{0., -GAME_EXTENTS.y + player1.extents.y};
-    player1.color = Vector4.{.3, .2, 0, 1};
-    {
+    init_player :: (using player : *Player, center_y : float) {
+        center = Vector2.{0., center_y};
+        color = Vector4.{.3, .2, 0, 1};
+
         body_def : b2BodyDef;
         b2BodyDef.Constructor(*body_def);
-        body_def.type = .b2_kinematicBody;
-        body_def.position = player1.center;
-        player1.body = b2World.CreateBody(world, *body_def);
+        body_def.type = .b2_dynamicBody;
+        body_def.position = center;
+        body = b2World.CreateBody(world, *body_def);
+
+        b2Body.SetSleepingAllowed(body, false);
 
         shape : b2PolygonShape;
         b2PolygonShape.Constructor(*shape);
-        b2PolygonShape.SetAsBox(*shape, player1.extents.x, player1.extents.y, .{}, 0.);
+        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, 0.);
 
         fixture_def : b2FixtureDef;
         b2FixtureDef.Constructor(*fixture_def);
         fixture_def.shape = *shape;
-        fixture_def.density = .0;
-        fixture_def.friction = .2;
-        fixture_def.restitution = 1.;
-        b2Body.CreateFixture(player1.body, *fixture_def);
-        // b2Body.CreateFixture(player1.body, *shape, 0.);
+        fixture_def.density = PADDLE_DENSITY;
+        fixture_def.friction = PADDLE_FRICTION;
+        fixture_def.restitution = PADDLE_RESTITUTION;
+        b2Body.CreateFixture(body, *fixture_def);
+
+        // Constrain player movement to within the GAME_EXTENTS
+        joint_def : b2PrismaticJointDef;
+        b2PrismaticJointDef.Constructor(*joint_def);
+        b2PrismaticJointDef.Initialize(*joint_def, landscape, body, -GAME_EXTENTS, .{1., 0.});
+        joint_def.lowerTranslation = -GAME_EXTENTS.x + PADDLE_EXTENTS.x;
+        joint_def.upperTranslation =  GAME_EXTENTS.x - PADDLE_EXTENTS.x;
+        joint_def.enableLimit = true;
+        b2World.CreateJoint(world, *joint_def);
     }
+
+    init_player(*player1, -GAME_EXTENTS.y + player1.extents.y);
+    init_player(*player2,  GAME_EXTENTS.y - player2.extents.y);
 
     while !should_quit_game {
         reset_temporary_storage();
@@ -438,6 +467,12 @@ main :: () {
 
         // Draws the physics/collision geometry
         b2World.DebugDraw(world);
+
+        text := sprint("%:%", player1.score, player2.score);
+        defer free(text);
+        text_w := Simp.prepare_text(font, text);
+        scale := 0.5;
+        Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
 
         Simp.swap_buffers(window);
 
