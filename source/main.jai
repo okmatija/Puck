@@ -2,8 +2,20 @@
 #import "String";
 #import "System";
 #import "Input";
+#import "Sound_Player";
+#import "Wav_File";
+#import "stb_vorbis";
+#import "Thread";
 #import "Window_Creation";
 #import "Math";
+#import "Random";
+#import "File";
+
+#if OS == .WINDOWS {
+#import "Windows";
+}
+
+#load "sound.jai";
 
 #import,dir "ThirdParty/JaiBox2D";
 #load "Box2D_DebugDraw_Simp.jai";
@@ -27,14 +39,14 @@ Texture :: Simp.Texture;
 // - Game playable area is padded left and right by GAME_PADDING
 GAME_EXTENTS :: Vector2.{10.0, 10.0}; // half-width/height in meters
 GAME_PADDING :: 3.0; // Applied to both sides of game
-WINDOW_HEIGHT_INITIAL :: 640;
+WINDOW_HEIGHT_INITIAL :: 1280;
 
 BALL_RADIUS_INITIAL :: 0.2;
 BALL_DENSITY :: 1.0;
 BALL_FRICTION :: 0.3;
 BALL_RESTITUTION :: 1.0;
 
-WALL_FRICTION :: 0.0;
+WALL_FRICTION :: 0.0; // Set to zero because otherwise we get into situations where the ball bounces back and forth horizontally... also it seems better to have the spin only affected by player movement
 WALL_RESTITUTION :: 0.0;
 
 PADDLE_EXTENTS :: Vector2.{2.00, 0.25};
@@ -42,6 +54,10 @@ PADDLE_SPEED :: #run (GAME_EXTENTS.x / 0.35);
 PADDLE_DENSITY :: 1.;
 PADDLE_FRICTION :: .2;
 PADDLE_RESTITUTION :: 1.3;
+
+sound_start_game : *Mixer_Sound_Data;
+sound_collision1 : *Mixer_Sound_Data;
+sound_player : *Sound_Player;
 
 meters_to_pixels :: () -> float {
     return window_height / (2. * GAME_EXTENTS.y);
@@ -130,6 +146,43 @@ init_textures :: () {
     sky_map = make_texture("sky.png");
 }
 
+init_sounds :: (window : *Window_Type) {
+    sound_player = New(Sound_Player);
+    sound_player.update_history = true;
+
+    //
+    // Load sound effects
+    //
+    load_sound :: (basename: string) -> *Mixer_Sound_Data {
+        name := tprint("%/%.wav", data_folder, basename);
+        data := load_audio_file(name);
+
+        if !data {
+            print("Error: Could not load wav file: %\n", name);
+            exit(1); // Hard-exit for now.
+            return null;
+        }
+
+        return data;
+    }
+
+    // You might think, "hey, we can auto-generate this kind of
+    // thing from a list of strings with metaprogramming." We could,
+    // but this wouldn't allow us the freedom to change filenames,
+    // or renaming a variable would break the game in an unintuitive
+    // way because there would be no corresponding sound file.
+    // So we do it the simple / dumb way. A shipping game would have
+    // some kind of asset catalog where you would use handles (or
+    // maybe just the string name) when you play sound effects.
+
+    // nocommit Rename the sounds
+    sound_start_game = load_sound("start_game");
+    sound_collision1 = load_sound("collision1");
+
+    success := init(sound_player, xx window, true, true);
+    // assert(success); // @Incomplete We need an audio pass. Low priority (for now).
+}
+
 // Converts game units (meters) to pixels for rendering
 world_to_screen :: (meters : Vector2) -> Vector2 {
     return (GAME_EXTENTS + Vector2.{GAME_PADDING, 0.} + meters) * meters_to_pixels();
@@ -144,10 +197,18 @@ countdown :: (value_pointer: *float) {
     value_pointer.* = value;
 }
 
+kinetic_energy :: (body : *b2Body) -> float {
+    omega : float = b2Body.GetAngularVelocity(body);
+    velocity : b2Vec2 = b2Body.GetLinearVelocity(body);
+    mass_data : b2MassData;
+    b2Body.GetMassData(body, *mass_data);
+    return .5 * mass_data.mass * dot_product(velocity, velocity) + .5 * mass_data.I * omega * omega;
+}
+
 draw_background :: () {
     Simp.set_shader_for_images(*sky_map);
 
-    sky_color := Vector4.{1,1,1,1};
+        sky_color := Vector4.{1,1,1,1};
 
     Simp.immediate_quad(0, 0, xx window_width, xx window_height, sky_color);
 }
@@ -182,19 +243,6 @@ draw_player_at :: (using player: Player) {
     Simp.immediate_quad(p0, p1, p2, p3, color);
 }
 
-// // @todo write a draw_b2Shape function?
-// draw_b2PolygonShape :: (shape : b2PolygonShape, color : Vector4) {
-//     Simp.set_shader_for_color();
-
-//     triangle_count := shape.m_count - 2;
-//     o := Vector3.{xy=world_to_screen(shape.m_vertices[0]), z=0};
-//     for t : 0..triangle_count-1 {
-//         a := Vector3.{xy=world_to_screen(shape.m_vertices[t + 1]), z=0};
-//         b := Vector3.{xy=world_to_screen(shape.m_vertices[t + 2]), z=0};
-//         Simp.immediate_triangle(o, a, b, color, color, color);
-//     }
-// }
-
 simulate :: () {
     now := get_time();
     delta : float64 = now - last_time;
@@ -204,33 +252,31 @@ simulate :: () {
 
     last_time = now;
 
+    update_sound_player(current_dt);
+
     countdown(*ball_spawn_countdown);
 
     if !live_balls {
         if ball_spawn_countdown <= 0 {
             ball : *Ball = New(Ball);
 
-            start_position := Vector2.{0., 0.}; // pitch center
-            // start_linear_velocity := Vector2.{-GAME_EXTENTS.x / 2.0, -GAME_EXTENTS.y / 3.0};
-            start_linear_velocity := Vector2.{.0, -GAME_EXTENTS.y / 1.0};
-
             body_def : b2BodyDef;
             b2BodyDef.Constructor(*body_def);
             body_def.type = .b2_dynamicBody;
-            body_def.position = start_position;
-            body_def.linearVelocity = start_linear_velocity;
+            body_def.position = Vector2.{0., 0.}; // pitch center
+            body_def.linearVelocity = Vector2.{.0, -GAME_EXTENTS.y / 1.0};
             body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast!
 
             ball.body = b2World.CreateBody(world, *body_def);
             b2Body.SetSleepingAllowed(ball.body, false);
 
-            // shape : b2PolygonShape;
-            // b2PolygonShape.Constructor(*shape);
-            // b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
+             shape : b2PolygonShape;
+             b2PolygonShape.Constructor(*shape);
+             b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
 
-            shape : b2CircleShape;
-            b2CircleShape.Constructor(*shape);
-            shape.m_radius = ball.radius;
+            // shape : b2CircleShape;
+            // b2CircleShape.Constructor(*shape);
+            // shape.m_radius = ball.radius;
 
             fixture_def : b2FixtureDef;
             b2FixtureDef.Constructor(*fixture_def);
@@ -241,6 +287,8 @@ simulate :: () {
             b2Body.CreateFixture(ball.body, *fixture_def);
 
             array_add(*live_balls, ball);
+
+            play_sound(sound_start_game);
         }
     }
 
@@ -259,11 +307,15 @@ simulate :: () {
 
         if event.type == .KEYBOARD {
             if event.key_code == {
-                case #char "A"; player1.left =  event.key_pressed;
-                case #char "D"; player1.right = event.key_pressed;
+                case #char "A";
+                    player1.left =  event.key_pressed;
+                case #char "D";
+                    player1.right = event.key_pressed;
 
-                case #char "J"; player2.left =  event.key_pressed;
-                case #char "L"; player2.right = event.key_pressed;
+                case #char "J";
+                    player2.left =  event.key_pressed;
+                case #char "L";
+                    player2.right = event.key_pressed;
 
                 case #char "R";
                     start_position := Vector2.{0., 0.}; // pitch center
@@ -294,12 +346,12 @@ simulate :: () {
     apply_impulse_to_move_player(player2);
 
     // // Apply a small force toward other player to prevent the ball getting stuck in a horizontal bounce
-    for ball : live_balls {
-        if ball.last_hit_player == {
-            case 1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
-            case 2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
-        }
-    }
+    // for ball : live_balls {
+    //     if ball.last_hit_player == {
+    //         case 1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
+    //         case 2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
+    //     }
+    // }
 
     b2World.Step(world, current_dt, 6, 2);
 
@@ -336,6 +388,7 @@ main :: () {
     window := create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
     Simp.set_render_target(window);
 
+    init_sounds(window);
     init_fonts();
     init_textures();
 
@@ -346,6 +399,61 @@ main :: () {
     box2d_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
     box2d_debug_draw := create_box2d_debug_draw_using_simp(box2d_debug_draw_transform);
     defer free(box2d_debug_draw);
+
+    Contact_Listener :: struct {
+        using #as base : b2ContactListener;
+    }
+
+    contact_listener : *Contact_Listener = New(Contact_Listener);
+    {
+        destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {
+            new_context : Context;
+            push_context new_context {
+                print("b2ContactListener.Destructor\n");
+            }
+        }
+
+        begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
+            new_context : Context;
+            push_context new_context {
+                print("b2ContactListener.BeginContact\n");
+                // Play sound
+                play_sound(sound_collision1, true);
+            }
+        }
+
+        end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
+            new_context : Context;
+            push_context new_context {
+                print("b2ContactListener.EndContact\n");
+                // Do nothing
+            }
+        }
+
+        pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {
+            new_context : Context;
+            push_context new_context {
+                print("b2ContactListener.PreSolve\n");
+                // Do nothing
+            }
+        }
+
+        post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {
+            new_context : Context;
+            push_context new_context {
+                print("b2ContactListener.PostSolve\n");
+                // Do nothing
+            }
+        }
+
+        contact_listener.vtable = New(b2ContactListener_VTable);
+        contact_listener.vtable.Destructor = destructor;
+        contact_listener.vtable.BeginContact = begin_contact;
+        contact_listener.vtable.EndContact = end_contact;
+        contact_listener.vtable.PreSolve = pre_solve;
+        contact_listener.vtable.PostSolve = post_solve;
+    }
+    b2World.SetContactListener(world, contact_listener);
 
     b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.shapeBit);
     // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.jointBit);
@@ -368,10 +476,10 @@ main :: () {
         // Shape coordinates are local to the body
 
         // Central box obstruction
-        // shape : b2PolygonShape;
-        // b2PolygonShape.Constructor(*shape);
-        // b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
-        // b2Body.CreateFixture(landscape, *shape, 0.);
+        shape : b2PolygonShape;
+        b2PolygonShape.Constructor(*shape);
+        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+        b2Body.CreateFixture(landscape, *shape, 0.);
 
         edge_shape : b2EdgeShape;
         b2EdgeShape.Constructor(*edge_shape);
