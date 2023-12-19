@@ -1,6 +1,10 @@
 # General
 
-[ ] Add a basic menu
+[x] Add a basic menu
+[ ] Add an option to toggle the ball type
+[ ] Add an option to toggle the paddle type
+[ ] Add an option to set the level/obstruction type
+[ ] Add an option to set the socket address (aka ip_address:port_number)
 
 # Sound
 

@@ -10,6 +10,7 @@
 #import "Math";
 #import "Random";
 #import "File";
+UI :: #import "GetRect_LeftHanded";
 
 #if OS == .WINDOWS {
 #import "Windows";
@@ -60,6 +61,14 @@ sound_collision1 : *Mixer_Sound_Data;
 sound_collision2 : *Mixer_Sound_Data;
 sound_player : *Sound_Player;
 
+current_theme: s32 = xx UI.Default_Themes.Default;
+my_theme: UI.Overall_Theme;  // This gets filled out by calling the Theme_Proc for current_theme.
+
+INITIAL_PLAYER_NAME :: "Lord Dimwit Flathead";
+INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
+player_name: string;
+socket_address: string;
+
 meters_to_pixels :: () -> float {
     return window_height / (2. * GAME_EXTENTS.y);
 }
@@ -77,10 +86,12 @@ font : *Simp.Dynamic_Font;
 
 should_ignore_input := false;
 should_quit_game :=    false;
+in_game := false;
 
-current_dt: float = 1. / 60.;
-last_time:  float64;
 DT_MAX : float : 0.15;
+current_dt: float = 1. / 60.;
+current_time: float64;
+last_time:  float64;
 
 data_folder: string;
 
@@ -252,16 +263,6 @@ draw_player_at :: (using player: Player) {
 }
 
 simulate :: () {
-    now := get_time();
-    delta : float64 = now - last_time;
-    current_dt = cast(float) delta;
-
-    if current_dt > DT_MAX current_dt = DT_MAX;
-
-    last_time = now;
-
-    update_sound_player(current_dt);
-
     countdown(*ball_spawn_countdown);
 
     if !live_balls {
@@ -278,13 +279,13 @@ simulate :: () {
             ball.body = b2World.CreateBody(world, *body_def);
             b2Body.SetSleepingAllowed(ball.body, false);
 
-            shape : b2PolygonShape;
-            b2PolygonShape.Constructor(*shape);
-            b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
+            // shape : b2PolygonShape;
+            // b2PolygonShape.Constructor(*shape);
+            // b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
 
-            // shape : b2CircleShape;
-            // b2CircleShape.Constructor(*shape);
-            // shape.m_radius = ball.radius;
+            shape : b2CircleShape;
+            b2CircleShape.Constructor(*shape);
+            shape.m_radius = ball.radius;
 
             fixture_def : b2FixtureDef;
             b2FixtureDef.Constructor(*fixture_def);
@@ -296,33 +297,31 @@ simulate :: () {
 
             array_add(*live_balls, ball);
 
-            play_sound(sound_start_game);
+            // play_sound(sound_start_game); // @todo find a nicer sound for this!
         }
     }
 
     for event : events_this_frame {
         if event.type == .QUIT {
-            should_quit_game = true;
+            in_game = false;
+            break;
         }
 
         if event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed {
-            should_quit_game = true;
-        }
-
-        if should_quit_game {
+            in_game = false;
             break;
         }
 
         if event.type == .KEYBOARD {
             if event.key_code == {
-                case #char "A";
+                case #char "J";
                     player1.left =  event.key_pressed;
-                case #char "D";
+                case #char "L";
                     player1.right = event.key_pressed;
 
-                case #char "J";
+                case #char "A";
                     player2.left =  event.key_pressed;
-                case #char "L";
+                case #char "D";
                     player2.right = event.key_pressed;
 
                 case #char "R";
@@ -447,15 +446,32 @@ main :: () {
 
     last_time = get_time();
 
+    #if OS == .WINDOWS {
+        Windows :: #import "Windows";
+        Windows.SetProcessDPIAware();
+
+        // Windows is very bad at thread-switching by default unless you do this. Sad.
+        Windows.timeBeginPeriod(1);
+    }
+
     window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
     Simp.set_render_target(window);
 
+    // We'll draw the cursor manually when we're in the menu
+    // Note: @CompilerBug show_cursor() and hide_cursor() didn't seem to work correctly when called in the game/menu, but its not clear why
     hide_cursor();
 
     init_sounds(window);
     init_fonts();
     init_textures();
+    UI.ui_init();
 
+    // So that we have consistent memory handling after these
+    // strings are user-modified, we heap-allocate them. You don't
+    // have to do this; you just need some consistent way of
+    // storing the strings.
+    player_name = copy_string(INITIAL_PLAYER_NAME);
+    socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
 
     world = New(b2World);
     b2World.Constructor(world, Vector2.{0., 0.}); // nocommit Zero gravity in this game
@@ -654,48 +670,133 @@ main :: () {
     while !should_quit_game {
         reset_temporary_storage();
 
+        current_time = get_time();
+        delta : float64 = current_time - last_time;
+        current_dt = cast(float) delta;
+        if current_dt > DT_MAX current_dt = DT_MAX;
+        last_time = current_time;
+
         Simp.clear_render_target(1, 0, 0, 1);
 
         update_window_events();
 
-        simulate();
+        for get_window_resizes() {
+            Simp.update_window(it.window);
 
-        draw_background();
+            if it.window == window {
+                should_reinit := (it.width != window_width) || (it.height != window_height);
 
-        /*
-        draw_b2PolygonShape(test_ground_shape, Vector4.{0, 0, 1, 1}); // nocommit We should be drawing via the body, to get the fixture, and then get the shape from that
+                window_width  = it.width;
+                window_height = it.height;
 
-        {
-            fixture : *b2Fixture = b2Body.GetFixtureList(test_physics_ball);
-            while fixture != null {
-                shape : *b2Shape = b2Fixture.GetShape(fixture);
-                if shape.m_type == {
-                    case .polygon;
-                        draw_b2PolygonShape(cast(*b2PolygonShape)shape, Vector4.{1, 0, 1, 1});
-                    case;
-                        print("Error\n");
-                }
-                fixture = b2Fixture.GetNext(fixture);
+                if should_reinit init_fonts();  // Resize the font for the new window size.
             }
         }
-        */
 
-        //for live_balls {
-        //    draw_ball_at(it);
-        //}
-        //draw_player_at(player1);
+        update_sound_player(current_dt);
 
-        // Draws the physics/collision geometry
-        b2World.DebugDraw(world);
+        // @Cleanup Just do this when we enter the game/menu
+        if in_game {
+            hide_cursor();
 
-        text := sprint("%:%", player1.score, player2.score);
-        defer free(text);
-        text_w := Simp.prepare_text(font, text);
-        scale := 0.5;
-        Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
+            simulate();
+
+            draw_background();
+
+            //for live_balls {
+            //    draw_ball_at(it);
+            //}
+            //draw_player_at(player1);
+
+            // Draws the physics/collision geometry
+            b2World.DebugDraw(world);
+
+            text := sprint("%:%", player1.score, player2.score);
+            defer free(text);
+            text_w := Simp.prepare_text(font, text);
+            scale := 0.5;
+            Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
+
+        } else {
+            for event : events_this_frame {
+                if event.type == .QUIT {
+                    should_quit_game = true;
+                }
+
+                if event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed {
+                    should_quit_game = true;
+                }
+
+                if should_quit_game {
+                    break;
+                }
+
+                UI.getrect_handle_event(event);
+            }
+
+            draw_background();
+
+            x, y, width, height := get_dimensions(window, true);
+            UI.ui_per_frame_update(window, window_width, window_height, current_time);
+
+            proc := UI.default_theme_procs[current_theme];
+            my_theme = proc();
+            UI.set_default_theme(my_theme);  // Just in case we don't explicitly pass themes sometimes...!
+
+            button_theme := my_theme.button_theme;
+            button_theme.font = font;
+            button_theme.enable_variable_frame_thickness = true;
+            // 'k' is some resolution-adjusting unit of distance. Right now it is
+            // 1/10 of the screen height, so, 108 pixels at 1920x1080.
+            k := window_height * .1;
+            r := UI.get_rect(5.*k, 5.*k - .5*k, 3*k, k);
+
+            button_theme.label_theme.alignment = .Center;
+            pressed := UI.button(r, "Play", *button_theme);
+            if pressed in_game = true;
+
+            //
+            // Text Input stuff:
+            //
+
+            // text_theme := my_theme.text_input_theme;
+            // text_theme.font = font;
+
+            // r = UI.get_rect(5*k, 4*k, 5*k, font.character_height*1.35);
+            // action_a, new_text_a := UI.text_input(r, player_name, *text_theme);
+            // if action_a & .ENTERED  modify_string(*player_name, new_text_a);
+
+            // text_theme.alignment = .Center;
+            // r.y += font.character_height * 1.5;
+            // action_b, new_socket_address := UI.text_input(r, socket_address, *text_theme);
+            // if action_b & .ENTERED  modify_string(*socket_address, new_socket_address);
+
+
+            {
+                Simp.set_shader_for_color(true);
+
+                v : [4]Vector2;
+
+                mouse_x, mouse_y, _ := get_mouse_pointer_position();
+                D :: 20;
+                v[0] = .{cast(float) mouse_x,     window_height - cast(float)mouse_y - D};
+                v[1] = .{cast(float) mouse_x + D, window_height - cast(float)mouse_y - D};
+                v[2] = .{cast(float) mouse_x + D, window_height - cast(float)mouse_y};
+                v[3] = .{cast(float) mouse_x,     window_height - cast(float)mouse_y};
+                color := Vector4.{1,1,1,1};
+
+                Simp.immediate_quad(v[0], v[1], v[2], v[3], color); // nocommit
+            }
+
+        }
 
         Simp.swap_buffers(window);
 
         // memory_visualizer_per_frame_update();
     }
+}
+
+modify_string :: (ps: *string, new_value: string) {
+    free(ps.*);
+    ps.* = copy_string(new_value);
 }
