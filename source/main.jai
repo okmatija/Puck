@@ -57,6 +57,7 @@ PADDLE_RESTITUTION :: 1.3;
 
 sound_start_game : *Mixer_Sound_Data;
 sound_collision1 : *Mixer_Sound_Data;
+sound_collision2 : *Mixer_Sound_Data;
 sound_player : *Sound_Player;
 
 meters_to_pixels :: () -> float {
@@ -176,8 +177,10 @@ init_sounds :: (window : *Window_Type) {
     // maybe just the string name) when you play sound effects.
 
     // nocommit Rename the sounds
-    sound_start_game = load_sound("start_game");
+    // sound_start_game = load_sound("start_game");
+    sound_start_game = load_sound("collision1");
     sound_collision1 = load_sound("collision1");
+    sound_collision2 = load_sound("collision2");
 
     success := init(sound_player, xx window, true, true);
     // assert(success); // @Incomplete We need an audio pass. Low priority (for now).
@@ -265,14 +268,14 @@ simulate :: () {
             body_def.type = .b2_dynamicBody;
             body_def.position = Vector2.{0., 0.}; // pitch center
             body_def.linearVelocity = Vector2.{.0, -GAME_EXTENTS.y / 1.0};
-            body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast!
+            body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast so better make it a bullet
 
             ball.body = b2World.CreateBody(world, *body_def);
             b2Body.SetSleepingAllowed(ball.body, false);
 
-             shape : b2PolygonShape;
-             b2PolygonShape.Constructor(*shape);
-             b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
+            shape : b2PolygonShape;
+            b2PolygonShape.Constructor(*shape);
+            b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
 
             // shape : b2CircleShape;
             // b2CircleShape.Constructor(*shape);
@@ -333,9 +336,26 @@ simulate :: () {
 
     apply_impulse_to_move_player :: (using player : Player) {
         current_velocity := b2Body.GetLinearVelocity(body);
+
+
+#if 0 {
+        // Instantaneous velocity change
         desired_velocity := 0.;
         if left  desired_velocity = -PADDLE_SPEED;
         if right desired_velocity =  PADDLE_SPEED;
+} else {
+        // 5 frame acceleration, 2 frame deceleration
+        accel := (PADDLE_SPEED / (3 * current_dt));
+        decel := (PADDLE_SPEED / (1 * current_dt));
+
+        desired_velocity := 0.;
+        if left       desired_velocity = max(-PADDLE_SPEED, current_velocity.x - current_dt * accel);
+        else if right desired_velocity = min( PADDLE_SPEED, current_velocity.x + current_dt * accel);
+        else {
+            if current_velocity.x < 0      desired_velocity = min(0., current_velocity.x + current_dt * decel);
+            else if current_velocity.x > 0 desired_velocity = max(0., current_velocity.x - current_dt * decel);
+        }
+}
 
         velocity_change := desired_velocity - current_velocity.x;
         impulse := b2Body.GetMass(body) * velocity_change;
@@ -409,23 +429,23 @@ main :: () {
         destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {
             new_context : Context;
             push_context new_context {
-                print("b2ContactListener.Destructor\n");
+                //print("b2ContactListener.Destructor\n");
             }
         }
 
         begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
             new_context : Context;
             push_context new_context {
-                print("b2ContactListener.BeginContact\n");
+                //print("b2ContactListener.BeginContact\n");
                 // Play sound
-                play_sound(sound_collision1, true);
+                play_sound(sound_collision2, true);
             }
         }
 
         end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
             new_context : Context;
             push_context new_context {
-                print("b2ContactListener.EndContact\n");
+                //print("b2ContactListener.EndContact\n");
                 // Do nothing
             }
         }
@@ -433,7 +453,7 @@ main :: () {
         pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {
             new_context : Context;
             push_context new_context {
-                print("b2ContactListener.PreSolve\n");
+                //print("b2ContactListener.PreSolve\n");
                 // Do nothing
             }
         }
@@ -441,7 +461,7 @@ main :: () {
         post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {
             new_context : Context;
             push_context new_context {
-                print("b2ContactListener.PostSolve\n");
+                //print("b2ContactListener.PostSolve\n");
                 // Do nothing
             }
         }
@@ -479,6 +499,7 @@ main :: () {
         shape : b2PolygonShape;
         b2PolygonShape.Constructor(*shape);
         b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+
         b2Body.CreateFixture(landscape, *shape, 0.);
 
         edge_shape : b2EdgeShape;
@@ -496,14 +517,13 @@ main :: () {
 
         b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
         b2Body.CreateFixture(landscape, *fixture_def);
-
-        // // @temporary Remove this boundary when player 2 is implemented
-        // b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
-        // b2Body.CreateFixture(landscape, *edge_shape, 0.);
     }
 
-    init_player :: (using player : *Player, center_y : float) {
-        center = Vector2.{0., center_y};
+    init_player :: (using player : *Player, player_index : int) {
+        center_y := ifx player_index == 1
+            then -GAME_EXTENTS.y + player1.extents.y
+            else  GAME_EXTENTS.y - player2.extents.y;
+        center = Vector2.{0, center_y};
         color = Vector4.{.3, .2, 0, 1};
 
         body_def : b2BodyDef;
@@ -514,9 +534,34 @@ main :: () {
 
         b2Body.SetSleepingAllowed(body, false);
 
-        shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*shape);
-        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, 0.);
+        trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
+            shape : b2PolygonShape; 
+            b2PolygonShape.Constructor(*shape);
+            vertices : [4]b2Vec2 = ---;
+            if player_index == 1 {
+                vertices = .[
+                    .{-extents.x, -extents.y},
+                    .{ extents.x, -extents.y},
+                    .{ extents.x - short_over_long * extents.x, extents.y},
+                    .{-extents.x + short_over_long * extents.x, extents.y}
+                ];
+            } else {
+                vertices = .[
+                    .{-extents.x + short_over_long * extents.x, -extents.y},
+                    .{ extents.x - short_over_long * extents.x, -extents.y},
+                    .{ extents.x, extents.y},
+                    .{-extents.x, extents.y} 
+                ];
+            }
+            b2PolygonShape.Set(*shape, vertices.data, vertices.count);
+            return shape;
+        }
+
+        rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
+            return trapezoid_paddle(extents, 0., player_index);
+        }
+
+        shape := trapezoid_paddle(player.extents, 1./3., player_index);
 
         fixture_def : b2FixtureDef;
         b2FixtureDef.Constructor(*fixture_def);
@@ -536,8 +581,8 @@ main :: () {
         b2World.CreateJoint(world, *joint_def);
     }
 
-    init_player(*player1, -GAME_EXTENTS.y + player1.extents.y);
-    init_player(*player2,  GAME_EXTENTS.y - player2.extents.y);
+    init_player(*player1, 1);
+    init_player(*player2, 2);
 
     while !should_quit_game {
         reset_temporary_storage();

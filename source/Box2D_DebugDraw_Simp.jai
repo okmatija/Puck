@@ -1,5 +1,5 @@
 Box2D_Debug_Draw :: struct {
-    using #as b2draw : b2Draw;
+    using #as base : b2Draw;
 
     // Simp's projection matrix assumes vertices are in [0,0,-1]x[w,h,1],
     // where w and h are are the width and height of the render target.

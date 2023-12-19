@@ -27,6 +27,9 @@ b2_timeToSleep :: 0.5;
 
 b2_nullNode :: -1;
 
+// nocommit Remove these typedefs, or prefix them?
+#scope_file
+
 int8 :: s8;
 int16 :: s16;
 int32 :: s32;
@@ -34,6 +37,8 @@ uint8 :: u8;
 uint16 :: u16;
 uint32 :: u32;
 uintptr_t :: u64;
+
+#scope_export
 
 /// You can define this to inject whatever data you want in b2Body
 b2BodyUserData :: struct {

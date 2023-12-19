@@ -1,5 +1,50 @@
 # General
 
+[ ] Add a basic menu
+
+# Sound
+
+[x] Listen to physics contacts
+[x] Play hit sound
+
+# Rendering
+
+[ ] Color the ball based on how it is spinning e.g., CW/CCW
+[ ] Fake higher framerates by rendering the sweep of the ball
+
+# Networking
+
+[ ] Basic network play
+
+# Gameplay
+
+[ ] Show the short term predicted trajectory of the ball?
+[ ] Gradually add the slope to the paddles as you play the game since otherwise you can slam it really hard and win right away
+[ ] Divide paddles into thirds and have each third have different coeffs of restitution
+[ ] Add accelleration to the paddle
+[ ] Mouse control, and maybe add curve to the ball by applying a force depending on the player motion after the ball was hit by the paddle 
+[ ] Two parallel channels in the level with very high coeff of restitution inside them
+[ ] Powerups as goal posts which change the property of the ball
+[ ] Powerup to change the shape of the paddle
+[ ] Add serving the ball?
+[ ] Add tilt/rotate button
+[ ] Change ball shape e.g., circle, square, elipsoid, hexagon, square with rounded corners?
+[ ] Powerup to make the other player smooth so they can't do spin shots. get powerups by 
+[ ] Add lateral (left/right) boost: if ball bounces during lateral boost add ball spin
+[ ] Add vertical/jump (boost): if ball bounces during jump boost increase ball speed
+[ ] Experiment with no colliding balls?
+
+
+# Weird
+[ ] Add little legs to the paddle, upgrading these makes them bigger chad legs and you can accelerate faster
+
+# Notes
+- To hit the ball really fast you can hit it with the side of the paddle, but to do that you need to risk missing the ball entirely which is neat
+
+# DONE
+
+[x] Add local Player2
+[x] Add text keeping score
 [x] Move player 1 panel left and right
 [x] Switch to MKS units (meters/kilograms/seconds)
 [x] Add ball 
@@ -8,24 +53,6 @@
 [x] What kind of Box2D body to use for the player?
 [x] Tweak the scale of things so the physics works well
 [x] Use b2EdgeShape for play edges
-[ ] Change ball shape e.g., circle, square, elipsoid
-[ ] Add text keeping score
-[ ] Add little legs to the paddle, upgrading these makes them bigger chad legs and you can accelerate faster
-[ ] Add serving the ball?
-[ ] :AddPlayer2
-[ ] Network play
-[ ] Add tilt/rotate button
-[ ] Add lateral (left/right) boost: if ball bounces during lateral boost add ball spin
-[ ] Add vertical/jump (boost): if ball bounces during jump boost increase ball speed
-
-# Rendering
-
-
-# Powerups
-
-[ ] Powerup to make the other player smooth so they can't do spin shots. get powerups by 
-
-
 
 
 
@@ -50,6 +77,7 @@
 Things to report on Jai discord:
 
 [ ] Why does `jai first.jai...` work? adding dots to the end of the file name is allowed? 
+[ ] modules/std_vorbis/windows.jai and JaiBox2D/module.jai both export type declarations like uint8 :: u8, which causes errors, can the compiler realize these are the same? or do we need to make the definition file scoped (what I did in JaiBox2D). Its a bit confusing to be able to access a private via a different declaration
 [ ] Suggest a bounty for adding Box2D bindings/module
 [ ] Suggest a bounty for adding line rendering to Simp
 
@@ -86,3 +114,4 @@ Random notes:
 ---
 
 Make a mobile app for twitch chats, make it flash when you get a new message so when you stream you can use your phone to read the chat and you don't miss things 
+
