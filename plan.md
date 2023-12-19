@@ -26,6 +26,7 @@
 
 # Gameplay
 
+[x] Kinematic obstructions in the play area
 [ ] Show the short term predicted trajectory of the ball?
 [ ] Gradually add the slope to the paddles as you play the game since otherwise you can slam it really hard and win right away
 [ ] Gradually change the ball shape as the game progresses, to become more boxy?
@@ -41,6 +42,7 @@
 
 
 # Weird
+
 [ ] Add little legs to the paddle, upgrading these makes them bigger chad legs and you can accelerate faster
 
 # Notes

@@ -390,7 +390,7 @@ simulate :: () {
                 mouse.x, mouse.y = xx mouse_x, xx mouse_y;
 
                 current_position_x := b2Body.GetPosition(body).x;
-                desired_position_x := screen_to_world(mouse).x; //mouse_x * pixels_to_meters();
+                desired_position_x := screen_to_world(mouse).x;
                 desired_velocity := (desired_position_x - current_position_x) / current_dt;
                 if desired_velocity < 0 {
                     desired_velocity = max(desired_velocity, -PADDLE_SPEED);
@@ -539,13 +539,6 @@ main :: () {
 
         // Shape coordinates are local to the body
 
-        // Central box obstruction
-        shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*shape);
-        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
-
-        b2Body.CreateFixture(landscape, *shape, 0.);
-
         edge_shape : b2EdgeShape;
         b2EdgeShape.Constructor(*edge_shape);
 
@@ -561,6 +554,36 @@ main :: () {
 
         b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
         b2Body.CreateFixture(landscape, *fixture_def);
+    }
+
+    // Central box obstruction
+    {
+        extents := .25 * GAME_EXTENTS;
+        center := Vector2.{0., -.75 * GAME_EXTENTS.y};
+        angle := 0.;
+
+        body_def : b2BodyDef;
+        b2BodyDef.Constructor(*body_def);
+        body_def.type = .b2_kinematicBody;
+        obstruction := b2World.CreateBody(world, *body_def); // nocommit cache this pointer
+
+        shape : b2PolygonShape;
+        b2PolygonShape.Constructor(*shape);
+        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+
+        joint_def : b2PrismaticJointDef;
+        b2PrismaticJointDef.Constructor(*joint_def);
+        b2PrismaticJointDef.Initialize(*joint_def, landscape, obstruction, .{}, .{1., 0.});
+        b2Body.SetAngularVelocity(obstruction, 1.);
+
+        fixture_def : b2FixtureDef;
+        b2FixtureDef.Constructor(*fixture_def);
+        fixture_def.shape = *shape;
+        fixture_def.density = 0.;
+        fixture_def.friction = WALL_FRICTION;
+        fixture_def.restitution = WALL_RESTITUTION;
+        b2Body.CreateFixture(obstruction, *fixture_def);
+
     }
 
     init_player :: (using player : *Player, player_index : int) {
