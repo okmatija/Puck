@@ -39,3 +39,29 @@ printv :: (a : Code, loc := #caller_location) #expand {
 }
     }
 }
+
+show_cursor :: inline ()
+{
+	#if OS == .WINDOWS
+	{
+		win32 :: #import "Windows";
+		win32.ShowCursor (1);
+	}
+	else
+	{
+		// @Todo!
+	}
+}
+
+hide_cursor :: inline ()
+{
+	#if OS == .WINDOWS
+	{
+		win32 :: #import "Windows";
+		win32.ShowCursor (0);
+	}
+	else
+	{
+		// @Todo!
+	}
+}

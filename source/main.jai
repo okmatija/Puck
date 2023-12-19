@@ -69,6 +69,7 @@ pixels_to_meters :: () -> float {
 }
 
 //App :: struct {
+window : Window_Type;
 window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
 font : *Simp.Dynamic_Font;
@@ -189,6 +190,10 @@ init_sounds :: (window : *Window_Type) {
 // Converts game units (meters) to pixels for rendering
 world_to_screen :: (meters : Vector2) -> Vector2 {
     return (GAME_EXTENTS + Vector2.{GAME_PADDING, 0.} + meters) * meters_to_pixels();
+}
+
+screen_to_world :: (pixels : Vector2) -> Vector2 {
+    return pixels * pixels_to_meters() - GAME_EXTENTS - Vector2.{GAME_PADDING, 0.};
 }
 
 countdown :: (value_pointer: *float) {
@@ -334,36 +339,73 @@ simulate :: () {
         }
     }
 
-    apply_impulse_to_move_player :: (using player : Player) {
-        current_velocity := b2Body.GetLinearVelocity(body);
+    apply_impulse_to_move_player :: (using player : Player, player_index : int) {
 
-
-#if 0 {
-        // Instantaneous velocity change
-        desired_velocity := 0.;
-        if left  desired_velocity = -PADDLE_SPEED;
-        if right desired_velocity =  PADDLE_SPEED;
-} else {
-        // 5 frame acceleration, 2 frame deceleration
-        accel := (PADDLE_SPEED / (3 * current_dt));
-        decel := (PADDLE_SPEED / (1 * current_dt));
-
-        desired_velocity := 0.;
-        if left       desired_velocity = max(-PADDLE_SPEED, current_velocity.x - current_dt * accel);
-        else if right desired_velocity = min( PADDLE_SPEED, current_velocity.x + current_dt * accel);
-        else {
-            if current_velocity.x < 0      desired_velocity = min(0., current_velocity.x + current_dt * decel);
-            else if current_velocity.x > 0 desired_velocity = max(0., current_velocity.x - current_dt * decel);
+        Control_Mode :: enum {
+            KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
+            KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
+            MOUSE_SET_POSITION_INF_ACCELERATION;
+            MOUSE_SET_POSITION_NFRAME_ACCELERATION;
         }
-}
 
-        velocity_change := desired_velocity - current_velocity.x;
-        impulse := b2Body.GetMass(body) * velocity_change;
-        b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
+        control_mode : Control_Mode = ifx player_index == 1
+            then .MOUSE_SET_POSITION_INF_ACCELERATION
+            else .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
+        // control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_WITH_ACCELERATION;
+
+        if control_mode == {
+            case .KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
+
+                current_velocity := b2Body.GetLinearVelocity(body);
+                desired_velocity := 0.;
+                if left  desired_velocity = -PADDLE_SPEED;
+                if right desired_velocity =  PADDLE_SPEED;
+
+                velocity_change := desired_velocity - current_velocity.x;
+                impulse := b2Body.GetMass(body) * velocity_change;
+                b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
+
+            case .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
+
+                accel := (PADDLE_SPEED / (3 * current_dt));
+                decel := (PADDLE_SPEED / (1 * current_dt));
+
+                current_velocity := b2Body.GetLinearVelocity(body);
+                desired_velocity := 0.;
+                if left       desired_velocity = max(-PADDLE_SPEED, current_velocity.x - current_dt * accel);
+                else if right desired_velocity = min( PADDLE_SPEED, current_velocity.x + current_dt * accel);
+                else {
+                    if current_velocity.x < 0      desired_velocity = min(0., current_velocity.x + current_dt * decel);
+                    else if current_velocity.x > 0 desired_velocity = max(0., current_velocity.x - current_dt * decel);
+                }
+
+                velocity_change := desired_velocity - current_velocity.x;
+                impulse := b2Body.GetMass(body) * velocity_change;
+                b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
+
+            case .MOUSE_SET_POSITION_INF_ACCELERATION;
+
+                mouse_x, mouse_y, _ := get_mouse_pointer_position();
+                mouse : Vector2;
+                mouse.x, mouse.y = xx mouse_x, xx mouse_y;
+
+                current_position_x := b2Body.GetPosition(body).x;
+                desired_position_x := screen_to_world(mouse).x; //mouse_x * pixels_to_meters();
+                desired_velocity := (desired_position_x - current_position_x) / current_dt;
+                if desired_velocity < 0 {
+                    desired_velocity = max(desired_velocity, -PADDLE_SPEED);
+                } else {
+                    desired_velocity = min(desired_velocity, PADDLE_SPEED);
+                }
+                current_velocity := b2Body.GetLinearVelocity(body);
+                velocity_change := desired_velocity - current_velocity.x;
+                impulse := b2Body.GetMass(body) * velocity_change;
+                b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
+        }
     }
 
-    apply_impulse_to_move_player(player1);
-    apply_impulse_to_move_player(player2);
+    apply_impulse_to_move_player(player1, 1);
+    apply_impulse_to_move_player(player2, 2);
 
     // // Apply a small force toward other player to prevent the ball getting stuck in a horizontal bounce
     // for ball : live_balls {
@@ -405,8 +447,10 @@ main :: () {
 
     last_time = get_time();
 
-    window := create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
+    window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
     Simp.set_render_target(window);
+
+    hide_cursor();
 
     init_sounds(window);
     init_fonts();

@@ -16,18 +16,23 @@
 
 [ ] Basic network play
 
+# Controls
+
+[x] Basic mouse control
+[x] Add acceleration to the paddle
+[ ] Curve to the ball (applying a force) player motion after the ball was hit
+[ ] Add serving the ball?
+[ ] Add tilt/rotate button
+
 # Gameplay
 
 [ ] Show the short term predicted trajectory of the ball?
 [ ] Gradually add the slope to the paddles as you play the game since otherwise you can slam it really hard and win right away
+[ ] Gradually change the ball shape as the game progresses, to become more boxy?
 [ ] Divide paddles into thirds and have each third have different coeffs of restitution
-[ ] Add accelleration to the paddle
-[ ] Mouse control, and maybe add curve to the ball by applying a force depending on the player motion after the ball was hit by the paddle 
 [ ] Two parallel channels in the level with very high coeff of restitution inside them
 [ ] Powerups as goal posts which change the property of the ball
 [ ] Powerup to change the shape of the paddle
-[ ] Add serving the ball?
-[ ] Add tilt/rotate button
 [ ] Change ball shape e.g., circle, square, elipsoid, hexagon, square with rounded corners?
 [ ] Powerup to make the other player smooth so they can't do spin shots. get powerups by 
 [ ] Add lateral (left/right) boost: if ball bounces during lateral boost add ball spin
