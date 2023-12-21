@@ -21,14 +21,25 @@ PADDLE_DENSITY :: 1.;
 PADDLE_FRICTION :: .2;
 PADDLE_RESTITUTION :: 1.3;
 
+INITIAL_PLAYER_NAME :: "Lord Dimwit Flathead";
+INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
+
+player_name: string; // @Cleanup move to Player struct
+socket_address: string;
+
 window : Window_Type;
 window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
 font : *Simp.Dynamic_Font;
 
-should_ignore_input := false;
-should_quit_game :=    false;
-in_game := false;
+Game_State :: enum {
+    GAME_PLAYING; // -> GAME_PAUSED
+    GAME_PAUSED;  // -> MAIN_MENU | GAME_PLAYING
+    MAIN_MENU;    // -> GAME_PLAYING | END_PROGRAM
+    END_PROGRAM;  //
+}
+
+game_state := Game_State.MAIN_MENU;
 
 current_dt: float = 1. / 60.;
 current_time: float64;
@@ -51,6 +62,25 @@ sound_collision2 : *Mixer_Sound_Data;
 
 sound_player : *Sound_Player;
 
+current_ball_shape : s32 = xx Ball_Shape.Circle;
+current_paddle_shape : s32 = xx Paddle_Shape.Prism;
+
+Ball_Shape :: enum {
+    Circle;
+    Square;
+    // Capsule;
+    // Rounded_Box;
+    // Triangle;
+    // Pentagon;
+    // Hexagon;
+}
+
+Paddle_Shape :: enum {
+    Box;     // aka rectangle
+    Prism;   // aka isosceles trapezoid
+    // Dome;    // aka circular segment
+    // Capsule; // aka a half capsule cut along the line connecting circle centers
+};
 
 Ball :: struct {
     center : Vector2;
@@ -112,13 +142,30 @@ main :: () {
     player_name = copy_string(INITIAL_PLAYER_NAME);
     socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
 
+    contact_listener : b2ContactListener;
+    begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
+        new_context : Context;
+        push_context new_context {
+            play_sound(sound_collision2, true);
+        }
+    }
+    end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
+    pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {}
+    post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
+    destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
+    contact_listener.vtable = New(b2ContactListener_VTable); // @Leak
+    contact_listener.vtable.BeginContact = begin_contact;
+    contact_listener.vtable.EndContact = end_contact;
+    contact_listener.vtable.PreSolve = pre_solve;
+    contact_listener.vtable.PostSolve = post_solve;
+    contact_listener.vtable.Destructor = destructor;
 
-    init_world();
+    init_world(*contact_listener);
     init_level();
     init_player(*player1, 1);
     init_player(*player2, 2);
 
-    while !should_quit_game {
+    while game_state != .END_PROGRAM {
         reset_temporary_storage();
 
         current_time = get_time();
@@ -147,7 +194,8 @@ main :: () {
         update_sound_player(current_dt);
 
         // @Cleanup Just do this when we enter the game/menu
-        if in_game {
+        if #complete game_state == {
+        case .GAME_PLAYING;
 
             hide_cursor();
 
@@ -169,9 +217,14 @@ main :: () {
             scale := 0.5;
             Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
 
-        } else {
+        case .MAIN_MENU; #through;
+        case .GAME_PAUSED;
 
             menu();
+
+        case .END_PROGRAM;
+
+            // Do nothing, we'll quit next frame
 
         }
 
@@ -334,7 +387,7 @@ simulate :: () {
     countdown(*ball_spawn_countdown);
 
     if !live_balls {
-        if ball_spawn_countdown <= 0 {
+        for 0..10 if ball_spawn_countdown <= 0 {
             ball : *Ball = New(Ball);
 
             body_def : b2BodyDef;
@@ -373,13 +426,9 @@ simulate :: () {
     }
 
     for event : events_this_frame {
-        if event.type == .QUIT {
-            in_game = false;
-            break;
-        }
-
-        if event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed {
-            in_game = false;
+        if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
+            // @Cleanup Is this correct? What even is the QUIT event?
+            game_state = .GAME_PAUSED;
             break;
         }
 
@@ -510,7 +559,7 @@ simulate :: () {
     // for live_emitters update_emitter(it, current_dt);
 }
 
-init_world :: () {
+init_world :: (contact_listener : *b2ContactListener) {
     world = New(b2World);
     b2World.Constructor(world, Vector2.{0., 0.});
 
@@ -522,27 +571,6 @@ init_world :: () {
     //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.pairBit);
     //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.centerOfMassBit);
     b2World.SetDebugDraw(world, world_debug_draw);
-
-    contact_listener := New(b2ContactListener);
-
-    begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
-        new_context : Context;
-        push_context new_context {
-            play_sound(sound_collision2, true);
-        }
-    }
-
-    end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
-    pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {}
-    post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
-    destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
-
-    contact_listener.vtable = New(b2ContactListener_VTable);
-    contact_listener.vtable.BeginContact = begin_contact;
-    contact_listener.vtable.EndContact = end_contact;
-    contact_listener.vtable.PreSolve = pre_solve;
-    contact_listener.vtable.PostSolve = post_solve;
-    contact_listener.vtable.Destructor = destructor;
 
     b2World.SetContactListener(world, contact_listener);
 }
@@ -615,6 +643,11 @@ init_level :: () {
 }
 
 init_player :: (using player : *Player, player_index : int) {
+
+    if player.body {
+        free(player.body);
+    }
+
     center_y := ifx player_index == 1
         then -GAME_EXTENTS.y + player1.extents.y
         else  GAME_EXTENTS.y - player2.extents.y;
@@ -629,9 +662,9 @@ init_player :: (using player : *Player, player_index : int) {
 
     b2Body.SetSleepingAllowed(body, false);
 
-    trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> *b2PolygonShape {
-        shape := New(b2PolygonShape); 
-        b2PolygonShape.Constructor(shape);
+    trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
+        shape : b2PolygonShape; 
+        b2PolygonShape.Constructor(*shape);
         vertices : [4]b2Vec2 = ---;
         if player_index == 1 {
             vertices = .[
@@ -648,20 +681,23 @@ init_player :: (using player : *Player, player_index : int) {
                 .{-extents.x, extents.y} 
             ];
         }
-        b2PolygonShape.Set(shape, vertices.data, vertices.count);
+        b2PolygonShape.Set(*shape, vertices.data, vertices.count);
         return shape;
     }
 
-    rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> *b2PolygonShape {
+    rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
         return trapezoid_paddle(extents, 0., player_index);
+    }
+
+    polygon_shape : b2PolygonShape;
+    if #complete cast(Paddle_Shape)current_paddle_shape == {
+        case .Box;   polygon_shape = rectangle_paddle(player.extents, 1./3., player_index);
+        case .Prism; polygon_shape = trapezoid_paddle(player.extents, 1./3., player_index);
     }
 
     fixture_def : b2FixtureDef;
     b2FixtureDef.Constructor(*fixture_def);
-    if #complete cast(Paddle_Shape)current_paddle_shape == {
-        case .Box;   fixture_def.shape = rectangle_paddle(player.extents, 1./3., player_index);
-        case .Prism; fixture_def.shape = trapezoid_paddle(player.extents, 1./3., player_index);
-    }
+    fixture_def.shape = *polygon_shape;
     fixture_def.density = PADDLE_DENSITY;
     fixture_def.friction = PADDLE_FRICTION;
     fixture_def.restitution = PADDLE_RESTITUTION;

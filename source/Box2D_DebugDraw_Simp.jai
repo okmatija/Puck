@@ -13,6 +13,7 @@ create_box2d_debug_draw_using_simp :: (transform: (Vector2)->Vector3) -> *b2Draw
     // @cleanup Is this the only/best way to ensure this state is passed into new pushed contexts?
     simp = context.simp;
 
+    // @Incomplete Should we be heap allocating this Box2D struct?
     draw := New(Box2D_Debug_Draw);
     b2Draw.Constructor(draw);
 
