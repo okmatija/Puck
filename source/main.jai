@@ -1,39 +1,3 @@
-#import "Basic";
-#import "String";
-#import "System";
-#import "Input";
-#import "Sound_Player";
-#import "Wav_File";
-#import "stb_vorbis";
-#import "Thread";
-#import "Window_Creation";
-#import "Math";
-#import "Random";
-#import "File";
-UI :: #import "GetRect_LeftHanded";
-
-#if OS == .WINDOWS {
-#import "Windows";
-}
-
-#load "sound.jai";
-
-#import,dir "ThirdParty/JaiBox2D";
-#load "Box2D_DebugDraw_Simp.jai";
-
-// @Cleanup This is b2Mul in Box2D, it is not output by JaiBox2D/generate.jai, maybe because older versions of Bindings_Generator didn't do that
-apply_transform :: (transform: b2Transform, point: Vector2) -> Vector2 {
-    result : Vector2 = ---;
-    result.x = (transform.q.c * point.x - transform.q.s * point.y) + transform.p.x;
-    result.y = (transform.q.s * point.x + transform.q.c * point.y) + transform.p.y;
-    return result;
-}
-
-#load "carpet.jai";
-
-Simp :: #import "Simp";
-Texture :: Simp.Texture;
-
 // - Game coordinates are in meters
 // - Game origin, (0,0) is at the center of the window
 // - Game occupies a central vertical strip of the window, P1 at the bottom, P2 at the top
@@ -41,6 +5,7 @@ Texture :: Simp.Texture;
 GAME_EXTENTS :: Vector2.{10.0, 10.0}; // half-width/height in meters
 GAME_PADDING :: 3.0; // Applied to both sides of game
 WINDOW_HEIGHT_INITIAL :: 1280;
+DT_MAX : float : 0.15;
 
 BALL_RADIUS_INITIAL :: 0.2;
 BALL_DENSITY :: 1.0;
@@ -56,44 +21,35 @@ PADDLE_DENSITY :: 1.;
 PADDLE_FRICTION :: .2;
 PADDLE_RESTITUTION :: 1.3;
 
-sound_start_game : *Mixer_Sound_Data;
-sound_collision1 : *Mixer_Sound_Data;
-sound_collision2 : *Mixer_Sound_Data;
-sound_player : *Sound_Player;
-
-current_theme: s32 = xx UI.Default_Themes.Default;
-my_theme: UI.Overall_Theme;  // This gets filled out by calling the Theme_Proc for current_theme.
-
-INITIAL_PLAYER_NAME :: "Lord Dimwit Flathead";
-INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
-player_name: string;
-socket_address: string;
-
-meters_to_pixels :: () -> float {
-    return window_height / (2. * GAME_EXTENTS.y);
-}
-
-pixels_to_meters :: () -> float {
-    return 1. / meters_to_pixels();
-}
-
-//App :: struct {
 window : Window_Type;
 window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
 font : *Simp.Dynamic_Font;
-//}
 
 should_ignore_input := false;
 should_quit_game :=    false;
 in_game := false;
 
-DT_MAX : float : 0.15;
 current_dt: float = 1. / 60.;
 current_time: float64;
 last_time:  float64;
 
+player1 : Player;
+player2 : Player;
+live_balls : [..] *Ball;
+ball_spawn_countdown := 0.;
+
+world : *b2World;
+world_debug_draw : *b2Draw;
+landscape : *b2Body;
+
 data_folder: string;
+sky_map : Texture;
+sound_start_game : *Mixer_Sound_Data;
+sound_collision1 : *Mixer_Sound_Data;
+sound_collision2 : *Mixer_Sound_Data;
+
+sound_player : *Sound_Player;
 
 
 Ball :: struct {
@@ -109,9 +65,6 @@ Ball :: struct {
     body : *b2Body;
 }
 
-live_balls : [..] *Ball;
-ball_spawn_countdown := 0.;
-
 Player :: struct {
     center : Vector2;
     extents : Vector2 = PADDLE_EXTENTS;
@@ -125,13 +78,112 @@ Player :: struct {
     body : *b2Body;
 }
 
-player1 : Player;
-player2 : Player;
+main :: () {
+    path := path_strip_filename(get_path_of_running_executable());
+    data_folder = join(path, "data");
+    print("data_folder is '%'\n", data_folder);
 
-sky_map : Texture;
+    last_time = get_time();
 
-world : *b2World;
-landscape : *b2Body;
+    #if OS == .WINDOWS {
+        Windows :: #import "Windows";
+        Windows.SetProcessDPIAware();
+
+        // Windows is very bad at thread-switching by default unless you do this. Sad.
+        Windows.timeBeginPeriod(1);
+    }
+
+    window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
+    Simp.set_render_target(window);
+
+    // We'll draw the cursor manually when we're in the menu
+    // Note: @CompilerBug show_cursor() and hide_cursor() didn't seem to work correctly when called in the game/menu, but its not clear why
+    hide_cursor();
+
+    init_sounds(window);
+    init_fonts();
+    init_textures();
+    UI.ui_init();
+
+    // So that we have consistent memory handling after these
+    // strings are user-modified, we heap-allocate them. You don't
+    // have to do this; you just need some consistent way of
+    // storing the strings.
+    player_name = copy_string(INITIAL_PLAYER_NAME);
+    socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
+
+
+    init_world();
+    init_level();
+    init_player(*player1, 1);
+    init_player(*player2, 2);
+
+    while !should_quit_game {
+        reset_temporary_storage();
+
+        current_time = get_time();
+        delta : float64 = current_time - last_time;
+        current_dt = cast(float) delta;
+        if current_dt > DT_MAX current_dt = DT_MAX;
+        last_time = current_time;
+
+        Simp.clear_render_target(1, 0, 0, 1);
+
+        update_window_events();
+
+        for get_window_resizes() {
+            Simp.update_window(it.window);
+
+            if it.window == window {
+                should_reinit := (it.width != window_width) || (it.height != window_height);
+
+                window_width  = it.width;
+                window_height = it.height;
+
+                if should_reinit init_fonts();  // Resize the font for the new window size.
+            }
+        }
+
+        update_sound_player(current_dt);
+
+        // @Cleanup Just do this when we enter the game/menu
+        if in_game {
+
+            hide_cursor();
+
+            simulate();
+
+            draw_background();
+
+            //for live_balls {
+            //    draw_ball_at(it);
+            //}
+            //draw_player_at(player1);
+
+            // Draws the physics/collision geometry
+            b2World.DebugDraw(world);
+
+            text := sprint("%:%", player1.score, player2.score);
+            defer free(text);
+            text_w := Simp.prepare_text(font, text);
+            scale := 0.5;
+            Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
+
+        } else {
+
+            menu();
+
+        }
+
+        Simp.swap_buffers(window);
+
+        // memory_visualizer_per_frame_update();
+    }
+
+    free(world_debug_draw);
+}
+
+
 
 init_fonts :: () {
     // So that we can load our font, set to path of running executable.
@@ -196,6 +248,22 @@ init_sounds :: (window : *Window_Type) {
 
     success := init(sound_player, xx window, true, true);
     // assert(success); // @Incomplete We need an audio pass. Low priority (for now).
+}
+
+// @Cleanup This is b2Mul in Box2D, it is not output by JaiBox2D/generate.jai, maybe because older versions of Bindings_Generator didn't do that
+apply_transform :: (transform: b2Transform, point: Vector2) -> Vector2 {
+    result : Vector2 = ---;
+    result.x = (transform.q.c * point.x - transform.q.s * point.y) + transform.p.x;
+    result.y = (transform.q.s * point.x + transform.q.c * point.y) + transform.p.y;
+    return result;
+}
+
+meters_to_pixels :: () -> float {
+    return window_height / (2. * GAME_EXTENTS.y);
+}
+
+pixels_to_meters :: () -> float {
+    return 1. / meters_to_pixels();
 }
 
 // Converts game units (meters) to pixels for rendering
@@ -273,23 +341,26 @@ simulate :: () {
             b2BodyDef.Constructor(*body_def);
             body_def.type = .b2_dynamicBody;
             body_def.position = Vector2.{0., 0.}; // pitch center
-            body_def.linearVelocity = Vector2.{.0, -GAME_EXTENTS.y / 1.0};
+            body_def.linearVelocity = Vector2.{.0, -GAME_EXTENTS.y / .5};
             body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast so better make it a bullet
 
             ball.body = b2World.CreateBody(world, *body_def);
             b2Body.SetSleepingAllowed(ball.body, false);
 
-            // shape : b2PolygonShape;
-            // b2PolygonShape.Constructor(*shape);
-            // b2PolygonShape.SetAsBox(*shape, ball.radius, ball.radius, .{0., 0.}, 0);
+            circle_shape : b2CircleShape;
+            b2CircleShape.Constructor(*circle_shape);
+            circle_shape.m_radius = ball.radius;
 
-            shape : b2CircleShape;
-            b2CircleShape.Constructor(*shape);
-            shape.m_radius = ball.radius;
+            square_shape : b2PolygonShape;
+            b2PolygonShape.Constructor(*square_shape);
+            b2PolygonShape.SetAsBox(*square_shape, ball.radius, ball.radius, .{0., 0.}, 0);
 
             fixture_def : b2FixtureDef;
             b2FixtureDef.Constructor(*fixture_def);
-            fixture_def.shape = *shape;
+            if cast(Ball_Shape)current_ball_shape == {
+                case .Circle; fixture_def.shape = *circle_shape;
+                case .Square; fixture_def.shape = *square_shape;
+            }
             fixture_def.density = BALL_DENSITY;
             fixture_def.friction = BALL_FRICTION;
             fixture_def.restitution = BALL_RESTITUTION;
@@ -348,7 +419,7 @@ simulate :: () {
         }
 
         control_mode : Control_Mode = ifx player_index == 1
-            then .MOUSE_SET_POSITION_INF_ACCELERATION
+            then .MOUSE_SET_POSITION_NFRAME_ACCELERATION
             else .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
         // control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_WITH_ACCELERATION;
 
@@ -382,7 +453,7 @@ simulate :: () {
                 impulse := b2Body.GetMass(body) * velocity_change;
                 b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
 
-            case .MOUSE_SET_POSITION_INF_ACCELERATION;
+            case .MOUSE_SET_POSITION_NFRAME_ACCELERATION;
 
                 mouse_x, mouse_y, _ := get_mouse_pointer_position();
                 mouse : Vector2;
@@ -439,110 +510,44 @@ simulate :: () {
     // for live_emitters update_emitter(it, current_dt);
 }
 
-main :: () {
-    path := path_strip_filename(get_path_of_running_executable());
-    data_folder = join(path, "data");
-    print("data_folder is '%'\n", data_folder);
-
-    last_time = get_time();
-
-    #if OS == .WINDOWS {
-        Windows :: #import "Windows";
-        Windows.SetProcessDPIAware();
-
-        // Windows is very bad at thread-switching by default unless you do this. Sad.
-        Windows.timeBeginPeriod(1);
-    }
-
-    window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
-    Simp.set_render_target(window);
-
-    // We'll draw the cursor manually when we're in the menu
-    // Note: @CompilerBug show_cursor() and hide_cursor() didn't seem to work correctly when called in the game/menu, but its not clear why
-    hide_cursor();
-
-    init_sounds(window);
-    init_fonts();
-    init_textures();
-    UI.ui_init();
-
-    // So that we have consistent memory handling after these
-    // strings are user-modified, we heap-allocate them. You don't
-    // have to do this; you just need some consistent way of
-    // storing the strings.
-    player_name = copy_string(INITIAL_PLAYER_NAME);
-    socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
-
+init_world :: () {
     world = New(b2World);
-    b2World.Constructor(world, Vector2.{0., 0.}); // nocommit Zero gravity in this game
+    b2World.Constructor(world, Vector2.{0., 0.});
 
-    box2d_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
-    box2d_debug_draw := create_box2d_debug_draw_using_simp(box2d_debug_draw_transform);
-    defer free(box2d_debug_draw);
+    world_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
+    world_debug_draw = create_box2d_debug_draw_using_simp(world_debug_draw_transform);
+    b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.shapeBit);
+    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.jointBit);
+    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.aabbBit);
+    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.pairBit);
+    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.centerOfMassBit);
+    b2World.SetDebugDraw(world, world_debug_draw);
 
-    Contact_Listener :: struct {
-        using #as base : b2ContactListener;
+    contact_listener := New(b2ContactListener);
+
+    begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
+        new_context : Context;
+        push_context new_context {
+            play_sound(sound_collision2, true);
+        }
     }
 
-    contact_listener : *Contact_Listener = New(Contact_Listener);
-    {
-        destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {
-            new_context : Context;
-            push_context new_context {
-                //print("b2ContactListener.Destructor\n");
-            }
-        }
+    end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
+    pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {}
+    post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
+    destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
 
-        begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
-            new_context : Context;
-            push_context new_context {
-                //print("b2ContactListener.BeginContact\n");
-                // Play sound
-                play_sound(sound_collision2, true);
-            }
-        }
+    contact_listener.vtable = New(b2ContactListener_VTable);
+    contact_listener.vtable.BeginContact = begin_contact;
+    contact_listener.vtable.EndContact = end_contact;
+    contact_listener.vtable.PreSolve = pre_solve;
+    contact_listener.vtable.PostSolve = post_solve;
+    contact_listener.vtable.Destructor = destructor;
 
-        end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
-            new_context : Context;
-            push_context new_context {
-                //print("b2ContactListener.EndContact\n");
-                // Do nothing
-            }
-        }
-
-        pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {
-            new_context : Context;
-            push_context new_context {
-                //print("b2ContactListener.PreSolve\n");
-                // Do nothing
-            }
-        }
-
-        post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {
-            new_context : Context;
-            push_context new_context {
-                //print("b2ContactListener.PostSolve\n");
-                // Do nothing
-            }
-        }
-
-        contact_listener.vtable = New(b2ContactListener_VTable);
-        contact_listener.vtable.Destructor = destructor;
-        contact_listener.vtable.BeginContact = begin_contact;
-        contact_listener.vtable.EndContact = end_contact;
-        contact_listener.vtable.PreSolve = pre_solve;
-        contact_listener.vtable.PostSolve = post_solve;
-    }
     b2World.SetContactListener(world, contact_listener);
+}
 
-    b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.shapeBit);
-    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.jointBit);
-    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.aabbBit);
-    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.pairBit);
-    // b2Draw.AppendFlags(box2d_debug_draw, xx b2Draw.e_2.centerOfMassBit);
-
-    b2World.SetDebugDraw(world, box2d_debug_draw);
-
+init_level :: () {
     { // Create landscape aka play area
         // extents := Vector2.{GAME_EXTENTS.x, 1.}; //Vector2.{GAME_EXTENTS.x / 8., GAME_EXTENTS.y / 10.};
         extents := .25 * GAME_EXTENTS;
@@ -565,10 +570,16 @@ main :: () {
         fixture_def.friction = WALL_FRICTION;
         fixture_def.restitution = WALL_RESTITUTION;
 
+        // Left edge
         b2EdgeShape.SetTwoSided(*edge_shape, -GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y});
         b2Body.CreateFixture(landscape, *fixture_def);
 
+        // Right edge
         b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
+        b2Body.CreateFixture(landscape, *fixture_def);
+
+        // Top edge
+        b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
         b2Body.CreateFixture(landscape, *fixture_def);
     }
 
@@ -601,202 +612,99 @@ main :: () {
         b2Body.CreateFixture(obstruction, *fixture_def);
 
     }
+}
 
-    init_player :: (using player : *Player, player_index : int) {
-        center_y := ifx player_index == 1
-            then -GAME_EXTENTS.y + player1.extents.y
-            else  GAME_EXTENTS.y - player2.extents.y;
-        center = Vector2.{0, center_y};
-        color = Vector4.{.3, .2, 0, 1};
+init_player :: (using player : *Player, player_index : int) {
+    center_y := ifx player_index == 1
+        then -GAME_EXTENTS.y + player1.extents.y
+        else  GAME_EXTENTS.y - player2.extents.y;
+    center = Vector2.{0, center_y};
+    color = Vector4.{.3, .2, 0, 1};
 
-        body_def : b2BodyDef;
-        b2BodyDef.Constructor(*body_def);
-        body_def.type = .b2_dynamicBody;
-        body_def.position = center;
-        body = b2World.CreateBody(world, *body_def);
+    body_def : b2BodyDef;
+    b2BodyDef.Constructor(*body_def);
+    body_def.type = .b2_dynamicBody;
+    body_def.position = center;
+    body = b2World.CreateBody(world, *body_def);
 
-        b2Body.SetSleepingAllowed(body, false);
+    b2Body.SetSleepingAllowed(body, false);
 
-        trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
-            shape : b2PolygonShape; 
-            b2PolygonShape.Constructor(*shape);
-            vertices : [4]b2Vec2 = ---;
-            if player_index == 1 {
-                vertices = .[
-                    .{-extents.x, -extents.y},
-                    .{ extents.x, -extents.y},
-                    .{ extents.x - short_over_long * extents.x, extents.y},
-                    .{-extents.x + short_over_long * extents.x, extents.y}
-                ];
-            } else {
-                vertices = .[
-                    .{-extents.x + short_over_long * extents.x, -extents.y},
-                    .{ extents.x - short_over_long * extents.x, -extents.y},
-                    .{ extents.x, extents.y},
-                    .{-extents.x, extents.y} 
-                ];
-            }
-            b2PolygonShape.Set(*shape, vertices.data, vertices.count);
-            return shape;
-        }
-
-        rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
-            return trapezoid_paddle(extents, 0., player_index);
-        }
-
-        shape := trapezoid_paddle(player.extents, 1./3., player_index);
-
-        fixture_def : b2FixtureDef;
-        b2FixtureDef.Constructor(*fixture_def);
-        fixture_def.shape = *shape;
-        fixture_def.density = PADDLE_DENSITY;
-        fixture_def.friction = PADDLE_FRICTION;
-        fixture_def.restitution = PADDLE_RESTITUTION;
-        b2Body.CreateFixture(body, *fixture_def);
-
-        // Constrain player movement to within the GAME_EXTENTS
-        joint_def : b2PrismaticJointDef;
-        b2PrismaticJointDef.Constructor(*joint_def);
-        b2PrismaticJointDef.Initialize(*joint_def, landscape, body, -GAME_EXTENTS, .{1., 0.});
-        joint_def.lowerTranslation = -GAME_EXTENTS.x + PADDLE_EXTENTS.x;
-        joint_def.upperTranslation =  GAME_EXTENTS.x - PADDLE_EXTENTS.x;
-        joint_def.enableLimit = true;
-        b2World.CreateJoint(world, *joint_def);
-    }
-
-    init_player(*player1, 1);
-    init_player(*player2, 2);
-
-    while !should_quit_game {
-        reset_temporary_storage();
-
-        current_time = get_time();
-        delta : float64 = current_time - last_time;
-        current_dt = cast(float) delta;
-        if current_dt > DT_MAX current_dt = DT_MAX;
-        last_time = current_time;
-
-        Simp.clear_render_target(1, 0, 0, 1);
-
-        update_window_events();
-
-        for get_window_resizes() {
-            Simp.update_window(it.window);
-
-            if it.window == window {
-                should_reinit := (it.width != window_width) || (it.height != window_height);
-
-                window_width  = it.width;
-                window_height = it.height;
-
-                if should_reinit init_fonts();  // Resize the font for the new window size.
-            }
-        }
-
-        update_sound_player(current_dt);
-
-        // @Cleanup Just do this when we enter the game/menu
-        if in_game {
-            hide_cursor();
-
-            simulate();
-
-            draw_background();
-
-            //for live_balls {
-            //    draw_ball_at(it);
-            //}
-            //draw_player_at(player1);
-
-            // Draws the physics/collision geometry
-            b2World.DebugDraw(world);
-
-            text := sprint("%:%", player1.score, player2.score);
-            defer free(text);
-            text_w := Simp.prepare_text(font, text);
-            scale := 0.5;
-            Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
-
+    trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> *b2PolygonShape {
+        shape := New(b2PolygonShape); 
+        b2PolygonShape.Constructor(shape);
+        vertices : [4]b2Vec2 = ---;
+        if player_index == 1 {
+            vertices = .[
+                .{-extents.x, -extents.y},
+                .{ extents.x, -extents.y},
+                .{ extents.x - short_over_long * extents.x, extents.y},
+                .{-extents.x + short_over_long * extents.x, extents.y}
+            ];
         } else {
-            for event : events_this_frame {
-                if event.type == .QUIT {
-                    should_quit_game = true;
-                }
-
-                if event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed {
-                    should_quit_game = true;
-                }
-
-                if should_quit_game {
-                    break;
-                }
-
-                UI.getrect_handle_event(event);
-            }
-
-            draw_background();
-
-            x, y, width, height := get_dimensions(window, true);
-            UI.ui_per_frame_update(window, window_width, window_height, current_time);
-
-            proc := UI.default_theme_procs[current_theme];
-            my_theme = proc();
-            UI.set_default_theme(my_theme);  // Just in case we don't explicitly pass themes sometimes...!
-
-            button_theme := my_theme.button_theme;
-            button_theme.font = font;
-            button_theme.enable_variable_frame_thickness = true;
-            // 'k' is some resolution-adjusting unit of distance. Right now it is
-            // 1/10 of the screen height, so, 108 pixels at 1920x1080.
-            k := window_height * .1;
-            r := UI.get_rect(5.*k, 5.*k - .5*k, 3*k, k);
-
-            button_theme.label_theme.alignment = .Center;
-            pressed := UI.button(r, "Play", *button_theme);
-            if pressed in_game = true;
-
-            //
-            // Text Input stuff:
-            //
-
-            // text_theme := my_theme.text_input_theme;
-            // text_theme.font = font;
-
-            // r = UI.get_rect(5*k, 4*k, 5*k, font.character_height*1.35);
-            // action_a, new_text_a := UI.text_input(r, player_name, *text_theme);
-            // if action_a & .ENTERED  modify_string(*player_name, new_text_a);
-
-            // text_theme.alignment = .Center;
-            // r.y += font.character_height * 1.5;
-            // action_b, new_socket_address := UI.text_input(r, socket_address, *text_theme);
-            // if action_b & .ENTERED  modify_string(*socket_address, new_socket_address);
-
-
-            {
-                Simp.set_shader_for_color(true);
-
-                v : [4]Vector2;
-
-                mouse_x, mouse_y, _ := get_mouse_pointer_position();
-                D :: 20;
-                v[0] = .{cast(float) mouse_x,     window_height - cast(float)mouse_y - D};
-                v[1] = .{cast(float) mouse_x + D, window_height - cast(float)mouse_y - D};
-                v[2] = .{cast(float) mouse_x + D, window_height - cast(float)mouse_y};
-                v[3] = .{cast(float) mouse_x,     window_height - cast(float)mouse_y};
-                color := Vector4.{1,1,1,1};
-
-                Simp.immediate_quad(v[0], v[1], v[2], v[3], color); // nocommit
-            }
-
+            vertices = .[
+                .{-extents.x + short_over_long * extents.x, -extents.y},
+                .{ extents.x - short_over_long * extents.x, -extents.y},
+                .{ extents.x, extents.y},
+                .{-extents.x, extents.y} 
+            ];
         }
-
-        Simp.swap_buffers(window);
-
-        // memory_visualizer_per_frame_update();
+        b2PolygonShape.Set(shape, vertices.data, vertices.count);
+        return shape;
     }
+
+    rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> *b2PolygonShape {
+        return trapezoid_paddle(extents, 0., player_index);
+    }
+
+    fixture_def : b2FixtureDef;
+    b2FixtureDef.Constructor(*fixture_def);
+    if #complete cast(Paddle_Shape)current_paddle_shape == {
+        case .Box;   fixture_def.shape = rectangle_paddle(player.extents, 1./3., player_index);
+        case .Prism; fixture_def.shape = trapezoid_paddle(player.extents, 1./3., player_index);
+    }
+    fixture_def.density = PADDLE_DENSITY;
+    fixture_def.friction = PADDLE_FRICTION;
+    fixture_def.restitution = PADDLE_RESTITUTION;
+    b2Body.CreateFixture(body, *fixture_def);
+
+    // Constrain player movement to within the GAME_EXTENTS
+    joint_def : b2PrismaticJointDef;
+    b2PrismaticJointDef.Constructor(*joint_def);
+    b2PrismaticJointDef.Initialize(*joint_def, landscape, body, -GAME_EXTENTS, .{1., 0.});
+    joint_def.lowerTranslation = -GAME_EXTENTS.x + PADDLE_EXTENTS.x;
+    joint_def.upperTranslation =  GAME_EXTENTS.x - PADDLE_EXTENTS.x;
+    joint_def.enableLimit = true;
+    b2World.CreateJoint(world, *joint_def);
 }
 
 modify_string :: (ps: *string, new_value: string) {
     free(ps.*);
     ps.* = copy_string(new_value);
 }
+
+#import "Basic";
+#import "String";
+#import "System";
+#import "Input";
+#import "Sound_Player";
+#import "Wav_File";
+#import "stb_vorbis";
+#import "Thread";
+#import "Window_Creation";
+#import "Math";
+#import "Random";
+#import "File";
+UI :: #import "GetRect_LeftHanded";
+Simp :: #import "Simp";
+Texture :: Simp.Texture;
+
+#if OS == .WINDOWS {
+#import "Windows";
+}
+
+#import,dir "ThirdParty/JaiBox2D";
+#load "Box2D_DebugDraw_Simp.jai";
+
+#load "sound.jai";
+#load "menu.jai";
+#load "carpet.jai";

@@ -8,6 +8,13 @@ to_degrees :: (radians : float) -> float {
     return radians * scale;
 }
 
+get_enum_count :: ($enum_type : Type) -> s64 {
+    info := type_info(enum_type);
+    assert(info.type == Type_Info_Tag.ENUM);
+    info_enum := cast(*Type_Info_Enum) info;
+    return info_enum.values.count;
+}
+
 printv :: (a : Code, loc := #caller_location) #expand {
 
     get_ident_name :: (code : Code) -> string {
