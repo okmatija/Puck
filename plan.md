@@ -1,10 +1,20 @@
+A pong game to play at work in breaks
+
 # General
 
 [x] Add a basic menu
+[ ] Add a restart button
+[ ] Options to have the window always on top 
 [ ] Add an option to toggle the ball type
+
 [ ] Add an option to toggle the paddle type
 [ ] Add an option to set the level/obstruction type
 [ ] Add an option to set the socket address (aka ip_address:port_number)
+
+# Payment
+
+[ ] $1.00 purchase cost, 2 invites per purchase? with some fraction to charity. $0.25 per invite after that?
+[ ] Database for user accounts etc
 
 # Sound
 
@@ -19,6 +29,8 @@
 # Networking
 
 [ ] Basic network play
+[ ] Get a free invite code when you buy a copy
+[ ] How to implement auto updates
 
 # Controls
 
@@ -31,6 +43,7 @@
 # Gameplay
 
 [x] Kinematic obstructions in the play area
+[ ] Sharp corners are bad because its hard to predict what the ball will do when it collides, which feels bad
 [ ] Show the short term predicted trajectory of the ball?
 [ ] Gradually add the slope to the paddles as you play the game since otherwise you can slam it really hard and win right away
 [ ] Gradually change the ball shape as the game progresses, to become more boxy?
