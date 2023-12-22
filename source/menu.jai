@@ -4,15 +4,17 @@ menu :: () {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
             if game_state == .GAME_PAUSED {
                 game_state = .MAIN_MENU;
+                deinit_game();
             } else if game_state == .MAIN_MENU {
-                game_state = .END_PROGRAM;
+                // Disabled since it makes it too easy to accidentally quit the game
+                //game_state = .END_PROGRAM;
             }
         }
 
         UI.getrect_handle_event(event);
     }
 
-    draw_background();
+    draw_menu_background();
 
     x, y, width, height := get_dimensions(window, true);
     UI.ui_per_frame_update(window, window_width, window_height, current_time);
@@ -56,6 +58,15 @@ menu :: () {
         paddle_shape_choices[it] = text;
     }
 
+    level_choices : [#run get_enum_count(Level_Id)]string;
+    for 0..get_enum_count(Level_Id)-1 {
+        text := tprint("%", cast(Level_Id)it);
+        for 0..text.count-1 {
+            if text[it] == #char "_"  text[it] = #char " ";  // Convert underscores to spaces!
+        }
+        level_choices[it] = text;
+    }
+
     // Returns the next rect to use and moves the cursor to the bottom center of the rect
     NextRect :: (w: float, h: float) -> UI.Rect #expand {
         padding_y := .1*k.y;
@@ -69,11 +80,14 @@ menu :: () {
 
     if game_state == .MAIN_MENU {
 
-        cursor := Vector2.{5.*k.x, 4.*k.y};
+        cursor := Vector2.{5.*k.x, 5.2*k.y};
 
         r := NextRect(1.25*k.x, .75*k.y);
-        if UI.button(r, "Play", *button_theme) {
+
+        _, _, released := UI.button(r, "Play", *button_theme);
+        if released {
             game_state = .GAME_PLAYING;
+            init_game();
         }
 
         r = NextRect(2.*k.x, .5*k.y);
@@ -82,23 +96,36 @@ menu :: () {
         r = NextRect(2.*k.x, .5*k.y);
         UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
 
+        r = NextRect(2.*k.x, .5*k.y);
+        UI.dropdown(r, level_choices, *current_level, dropdown_theme);
+
+        r = NextRect(2.*k.x, .5*k.y);
+        UI.slider(r, *friction, 0., 1., .01, *ui_theme.slider_theme, prefix="F ");
+
+        r = NextRect(2.*k.x, .5*k.y);
+        UI.slider(r, *restitution, 0., 1.5, .01, *ui_theme.slider_theme, prefix="R ");
+
         r = NextRect(1.25*k.x, .75*k.y);
-        if UI.button(r, "Quit", *button_theme) {
+        _, _, released = UI.button(r, "Quit", *button_theme);
+        if released {
             game_state = .END_PROGRAM;
         }
 
     } else if game_state == .GAME_PAUSED {
 
-        cursor := Vector2.{5.*k.x, 4.*k.y};
+        cursor := Vector2.{5.*k.x, 5.2*k.y};
 
         r := NextRect(1.25*k.x, .75*k.y);
-        if UI.button(r, "Resume", *button_theme) {
+        _, _, released := UI.button(r, "Resume", *button_theme);
+        if released {
             game_state = .GAME_PLAYING;
         }
 
         r = NextRect(1.75*k.x, .75*k.y);
-        if UI.button(r, "Main Menu", *button_theme) {
+        _, _, released = UI.button(r, "Main Menu", *button_theme);
+        if released {
             game_state = .MAIN_MENU;
+            deinit_game();
         }
 
     }

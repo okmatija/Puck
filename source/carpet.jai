@@ -15,6 +15,13 @@ get_enum_count :: ($enum_type : Type) -> s64 {
     return info_enum.values.count;
 }
 
+printd :: ($a : string, loc := #caller_location) #expand {
+    v := #insert a;
+    s := a;
+    s.count -= 1;
+    print("%:% % = %\n", loc.fully_pathed_filename, loc. line_number, s, v);
+}
+
 printv :: (a : Code, loc := #caller_location) #expand {
 
     get_ident_name :: (code : Code) -> string {

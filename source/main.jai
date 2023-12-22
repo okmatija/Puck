@@ -4,7 +4,7 @@
 // - Game playable area is padded left and right by GAME_PADDING
 GAME_EXTENTS :: Vector2.{10.0, 10.0}; // half-width/height in meters
 GAME_PADDING :: 3.0; // Applied to both sides of game
-WINDOW_HEIGHT_INITIAL :: 1280;
+WINDOW_HEIGHT_INITIAL :: 1440;
 DT_MAX : float : 0.15;
 
 BALL_RADIUS_INITIAL :: 0.2;
@@ -17,9 +17,12 @@ WALL_RESTITUTION :: 0.0;
 
 PADDLE_EXTENTS :: Vector2.{2.00, 0.25};
 PADDLE_SPEED :: #run (GAME_EXTENTS.x / 0.35);
-PADDLE_DENSITY :: 1.;
-PADDLE_FRICTION :: .2;
+PADDLE_DENSITY :: 1000;
+PADDLE_FRICTION :: 1.;
 PADDLE_RESTITUTION :: 1.3;
+
+friction := PADDLE_FRICTION;
+restitution := PADDLE_RESTITUTION;
 
 INITIAL_PLAYER_NAME :: "Lord Dimwit Flathead";
 INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
@@ -47,21 +50,28 @@ last_time:  float64;
 
 player1 : Player;
 player2 : Player;
+level : Level;
 live_balls : [..] *Ball;
 ball_spawn_countdown := 0.;
 
 world : *b2World;
 world_debug_draw : *b2Draw;
-landscape : *b2Body;
+
+Level :: struct {
+    edges : *b2Body;
+    obstruction : *b2Body;
+}
 
 data_folder: string;
 sky_map : Texture;
+menu_map : Texture;
 sound_start_game : *Mixer_Sound_Data;
 sound_collision1 : *Mixer_Sound_Data;
 sound_collision2 : *Mixer_Sound_Data;
 
 sound_player : *Sound_Player;
 
+current_level : s32 = xx Level_Id.Empty;
 current_ball_shape : s32 = xx Ball_Shape.Circle;
 current_paddle_shape : s32 = xx Paddle_Shape.Prism;
 
@@ -80,6 +90,12 @@ Paddle_Shape :: enum {
     Prism;   // aka isosceles trapezoid
     // Dome;    // aka circular segment
     // Capsule; // aka a half capsule cut along the line connecting circle centers
+};
+
+Level_Id :: enum {
+    Empty;
+    Fixed_Box;
+    Spinning_Box;
 };
 
 Ball :: struct {
@@ -123,7 +139,7 @@ main :: () {
         Windows.timeBeginPeriod(1);
     }
 
-    window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=2000, window_y=500);
+    window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=1100, window_y=400);
     Simp.set_render_target(window);
 
     // We'll draw the cursor manually when we're in the menu
@@ -161,9 +177,6 @@ main :: () {
     contact_listener.vtable.Destructor = destructor;
 
     init_world(*contact_listener);
-    init_level();
-    init_player(*player1, 1);
-    init_player(*player2, 2);
 
     while game_state != .END_PROGRAM {
         reset_temporary_storage();
@@ -201,7 +214,7 @@ main :: () {
 
             simulate();
 
-            draw_background();
+            draw_game_background();
 
             //for live_balls {
             //    draw_ball_at(it);
@@ -262,6 +275,7 @@ init_textures :: () {
     }
 
     sky_map = make_texture("sky.png");
+    menu_map = make_texture("pong.png");
 }
 
 init_sounds :: (window : *Window_Type) {
@@ -345,12 +359,14 @@ kinetic_energy :: (body : *b2Body) -> float {
     return .5 * mass_data.mass * dot_product(velocity, velocity) + .5 * mass_data.I * omega * omega;
 }
 
-draw_background :: () {
+draw_game_background :: () {
     Simp.set_shader_for_images(*sky_map);
+    Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
+}
 
-        sky_color := Vector4.{1,1,1,1};
-
-    Simp.immediate_quad(0, 0, xx window_width, xx window_height, sky_color);
+draw_menu_background :: () {
+    Simp.set_shader_for_images(*menu_map);
+    Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
 }
 
 draw_ball_at :: (using ball: Ball) {
@@ -387,7 +403,7 @@ simulate :: () {
     countdown(*ball_spawn_countdown);
 
     if !live_balls {
-        for 0..10 if ball_spawn_countdown <= 0 {
+        if ball_spawn_countdown <= 0 {
             ball : *Ball = New(Ball);
 
             body_def : b2BodyDef;
@@ -467,10 +483,10 @@ simulate :: () {
             MOUSE_SET_POSITION_NFRAME_ACCELERATION;
         }
 
-        control_mode : Control_Mode = ifx player_index == 1
-            then .MOUSE_SET_POSITION_NFRAME_ACCELERATION
-            else .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
-        // control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_WITH_ACCELERATION;
+        // control_mode : Control_Mode = ifx player_index == 1
+        //     then .MOUSE_SET_POSITION_NFRAME_ACCELERATION
+        //     else .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
+        control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
 
         if control_mode == {
             case .KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
@@ -511,6 +527,7 @@ simulate :: () {
                 current_position_x := b2Body.GetPosition(body).x;
                 desired_position_x := screen_to_world(mouse).x;
                 desired_velocity := (desired_position_x - current_position_x) / current_dt;
+                // @Feel Stop the paddle bouncing against the level border
                 if desired_velocity < 0 {
                     desired_velocity = max(desired_velocity, -PADDLE_SPEED);
                 } else {
@@ -544,12 +561,14 @@ simulate :: () {
     for ball : live_balls {
         if ball.center.y > GAME_EXTENTS.y {
             player1.score += 1;
+            deinit(ball);
             remove ball;
             free(ball);
             ball_spawn_countdown = 2.;
         }
         if ball.center.y < -GAME_EXTENTS.y {
             player2.score += 1;
+            deinit(ball);
             remove ball;
             free(ball);
             ball_spawn_countdown = 2.;
@@ -575,8 +594,41 @@ init_world :: (contact_listener : *b2ContactListener) {
     b2World.SetContactListener(world, contact_listener);
 }
 
+deinit :: (ball : *Ball) {
+    b2World.DestroyBody(world, ball.body);
+}
+
+deinit :: (player : *Player) {
+    player.score = 0;
+    b2World.DestroyBody(world, player.body);
+}
+
+deinit_game :: () {
+    for ball : live_balls {
+        deinit(ball);
+        remove ball;
+        free(ball);
+    }
+    ball_spawn_countdown = 2.;
+
+    deinit(*player2);
+    deinit(*player1);
+    deinit_level();
+}
+
+init_game :: () {
+    init_level();
+    init_player(*player1, 1);
+    init_player(*player2, 2);
+}
+
+deinit_level :: () {
+    if level.obstruction b2World.DestroyBody(world, level.obstruction);
+    b2World.DestroyBody(world, level.edges);
+}
+
 init_level :: () {
-    { // Create landscape aka play area
+    { // Create edges bounding the play area
         // extents := Vector2.{GAME_EXTENTS.x, 1.}; //Vector2.{GAME_EXTENTS.x / 8., GAME_EXTENTS.y / 10.};
         extents := .25 * GAME_EXTENTS;
         center := Vector2.{0., -.75 * GAME_EXTENTS.y};
@@ -584,7 +636,7 @@ init_level :: () {
 
         body_def : b2BodyDef;
         b2BodyDef.Constructor(*body_def);
-        landscape = b2World.CreateBody(world, *body_def);
+        level.edges = b2World.CreateBody(world, *body_def);
 
         // Shape coordinates are local to the body
 
@@ -600,53 +652,54 @@ init_level :: () {
 
         // Left edge
         b2EdgeShape.SetTwoSided(*edge_shape, -GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y});
-        b2Body.CreateFixture(landscape, *fixture_def);
+        b2Body.CreateFixture(level.edges, *fixture_def);
 
         // Right edge
         b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
-        b2Body.CreateFixture(landscape, *fixture_def);
+        b2Body.CreateFixture(level.edges, *fixture_def);
 
-        // Top edge
-        b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
-        b2Body.CreateFixture(landscape, *fixture_def);
+        // // Top edge
+        //b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
+        //b2Body.CreateFixture(level.edges, *fixture_def);
     }
 
     // Central box obstruction
-    {
-        extents := .25 * GAME_EXTENTS;
-        center := Vector2.{0., -.75 * GAME_EXTENTS.y};
-        angle := 0.;
+    if #complete cast(Level_Id)current_level == {
+        case .Empty;
+            // Do nothing
+        case .Fixed_Box; #through;
+        case .Spinning_Box;
+            extents := .25 * GAME_EXTENTS;
+            center := Vector2.{0., -.75 * GAME_EXTENTS.y};
+            angle := 0.;
 
-        body_def : b2BodyDef;
-        b2BodyDef.Constructor(*body_def);
-        body_def.type = .b2_kinematicBody;
-        obstruction := b2World.CreateBody(world, *body_def); // nocommit cache this pointer
+            body_def : b2BodyDef;
+            b2BodyDef.Constructor(*body_def);
+            body_def.type = .b2_kinematicBody;
+            level.obstruction = b2World.CreateBody(world, *body_def);
 
-        shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*shape);
-        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+            shape : b2PolygonShape;
+            b2PolygonShape.Constructor(*shape);
+            b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
 
-        joint_def : b2PrismaticJointDef;
-        b2PrismaticJointDef.Constructor(*joint_def);
-        b2PrismaticJointDef.Initialize(*joint_def, landscape, obstruction, .{}, .{1., 0.});
-        b2Body.SetAngularVelocity(obstruction, 1.);
+            fixture_def : b2FixtureDef;
+            b2FixtureDef.Constructor(*fixture_def);
+            fixture_def.shape = *shape;
+            fixture_def.density = 0.;
+            fixture_def.friction = WALL_FRICTION;
+            fixture_def.restitution = WALL_RESTITUTION;
+            b2Body.CreateFixture(level.obstruction, *fixture_def);
 
-        fixture_def : b2FixtureDef;
-        b2FixtureDef.Constructor(*fixture_def);
-        fixture_def.shape = *shape;
-        fixture_def.density = 0.;
-        fixture_def.friction = WALL_FRICTION;
-        fixture_def.restitution = WALL_RESTITUTION;
-        b2Body.CreateFixture(obstruction, *fixture_def);
-
+            joint_def : b2PrismaticJointDef;
+            b2PrismaticJointDef.Constructor(*joint_def);
+            b2PrismaticJointDef.Initialize(*joint_def, level.edges, level.obstruction, .{}, .{1., 0.});
+            if cast(Level_Id)current_level == .Spinning_Box {
+                b2Body.SetAngularVelocity(level.obstruction, .25);
+            }
     }
 }
 
 init_player :: (using player : *Player, player_index : int) {
-
-    if player.body {
-        free(player.body);
-    }
 
     center_y := ifx player_index == 1
         then -GAME_EXTENTS.y + player1.extents.y
@@ -699,14 +752,14 @@ init_player :: (using player : *Player, player_index : int) {
     b2FixtureDef.Constructor(*fixture_def);
     fixture_def.shape = *polygon_shape;
     fixture_def.density = PADDLE_DENSITY;
-    fixture_def.friction = PADDLE_FRICTION;
-    fixture_def.restitution = PADDLE_RESTITUTION;
+    fixture_def.friction = friction;
+    fixture_def.restitution = restitution;
     b2Body.CreateFixture(body, *fixture_def);
 
     // Constrain player movement to within the GAME_EXTENTS
     joint_def : b2PrismaticJointDef;
     b2PrismaticJointDef.Constructor(*joint_def);
-    b2PrismaticJointDef.Initialize(*joint_def, landscape, body, -GAME_EXTENTS, .{1., 0.});
+    b2PrismaticJointDef.Initialize(*joint_def, level.edges, body, -GAME_EXTENTS, .{1., 0.});
     joint_def.lowerTranslation = -GAME_EXTENTS.x + PADDLE_EXTENTS.x;
     joint_def.upperTranslation =  GAME_EXTENTS.x - PADDLE_EXTENTS.x;
     joint_def.enableLimit = true;
