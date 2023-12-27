@@ -71,7 +71,7 @@ sound_collision2 : *Mixer_Sound_Data;
 
 sound_player : *Sound_Player;
 
-current_level : s32 = xx Level_Id.Empty;
+current_level : s32 = xx Level_Id.Spinning_Box;
 current_ball_shape : s32 = xx Ball_Shape.Circle;
 current_paddle_shape : s32 = xx Paddle_Shape.Prism;
 
@@ -99,9 +99,7 @@ Level_Id :: enum {
 };
 
 Ball :: struct {
-    center : Vector2;
     radius : float = BALL_RADIUS_INITIAL;
-    velocity : Vector2;
     color := Vector4.{0, 1, 0, 1};
 
     last_hit_player : int; // 1/2 => player1/player2
@@ -112,14 +110,13 @@ Ball :: struct {
 }
 
 Player :: struct {
-    center : Vector2;
-    extents : Vector2 = PADDLE_EXTENTS;
     color : Vector4;
 
     left : u32;
     right : u32;
     score : int;
 
+    // Some powerups will change the size of the player
     // Note: The body shape is collision geometry not render geometry
     body : *b2Body;
 }
@@ -216,13 +213,17 @@ main :: () {
 
             draw_game_background();
 
-            //for live_balls {
-            //    draw_ball_at(it);
-            //}
-            //draw_player_at(player1);
+            draw_level();
+
+            draw_player_at(player1);
+            draw_player_at(player2);
+
+            for live_balls {
+               draw_ball_at(it);
+            }
 
             // Draws the physics/collision geometry
-            b2World.DebugDraw(world);
+            //b2World.DebugDraw(world);
 
             text := sprint("%:%", player1.score, player2.score);
             defer free(text);
@@ -369,78 +370,91 @@ draw_menu_background :: () {
     Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
 }
 
+draw_body :: (body : *b2Body, color : Vector4) {
+    if body == null return;
+
+    fixture : *b2Fixture = b2Body.GetFixtureList(body);
+    while fixture != null {
+        defer fixture = b2Fixture.GetNext(fixture);
+
+        shape : *b2Shape = b2Fixture.GetShape(fixture);
+        shape_type : b2Shape.Type = b2Shape.GetType(shape);
+
+        transform :: (body : *b2Body, v : Vector2) -> Vector3 {
+            t := b2Body.GetTransform(body);
+            return .{xy=world_to_screen(apply_transform(t, v))};
+        }
+
+        if shape_type == .polygon {
+            using polygon_shape := cast(*b2PolygonShape)shape;
+
+            v0 : Vector3 = transform(body, m_vertices[0]);
+            for i : 1..m_count-2 {
+                v1 : Vector3 = transform(body, m_vertices[i]);
+                v2 : Vector3 = transform(body, m_vertices[i+1]);
+                Simp.immediate_triangle(v0, v1, v2, color, color, color);
+            }
+        } else if shape_type == .circle {
+            using circle_shape := cast(*b2CircleShape)shape;
+
+            CIRCLE_SEGMENTS :: 16;
+            CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
+
+            sinInc := sin(CIRCLE_INCREMENT);
+            cosInc := cos(CIRCLE_INCREMENT);
+            v0 : Vector3 = transform(body, m_p);
+            r1 : b2Vec2 = .{cosInc, sinInc};
+            v1 : Vector3 = transform(body, m_p + m_radius * r1);
+            for i : 0..CIRCLE_SEGMENTS-1 {
+                // Perform rotation to avoid additional trigonometry.
+                r2 : b2Vec2 = ---;
+                r2.x = cosInc * r1.x - sinInc * r1.y;
+                r2.y = sinInc * r1.x + cosInc * r1.y;
+                v2 : Vector3 = transform(body, m_p + m_radius * r2);
+                Simp.immediate_triangle(v0, v1, v2, color, color, color);
+                r1 = r2;
+                v1 = v2;
+            }
+        } else if shape_type == .edge {
+            using edge_shape := cast(*b2EdgeShape)shape;
+
+            SEGMENT_THICKNESS :: 1.; // Simp units aka pixels
+
+            start : Vector2 = transform(body, m_vertex1).xy; 
+            end : Vector2 = transform(body, m_vertex2).xy;
+
+            // assert(start.z == 0. && end.z == 0.);
+            normal := unit_vector(end - start);
+            normal.x, normal.y = normal.y, -normal.x; // Rotate the unit direction by 90 degrees
+            q0 := start + normal * .5 * SEGMENT_THICKNESS;
+            q3 := start - normal * .5 * SEGMENT_THICKNESS;
+            q2 := end - normal * .5 * SEGMENT_THICKNESS;
+            q1 := end + normal * .5 * SEGMENT_THICKNESS;
+            Simp.immediate_quad(q0, q1, q2, q3, color, color, color, color);
+
+        } else {
+            assert(false); // @Incomplete
+        }
+    }
+}
+
+
+// @Incompleteee This should use the rendering geometry..! 
 draw_ball_at :: (using ball: Ball) {
     Simp.set_shader_for_color(true);
 
-    lo, hi : Vector2 = center - Vector2.{radius, radius}, center + Vector2.{radius, radius};
+    draw_body(ball.body, ball.color);
 
-    v : [4]Vector2;
-    v[0] = lo;
-    v[1] = Vector2.{hi.x, lo.y};
-    v[2] = hi;
-    v[3] = Vector2.{lo.x, hi.y};
-
-    transform : b2Transform = b2Body.GetTransform(ball.body);
-    for * v {
-        it.* = world_to_screen(apply_transform(transform, it));
-    }
-
-    Simp.immediate_quad(v[0], v[1], v[2], v[3], color); // nocommit
 }
 
+// @Incompleteee This should use the rendering geometry..! 
 draw_player_at :: (using player: Player) {
     Simp.set_shader_for_color();
 
-    p0 : Vector2 = world_to_screen(center - extents);
-    p2 : Vector2 = world_to_screen(center + extents);
-    p1 : Vector2 = .{p2.x, p0.y};
-    p3 : Vector2 = .{p0.x, p2.y};
-
-    Simp.immediate_quad(p0, p1, p2, p3, color);
+    draw_body(player.body, player.color);
 }
 
 simulate :: () {
-    countdown(*ball_spawn_countdown);
-
-    if !live_balls {
-        if ball_spawn_countdown <= 0 {
-            ball : *Ball = New(Ball);
-
-            body_def : b2BodyDef;
-            b2BodyDef.Constructor(*body_def);
-            body_def.type = .b2_dynamicBody;
-            body_def.position = Vector2.{0., 0.}; // pitch center
-            body_def.linearVelocity = Vector2.{.0, -GAME_EXTENTS.y / .5};
-            body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast so better make it a bullet
-
-            ball.body = b2World.CreateBody(world, *body_def);
-            b2Body.SetSleepingAllowed(ball.body, false);
-
-            circle_shape : b2CircleShape;
-            b2CircleShape.Constructor(*circle_shape);
-            circle_shape.m_radius = ball.radius;
-
-            square_shape : b2PolygonShape;
-            b2PolygonShape.Constructor(*square_shape);
-            b2PolygonShape.SetAsBox(*square_shape, ball.radius, ball.radius, .{0., 0.}, 0);
-
-            fixture_def : b2FixtureDef;
-            b2FixtureDef.Constructor(*fixture_def);
-            if cast(Ball_Shape)current_ball_shape == {
-                case .Circle; fixture_def.shape = *circle_shape;
-                case .Square; fixture_def.shape = *square_shape;
-            }
-            fixture_def.density = BALL_DENSITY;
-            fixture_def.friction = BALL_FRICTION;
-            fixture_def.restitution = BALL_RESTITUTION;
-            b2Body.CreateFixture(ball.body, *fixture_def);
-
-            array_add(*live_balls, ball);
-
-            // play_sound(sound_start_game); // @todo find a nicer sound for this!
-        }
-    }
-
     for event : events_this_frame {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
             // @Cleanup Is this correct? What even is the QUIT event?
@@ -553,20 +567,57 @@ simulate :: () {
 
     b2World.Step(world, current_dt, 6, 2);
 
-    for ball : live_balls {
-        ball.center = b2Body.GetPosition(ball.body);
-        ball.velocity = b2Body.GetLinearVelocity(ball.body);
+    countdown(*ball_spawn_countdown);
+
+    if !live_balls {
+        if ball_spawn_countdown <= 0 {
+            ball : *Ball = New(Ball);
+
+            body_def : b2BodyDef;
+            b2BodyDef.Constructor(*body_def);
+            body_def.type = .b2_dynamicBody;
+            body_def.position = Vector2.{0., 0.}; // pitch center
+            body_def.linearVelocity = Vector2.{.0, -GAME_EXTENTS.y / .5};
+            body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast so better make it a bullet
+
+            ball.body = b2World.CreateBody(world, *body_def);
+            b2Body.SetSleepingAllowed(ball.body, false);
+
+            circle_shape : b2CircleShape;
+            b2CircleShape.Constructor(*circle_shape);
+            circle_shape.m_radius = ball.radius;
+
+            square_shape : b2PolygonShape;
+            b2PolygonShape.Constructor(*square_shape);
+            b2PolygonShape.SetAsBox(*square_shape, ball.radius, ball.radius, .{0., 0.}, 0);
+
+            fixture_def : b2FixtureDef;
+            b2FixtureDef.Constructor(*fixture_def);
+            if cast(Ball_Shape)current_ball_shape == {
+                case .Circle; fixture_def.shape = *circle_shape;
+                case .Square; fixture_def.shape = *square_shape;
+            }
+            fixture_def.density = BALL_DENSITY;
+            fixture_def.friction = BALL_FRICTION;
+            fixture_def.restitution = BALL_RESTITUTION;
+            b2Body.CreateFixture(ball.body, *fixture_def);
+
+            array_add(*live_balls, ball);
+
+            // play_sound(sound_start_game); // @todo find a nicer sound for this!
+        }
     }
 
+
     for ball : live_balls {
-        if ball.center.y > GAME_EXTENTS.y {
+        center := b2Body.GetPosition(ball.body);
+        if center.y > GAME_EXTENTS.y {
             player1.score += 1;
             deinit(ball);
             remove ball;
             free(ball);
             ball_spawn_countdown = 2.;
-        }
-        if ball.center.y < -GAME_EXTENTS.y {
+        } else if center.y < -GAME_EXTENTS.y {
             player2.score += 1;
             deinit(ball);
             remove ball;
@@ -620,6 +671,13 @@ init_game :: () {
     init_level();
     init_player(*player1, 1);
     init_player(*player2, 2);
+}
+
+draw_level :: () {
+    Simp.set_shader_for_color(true);
+
+    draw_body(level.edges, Vector4.{1., 1., 1., 1.,});
+    draw_body(level.obstruction, Vector4.{1., 1., 1., 1.,});
 }
 
 deinit_level :: () {
@@ -702,15 +760,16 @@ init_level :: () {
 init_player :: (using player : *Player, player_index : int) {
 
     center_y := ifx player_index == 1
-        then -GAME_EXTENTS.y + player1.extents.y
-        else  GAME_EXTENTS.y - player2.extents.y;
-    center = Vector2.{0, center_y};
-    color = Vector4.{.3, .2, 0, 1};
+        then -GAME_EXTENTS.y + PADDLE_EXTENTS.y
+        else  GAME_EXTENTS.y - PADDLE_EXTENTS.y;
+    color = ifx player_index == 1
+        then Vector4.{1., .1, .1, 1.}
+        else Vector4.{.1, .1, 1., 1.};
 
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     body_def.type = .b2_dynamicBody;
-    body_def.position = center;
+    body_def.position = Vector2.{0, center_y};
     body = b2World.CreateBody(world, *body_def);
 
     b2Body.SetSleepingAllowed(body, false);
@@ -744,8 +803,8 @@ init_player :: (using player : *Player, player_index : int) {
 
     polygon_shape : b2PolygonShape;
     if #complete cast(Paddle_Shape)current_paddle_shape == {
-        case .Box;   polygon_shape = rectangle_paddle(player.extents, 1./3., player_index);
-        case .Prism; polygon_shape = trapezoid_paddle(player.extents, 1./3., player_index);
+        case .Box;   polygon_shape = rectangle_paddle(PADDLE_EXTENTS, 1./3., player_index);
+        case .Prism; polygon_shape = trapezoid_paddle(PADDLE_EXTENTS, 1./3., player_index);
     }
 
     fixture_def : b2FixtureDef;

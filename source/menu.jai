@@ -99,11 +99,11 @@ menu :: () {
         r = NextRect(2.*k.x, .5*k.y);
         UI.dropdown(r, level_choices, *current_level, dropdown_theme);
 
-        r = NextRect(2.*k.x, .5*k.y);
-        UI.slider(r, *friction, 0., 1., .01, *ui_theme.slider_theme, prefix="F ");
+        // r = NextRect(2.*k.x, .5*k.y);
+        // UI.slider(r, *friction, 0., 1., .01, *ui_theme.slider_theme, prefix="F ");
 
-        r = NextRect(2.*k.x, .5*k.y);
-        UI.slider(r, *restitution, 0., 1.5, .01, *ui_theme.slider_theme, prefix="R ");
+        // r = NextRect(2.*k.x, .5*k.y);
+        // UI.slider(r, *restitution, 0., 1.5, .01, *ui_theme.slider_theme, prefix="R ");
 
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Quit", *button_theme);
