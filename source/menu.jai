@@ -2,12 +2,12 @@ menu :: () {
 
     for event : events_this_frame {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
-            if game_state == .GAME_PAUSED {
-                game_state = .MAIN_MENU;
+            if game_mode == .GAME_PAUSED {
+                game_mode = .MAIN_MENU;
                 deinit_game();
-            } else if game_state == .MAIN_MENU {
+            } else if game_mode == .MAIN_MENU {
                 // Disabled since it makes it too easy to accidentally quit the game
-                //game_state = .END_PROGRAM;
+                //game_mode = .END_PROGRAM;
             }
         }
 
@@ -78,7 +78,7 @@ menu :: () {
         return r;
     }
 
-    if game_state == .MAIN_MENU {
+    if game_mode == .MAIN_MENU {
 
         cursor := Vector2.{5.*k.x, 5.2*k.y};
 
@@ -86,7 +86,7 @@ menu :: () {
 
         _, _, released := UI.button(r, "Play", *button_theme);
         if released {
-            game_state = .GAME_PLAYING;
+            game_mode = .GAME_PLAYING;
             init_game();
         }
 
@@ -108,23 +108,23 @@ menu :: () {
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Quit", *button_theme);
         if released {
-            game_state = .END_PROGRAM;
+            game_mode = .END_PROGRAM;
         }
 
-    } else if game_state == .GAME_PAUSED {
+    } else if game_mode == .GAME_PAUSED {
 
         cursor := Vector2.{5.*k.x, 5.2*k.y};
 
         r := NextRect(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Resume", *button_theme);
         if released {
-            game_state = .GAME_PLAYING;
+            game_mode = .GAME_PLAYING;
         }
 
         r = NextRect(1.75*k.x, .75*k.y);
         _, _, released = UI.button(r, "Main Menu", *button_theme);
         if released {
-            game_state = .MAIN_MENU;
+            game_mode = .MAIN_MENU;
             deinit_game();
         }
 

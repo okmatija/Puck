@@ -35,14 +35,14 @@ window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
 font : *Simp.Dynamic_Font;
 
-Game_State :: enum {
+Game_Mode :: enum {
     GAME_PLAYING; // -> GAME_PAUSED
     GAME_PAUSED;  // -> MAIN_MENU | GAME_PLAYING
     MAIN_MENU;    // -> GAME_PLAYING | END_PROGRAM
     END_PROGRAM;  //
 }
 
-game_state := Game_State.MAIN_MENU;
+game_mode := Game_Mode.MAIN_MENU;
 
 current_dt: float = 1. / 60.;
 current_time: float64;
@@ -175,7 +175,7 @@ main :: () {
 
     init_world(*contact_listener);
 
-    while game_state != .END_PROGRAM {
+    while game_mode != .END_PROGRAM {
         reset_temporary_storage();
 
         current_time = get_time();
@@ -204,7 +204,7 @@ main :: () {
         update_sound_player(current_dt);
 
         // @Cleanup Just do this when we enter the game/menu
-        if #complete game_state == {
+        if #complete game_mode == {
         case .GAME_PLAYING;
 
             hide_cursor();
@@ -458,7 +458,7 @@ simulate :: () {
     for event : events_this_frame {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
             // @Cleanup Is this correct? What even is the QUIT event?
-            game_state = .GAME_PAUSED;
+            game_mode = .GAME_PAUSED;
             break;
         }
 
