@@ -1,3 +1,5 @@
+#import "Math";
+
 to_radians :: (degrees : float) -> float {
     scale :: PI / 180;
     return degrees * scale;
