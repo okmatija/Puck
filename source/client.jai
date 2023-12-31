@@ -1,13 +1,15 @@
-#import "Basic";
-#import "Math";
 Socket :: #import "Socket";
 System :: #import "System";
+
+#import "Basic";
+#import "Math";
+#load "carpet.jai";
 
 // This is the client
 
 main :: () {
 
-    port : u16 = 55555;
+    port : u16 = 5555;
     // Note: "localhost" is not supported by Socket.bind (Socket module.jai) since it calls inet_addr which does not support "localhost"
     //socket_address := "127.0.0.1";
     // socket_address := "0.0.0.0";
@@ -16,11 +18,7 @@ main :: () {
 
 
     Socket.socket_init();
-    defer {
-        #if OS == .WINDOWS {
-            Socket.WSACleanup();
-        }
-    }
+    defer socket_deinit();
 
     send_socket : Socket.SOCKET = Socket.socket(Socket.AF_INET, .SOCK_DGRAM, .IPPROTO_UDP);
     if send_socket == Socket.INVALID_SOCKET {
@@ -41,6 +39,9 @@ main :: () {
 
     send_string :: (data : []u8, send_socket : Socket.SOCKET, dest_addr : Socket.sockaddr_in) {
         // print("Sending a datagram to the receiver...\n");
+
+        // @Cleanup use packet to name the sent data
+        // Note: sendto returning successfully only means the packet was sent from the local computer, UDP does not guarantee that the data was recieved by the recipient
         sent_bytes : s32 = Socket.sendto(send_socket, data.data, cast(s32)data.count, 0, cast(*Socket.SOCKADDR) *dest_addr, size_of(type_of(dest_addr)));
         if (sent_bytes == Socket.SOCKET_ERROR) {
             error := Socket.get_last_socket_error();
