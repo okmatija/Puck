@@ -1,3 +1,65 @@
+[Host Game]
+    [IP address]
+    [Port]
+    [Ball Type]
+    [Paddle Type]
+    [Level]
+    [Back]
+[Join Game]
+    [IP address]
+    [Port]
+    [Back]
+[Quit]
+
+
+When hosting a game, you can play alone until the other player joins
+When either player presses Esc during the game it pauses everywhere
+
+
+// wait for all client inputs
+// simulate
+// send new game state to all clients
+
+Client_Input :: struct {
+    left_down : bool;
+    right_down : bool;
+}
+
+
+// TODO Use notes to generate entries of the Game_State struct
+Game_State :: struct {
+    Player_State :: struct {
+        position_x : float;
+    };
+
+    player1 : Player_State;
+    player2 : Player_State;
+
+    Ball_State :: struct {
+        position : Vector2;
+        velocity : Vector2;
+    };
+
+    ball : Vector2;
+}
+
+game_state : Game_State;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 A pong game to play at work in breaks
 
 # General
@@ -28,6 +90,7 @@ A pong game to play at work in breaks
 
 # Networking
 
+[ ] Support up to 4 players on differently shaped game boards
 [ ] Basic network play
 [ ] Get a free invite code when you buy a copy
 [ ] How to implement auto updates
@@ -43,6 +106,7 @@ A pong game to play at work in breaks
 # Gameplay
 
 [x] Kinematic obstructions in the play area
+[ ] Implement a simple AI
 [ ] Sharp corners are bad because its hard to predict what the ball will do when it collides, which feels bad
 [ ] Show the short term predicted trajectory of the ball?
 [ ] Gradually add the slope to the paddles as you play the game since otherwise you can slam it really hard and win right away
