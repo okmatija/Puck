@@ -1,4 +1,20 @@
-#import "Math";
+// @Cleanup Move this into the Socket module. See https://gafferongames.com/post/sending_and_receiving_packets/
+socket_deinit :: () -> bool {
+    System :: #import "System";
+    #import "Windows";
+
+    #if OS == .WINDOWS {
+        result := Socket.WSACleanup();
+        if result == Socket.SOCKET_ERROR {
+            log_error("Could not terminate Winsock2: % %", result, System.get_error_string(cast (OS_Error_Code)result));
+            return false;
+        }
+    } else {
+        // Nothing to do on Unix
+    }
+
+    return true;
+}
 
 to_radians :: (degrees : float) -> float {
     scale :: PI / 180;
@@ -81,3 +97,5 @@ hide_cursor :: inline ()
 		// @Todo!
 	}
 }
+
+#import "Math";
