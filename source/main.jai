@@ -126,7 +126,7 @@ main :: () {
     data_folder = join(path, "data");
     print("data_folder is '%'\n", data_folder);
 
-    last_time = get_time();
+    last_time = seconds_since_init();
 
     #if OS == .WINDOWS {
         Windows :: #import "Windows";
@@ -178,7 +178,7 @@ main :: () {
     while game_mode != .END_PROGRAM {
         reset_temporary_storage();
 
-        current_time = get_time();
+        current_time = seconds_since_init();
         delta : float64 = current_time - last_time;
         current_dt = cast(float) delta;
         if current_dt > DT_MAX current_dt = DT_MAX;
@@ -843,6 +843,7 @@ modify_string :: (ps: *string, new_value: string) {
 #import "Random";
 #import "File";
 UI :: #import "GetRect_LeftHanded";
+Socket :: #import "Socket";
 Simp :: #import "Simp";
 Texture :: Simp.Texture;
 
