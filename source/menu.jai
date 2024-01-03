@@ -24,6 +24,9 @@ menu :: () {
     button_theme.enable_variable_frame_thickness = true;
     button_theme.label_theme.alignment = .Center;
 
+    text_theme := ui_theme.text_input_theme;
+    text_theme.font = font;
+
     dropdown_theme := *ui_theme.dropdown_theme;
 
 
@@ -171,7 +174,13 @@ menu :: () {
     case .JOIN_NETWORK_GAME_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
-        l, r := NextRect2(1.25*k.x, .75*k.y);
+
+        r := NextRect(4*k.x, .75*k.y);
+        text_theme.alignment = .Center;
+        action_b, new_socket_address := UI.text_input(r, socket_address, *text_theme);
+        if action_b & .ENTERED  modify_string(*socket_address, new_socket_address);
+
+        l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
             game_menu = .MAIN_MENU;
@@ -184,7 +193,13 @@ menu :: () {
     case .HOST_NETWORK_GAME_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
-        l, r := NextRect2(1.25*k.x, .75*k.y);
+
+        // @Cleanup This should not be editable
+        r := NextRect(4*k.x, .75*k.y);
+        text_theme.alignment = .Center;
+        UI.text_input(r, host_info.ipv4_string, *text_theme);
+
+        l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
             game_menu = .MAIN_MENU;
@@ -205,21 +220,6 @@ menu :: () {
     }
 
 
-    //
-    // Text Input stuff:
-    //
-
-    // text_theme := ui_theme.text_input_theme;
-    // text_theme.font = font;
-
-    // r = UI.get_rect(5*k, 4*k, 5*k, font.character_height*1.35);
-    // action_a, new_text_a := UI.text_input(r, player_name, *text_theme);
-    // if action_a & .ENTERED  modify_string(*player_name, new_text_a);
-
-    // text_theme.alignment = .Center;
-    // r.y += font.character_height * 1.5;
-    // action_b, new_socket_address := UI.text_input(r, socket_address, *text_theme);
-    // if action_b & .ENTERED  modify_string(*socket_address, new_socket_address);
 
     UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
 

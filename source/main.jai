@@ -29,6 +29,8 @@ INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
 
 player_name: string; // @Cleanup move to Player struct
 socket_address: string;
+server_address: string;
+host_info : Host_Info;
 
 window : Window_Type;
 window_height : s32 = WINDOW_HEIGHT_INITIAL;
@@ -215,6 +217,9 @@ main :: () {
     // Note: @CompilerBug show_cursor() and hide_cursor() didn't seem to work correctly when called in the game/menu, but its not clear why
     hide_cursor();
 
+    Socket.socket_init();
+    defer socket_deinit();
+
     init_sounds(window);
     init_fonts();
     init_textures();
@@ -226,6 +231,12 @@ main :: () {
     // storing the strings.
     player_name = copy_string(INITIAL_PLAYER_NAME);
     socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
+
+    // Get info about the host this program is running on
+    hostname0_found:, host_info.hostname = get_hostname0();
+    assert(hostname0_found);
+    ip_found:, host_info.ipv4, host_info.ipv4_string = get_host_info(host_info.hostname);
+    assert(ip_found);
 
     contact_listener : b2ContactListener;
     begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
