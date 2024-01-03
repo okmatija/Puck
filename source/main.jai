@@ -35,14 +35,57 @@ window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
 font : *Simp.Dynamic_Font;
 
+// @Cleanup Menus should be a state machine using this enum
 Game_Mode :: enum {
-    GAME_PLAYING; // -> GAME_PAUSED
-    GAME_PAUSED;  // -> MAIN_MENU | GAME_PLAYING
-    MAIN_MENU;    // -> GAME_PLAYING | END_PROGRAM
-    END_PROGRAM;  //
+    MAIN_MENU;
+    PLAY_LOCAL_GAME_MENU;
+    JOIN_NETWORK_GAME_MENU;
+    HOST_NETWORK_GAME_MENU;
+    SETTINGS_MENU;
+
+    // nocommit Make is_paused a boolean, since in settings we want to paused if game is playing
+    GAME_PAUSED_MENU;  // -> MAIN_MENU | GAME_PLAYING
+    GAME_PLAYING; // -> GAME_PAUSED_MENU
+    END_PROGRAM;
 }
 
 game_mode := Game_Mode.MAIN_MENU;
+
+Player_State :: struct {
+    position : float; // In the "player coordinate system" where left/right are determined by direction player is facing
+};
+
+Ball_State :: struct {
+    position : Vector2;
+    rotation : float;
+    velocity : Vector2;
+};
+
+Game_State :: struct {
+    mode : Game_Mode; // .GAME_PLAYING or .GAME_PAUSED_MENU only
+    level : Level_Id;
+    ball_shape : Ball_Shape;
+    paddle_shape : Paddle_Shape;
+}
+
+// This data is sent by the server to all connected clients
+// @TODO Generate the members using notes
+Game_Snapshot :: struct {
+    player1_state : Player_State;
+    player2_state : Player_State;
+    ball_state : Ball_State; // @Incomplete support more than one ball
+    game_state : Game_State; // @TODO Only send this when game starts
+}
+
+// Networking.
+// One program will host the game and will be the server.
+// The server program will also be a client conneted via the loopback address
+// The other player(s) will be connected via the clients IP address
+// Server game loop: read client input from UDP packets, simulate the game and compute a current game state which will be sent to the clients
+
+// Clients will send their input to the server
+is_server : bool = true;
+is_client : bool = true;
 
 current_dt: float = 1. / 60.;
 current_time: float64;
@@ -109,7 +152,18 @@ Ball :: struct {
     body : *b2Body;
 }
 
+Player_Index :: enum {
+    P1;
+    P2;
+    //P3;
+    //P4;
+}
+
 Player :: struct {
+    index : Player_Index; // 1 => player 1, 2 => player 2 etc
+    ip_address : u32 = #run Socket.inet_addr("127.0.0.1");
+    port : u16 = 0;
+
     color : Vector4;
 
     left : u32;
@@ -119,6 +173,21 @@ Player :: struct {
     // Some powerups will change the size of the player
     // Note: The body shape is collision geometry not render geometry
     body : *b2Body;
+}
+
+get_player_state :: (player : Player) -> Player_State {
+    result : Player_State;
+
+    return result;
+}
+
+get_game_state :: () -> Game_State {
+    result : Game_State;
+    result.mode = game_mode;
+    result.level = xx current_level;
+    result.ball_shape = xx current_ball_shape;
+    result.paddle_shape = xx current_paddle_shape;
+    return result;
 }
 
 main :: () {
@@ -179,12 +248,9 @@ main :: () {
         reset_temporary_storage();
 
         current_time = seconds_since_init();
-        delta : float64 = current_time - last_time;
-        current_dt = cast(float) delta;
+        current_dt = cast(float) (current_time - last_time);
         if current_dt > DT_MAX current_dt = DT_MAX;
         last_time = current_time;
-
-        Simp.clear_render_target(1, 0, 0, 1);
 
         update_window_events();
 
@@ -209,32 +275,52 @@ main :: () {
 
             hide_cursor();
 
-            simulate();
+            if is_server {
+                simulate();
 
-            draw_game_background();
+                game_snapshot : Game_Snapshot;
+                game_snapshot.game_state = get_game_state();
+                game_snapshot.player1_state = get_player_state(player1);
+                game_snapshot.player2_state = get_player_state(player2);
+                // if live_balls game_snapshot.ball_state = get_ball_state(live_balls[0]);
 
-            draw_level();
+                send_game_state_to_clients :: () {
 
-            draw_player_at(player1);
-            draw_player_at(player2);
+                }
 
-            for live_balls {
-               draw_ball_at(it);
+                send_game_state_to_clients();
             }
 
-            // Draws the physics/collision geometry
-            //b2World.DebugDraw(world);
+            if is_client {
+                receive_game_state_from_server :: () {
 
-            text := sprint("%:%", player1.score, player2.score);
-            defer free(text);
-            text_w := Simp.prepare_text(font, text);
-            scale := 0.5;
-            Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
+                }
+
+                receive_game_state_from_server();
+
+                Simp.clear_render_target(1, 0, 0, 1);
+                draw_game_background();
+                draw_level();
+                draw_player_at(player1);
+                draw_player_at(player2);
+                for live_balls draw_ball_at(it);
+                draw_score();
+
+                // Draws the physics/collision geometry
+                //b2World.DebugDraw(world);
+            }
 
         case .MAIN_MENU; #through;
-        case .GAME_PAUSED;
+        case .SETTINGS_MENU; #through;
+        case .PLAY_LOCAL_GAME_MENU; #through;
+        case .JOIN_NETWORK_GAME_MENU; #through;
+        case .HOST_NETWORK_GAME_MENU; #through;
+        case .GAME_PAUSED_MENU;
 
             menu();
+
+
+            // @Incomplete
 
         case .END_PROGRAM;
 
@@ -420,7 +506,7 @@ draw_body :: (body : *b2Body, color : Vector4) {
 
             SEGMENT_THICKNESS :: 1.; // Simp units aka pixels
 
-            start : Vector2 = transform(body, m_vertex1).xy; 
+            start : Vector2 = transform(body, m_vertex1).xy;
             end : Vector2 = transform(body, m_vertex2).xy;
 
             // assert(start.z == 0. && end.z == 0.);
@@ -439,7 +525,7 @@ draw_body :: (body : *b2Body, color : Vector4) {
 }
 
 
-// @Incompleteee This should use the rendering geometry..! 
+// @Incompleteee This should use the rendering geometry..!
 draw_ball_at :: (using ball: Ball) {
     Simp.set_shader_for_color(true);
 
@@ -447,18 +533,26 @@ draw_ball_at :: (using ball: Ball) {
 
 }
 
-// @Incompleteee This should use the rendering geometry..! 
+// @Incompleteee This should use the rendering geometry..!
 draw_player_at :: (using player: Player) {
     Simp.set_shader_for_color();
 
     draw_body(player.body, player.color);
 }
 
+draw_score :: () {
+    text := sprint("%:%", player1.score, player2.score);
+    defer free(text);
+    text_w := Simp.prepare_text(font, text);
+    scale := 0.5;
+    Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
+}
+
 simulate :: () {
     for event : events_this_frame {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
             // @Cleanup Is this correct? What even is the QUIT event?
-            game_mode = .GAME_PAUSED;
+            game_mode = .GAME_PAUSED_MENU;
             break;
         }
 
@@ -488,7 +582,7 @@ simulate :: () {
         }
     }
 
-    apply_impulse_to_move_player :: (using player : Player, player_index : int) {
+    apply_impulse_to_move_player :: (using player : Player) {
 
         Control_Mode :: enum {
             KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
@@ -497,7 +591,7 @@ simulate :: () {
             MOUSE_SET_POSITION_NFRAME_ACCELERATION;
         }
 
-        // control_mode : Control_Mode = ifx player_index == 1
+        // control_mode : Control_Mode = ifx index == .P1
         //     then .MOUSE_SET_POSITION_NFRAME_ACCELERATION
         //     else .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
         control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
@@ -554,8 +648,8 @@ simulate :: () {
         }
     }
 
-    apply_impulse_to_move_player(player1, 1);
-    apply_impulse_to_move_player(player2, 2);
+    apply_impulse_to_move_player(player1);
+    apply_impulse_to_move_player(player2);
 
     // // Apply a small force toward other player to prevent the ball getting stuck in a horizontal bounce
     // for ball : live_balls {
@@ -669,8 +763,8 @@ deinit_game :: () {
 
 init_game :: () {
     init_level();
-    init_player(*player1, 1);
-    init_player(*player2, 2);
+    init_player(*player1, .P1);
+    init_player(*player2, .P2);
 }
 
 draw_level :: () {
@@ -757,12 +851,14 @@ init_level :: () {
     }
 }
 
-init_player :: (using player : *Player, player_index : int) {
+init_player :: (using player : *Player, player_index : Player_Index) {
 
-    center_y := ifx player_index == 1
+    index = player_index;
+
+    center_y := ifx index == .P1
         then -GAME_EXTENTS.y + PADDLE_EXTENTS.y
         else  GAME_EXTENTS.y - PADDLE_EXTENTS.y;
-    color = ifx player_index == 1
+    color = ifx index == .P1
         then Vector4.{1., .1, .1, 1.}
         else Vector4.{.1, .1, 1., 1.};
 
@@ -774,11 +870,11 @@ init_player :: (using player : *Player, player_index : int) {
 
     b2Body.SetSleepingAllowed(body, false);
 
-    trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
-        shape : b2PolygonShape; 
+    trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : Player_Index) -> b2PolygonShape {
+        shape : b2PolygonShape;
         b2PolygonShape.Constructor(*shape);
         vertices : [4]b2Vec2 = ---;
-        if player_index == 1 {
+        if player_index == .P1 {
             vertices = .[
                 .{-extents.x, -extents.y},
                 .{ extents.x, -extents.y},
@@ -790,21 +886,21 @@ init_player :: (using player : *Player, player_index : int) {
                 .{-extents.x + short_over_long * extents.x, -extents.y},
                 .{ extents.x - short_over_long * extents.x, -extents.y},
                 .{ extents.x, extents.y},
-                .{-extents.x, extents.y} 
+                .{-extents.x, extents.y}
             ];
         }
         b2PolygonShape.Set(*shape, vertices.data, vertices.count);
         return shape;
     }
 
-    rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : int) -> b2PolygonShape {
+    rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : Player_Index) -> b2PolygonShape {
         return trapezoid_paddle(extents, 0., player_index);
     }
 
     polygon_shape : b2PolygonShape;
     if #complete cast(Paddle_Shape)current_paddle_shape == {
-        case .Box;   polygon_shape = rectangle_paddle(PADDLE_EXTENTS, 1./3., player_index);
-        case .Prism; polygon_shape = trapezoid_paddle(PADDLE_EXTENTS, 1./3., player_index);
+        case .Box;   polygon_shape = rectangle_paddle(PADDLE_EXTENTS, 1./3., index);
+        case .Prism; polygon_shape = trapezoid_paddle(PADDLE_EXTENTS, 1./3., index);
     }
 
     fixture_def : b2FixtureDef;

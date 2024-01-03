@@ -1,18 +1,15 @@
 menu :: () {
 
+    esc_pressed : bool;
     for event : events_this_frame {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
-            if game_mode == .GAME_PAUSED {
-                game_mode = .MAIN_MENU;
-                deinit_game();
-            } else if game_mode == .MAIN_MENU {
-                // Disabled since it makes it too easy to accidentally quit the game
-                //game_mode = .END_PROGRAM;
-            }
+            esc_pressed = true;
         }
 
         UI.getrect_handle_event(event);
     }
+
+    Simp.clear_render_target(1, 0, 0, 1);
 
     draw_menu_background();
 
@@ -33,6 +30,7 @@ menu :: () {
     // 'k' is some resolution-adjusting unit of distance. Right now it is
     // 1/10 of the screen width/height, so, 192/108 pixels at 1920x1080.
     k := Vector2.{window_width * .1, window_height * .1};
+    padding := Vector2.{.1*k.x, .1*k.y}; // x/y is horizontal/vertical space between widgets
 
     // The 'dropdown' function causes a popup to be created, which
     // gets rendered at the end of the frame when we call draw_popups().
@@ -67,32 +65,67 @@ menu :: () {
         level_choices[it] = text;
     }
 
+
     // Returns the next rect to use and moves the cursor to the bottom center of the rect
     NextRect :: (w: float, h: float) -> UI.Rect #expand {
-        padding_y := .1*k.y;
-
-        `cursor.x -= w*.5;
-        r := UI.get_rect(`cursor.x, `cursor.y, w, h);
-        `cursor.x += w*.5;
-        `cursor.y += h + padding_y;
+        r := UI.get_rect(`cursor.x - w*.5, `cursor.y, w, h);
+        `cursor.y += h + `padding.y;
         return r;
     }
 
-    if game_mode == .MAIN_MENU {
+    NextRect2 :: (w: float, h: float) -> UI.Rect, UI.Rect #expand {
+        l := UI.get_rect(`cursor.x - padding.x*.5 - w , `cursor.y, w, h);
+        r := UI.get_rect(`cursor.x + padding.x*.5,      `cursor.y, w, h);
+        `cursor.y += h + `padding.y;
+        return l, r;
+    }
 
-        cursor := Vector2.{5.*k.x, 5.2*k.y};
+    CenteredCursor :: (init_y : float) -> Vector2 #expand {
+        return .{5.*k.x, init_y};
+    }
 
-        r := NextRect(1.25*k.x, .75*k.y);
+    if #complete game_mode == {
+    case .MAIN_MENU;
 
-        _, _, released := UI.button(r, "Play", *button_theme);
+        cursor := CenteredCursor(5.2*k.y);
+
+        r := NextRect(3.25*k.x, .75*k.y);
+        _, _, released := UI.button(r, "Play Local Game", *button_theme);
         if released {
-            game_mode = .GAME_PLAYING;
-            init_game();
+            game_mode = .PLAY_LOCAL_GAME_MENU;
         }
 
-        r = NextRect(2.*k.x, .5*k.y);
+        r = NextRect(3.25*k.x, .75*k.y);
+        _, _, released = UI.button(r, "Join Network Game", *button_theme);
+        if released {
+            game_mode = .JOIN_NETWORK_GAME_MENU;
+        }
+
+        r = NextRect(3.25*k.x, .75*k.y);
+        _, _, released = UI.button(r, "Host Network Game", *button_theme);
+        if released {
+            game_mode = .HOST_NETWORK_GAME_MENU;
+        }
+
+        r = NextRect(1.75*k.x, .75*k.y);
+        _, _, released = UI.button(r, "Settings", *button_theme);
+        if released {
+            game_mode = .SETTINGS_MENU;
+        }
+
+        r = NextRect(1.25*k.x, .75*k.y);
+        _, _, released = UI.button(r, "Quit", *button_theme);
+        if released {
+            game_mode = .END_PROGRAM;
+        }
+
+    case .PLAY_LOCAL_GAME_MENU;
+
+        cursor := CenteredCursor(5.2*k.y);
+
+        r := NextRect(2.*k.x, .5*k.y);
         UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
-        
+
         r = NextRect(2.*k.x, .5*k.y);
         UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
 
@@ -105,28 +138,70 @@ menu :: () {
         // r = NextRect(2.*k.x, .5*k.y);
         // UI.slider(r, *restitution, 0., 1.5, .01, *ui_theme.slider_theme, prefix="R ");
 
-        r = NextRect(1.25*k.x, .75*k.y);
-        _, _, released = UI.button(r, "Quit", *button_theme);
+        l:, r = NextRect2(1.25*k.x, .75*k.y);
+        _, _, released := UI.button(l, "Back", *button_theme);
+        if released || esc_pressed {
+            game_mode = .MAIN_MENU;
+        }
+        _, _, released = UI.button(r, "Play", *button_theme);
         if released {
-            game_mode = .END_PROGRAM;
+            game_mode = .GAME_PLAYING;
+            init_game();
         }
 
-    } else if game_mode == .GAME_PAUSED {
+    case .GAME_PAUSED_MENU;
 
-        cursor := Vector2.{5.*k.x, 5.2*k.y};
+        cursor := CenteredCursor(5.2*k.y);
 
-        r := NextRect(1.25*k.x, .75*k.y);
+        l, r := NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Resume", *button_theme);
         if released {
             game_mode = .GAME_PLAYING;
         }
-
-        r = NextRect(1.75*k.x, .75*k.y);
-        _, _, released = UI.button(r, "Main Menu", *button_theme);
+        _, _, released = UI.button(l, "Leave", *button_theme);
         if released {
             game_mode = .MAIN_MENU;
             deinit_game();
         }
+
+    case .JOIN_NETWORK_GAME_MENU;
+
+        cursor := CenteredCursor(5.2*k.y);
+        l, r := NextRect2(1.25*k.x, .75*k.y);
+        _, _, released := UI.button(l, "Back", *button_theme);
+        if released || esc_pressed {
+            game_mode = .MAIN_MENU;
+        }
+        _, _, released = UI.button(r, "Join", *button_theme);
+        if released {
+            // @Incomplete
+        }
+
+    case .HOST_NETWORK_GAME_MENU;
+
+        cursor := CenteredCursor(5.2*k.y);
+        l, r := NextRect2(1.25*k.x, .75*k.y);
+        _, _, released := UI.button(l, "Back", *button_theme);
+        if released || esc_pressed {
+            game_mode = .MAIN_MENU;
+        }
+        _, _, released = UI.button(r, "Play", *button_theme);
+        if released {
+            // @Incomplete
+        }
+
+    case .SETTINGS_MENU;
+
+        cursor := CenteredCursor(5.2*k.y);
+        r := NextRect(1.25*k.x, .75*k.y);
+        _, _, released := UI.button(r, "Back", *button_theme);
+        if released || esc_pressed {
+            game_mode = .MAIN_MENU;
+        }
+
+    // nocommit Remove these
+    case .END_PROGRAM;
+    case .GAME_PLAYING;
 
     }
 
