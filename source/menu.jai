@@ -84,7 +84,11 @@ menu :: () {
         return .{5.*k.x, init_y};
     }
 
-    if #complete game_mode == {
+    if #complete game_menu == {
+    case .NONE;
+
+        assert(false); // We should not get here
+
     case .MAIN_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
@@ -92,31 +96,31 @@ menu :: () {
         r := NextRect(3.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Play Local Game", *button_theme);
         if released {
-            game_mode = .PLAY_LOCAL_GAME_MENU;
+            game_menu = .PLAY_LOCAL_GAME_MENU;
         }
 
         r = NextRect(3.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Join Network Game", *button_theme);
         if released {
-            game_mode = .JOIN_NETWORK_GAME_MENU;
+            game_menu = .JOIN_NETWORK_GAME_MENU;
         }
 
         r = NextRect(3.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Host Network Game", *button_theme);
         if released {
-            game_mode = .HOST_NETWORK_GAME_MENU;
+            game_menu = .HOST_NETWORK_GAME_MENU;
         }
 
         r = NextRect(1.75*k.x, .75*k.y);
         _, _, released = UI.button(r, "Settings", *button_theme);
         if released {
-            game_mode = .SETTINGS_MENU;
+            game_menu = .SETTINGS_MENU;
         }
 
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Quit", *button_theme);
         if released {
-            game_mode = .END_PROGRAM;
+            quitting = true;
         }
 
     case .PLAY_LOCAL_GAME_MENU;
@@ -141,26 +145,26 @@ menu :: () {
         l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
-            game_mode = .MAIN_MENU;
+            game_menu = .MAIN_MENU;
         }
         _, _, released = UI.button(r, "Play", *button_theme);
         if released {
-            game_mode = .GAME_PLAYING;
+            game_menu = .NONE;
             init_game();
         }
 
-    case .GAME_PAUSED_MENU;
+    case .PAUSE_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
 
         l, r := NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Resume", *button_theme);
         if released {
-            game_mode = .GAME_PLAYING;
+            game_menu = .NONE;
         }
         _, _, released = UI.button(l, "Leave", *button_theme);
         if released {
-            game_mode = .MAIN_MENU;
+            game_menu = .MAIN_MENU;
             deinit_game();
         }
 
@@ -170,7 +174,7 @@ menu :: () {
         l, r := NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
-            game_mode = .MAIN_MENU;
+            game_menu = .MAIN_MENU;
         }
         _, _, released = UI.button(r, "Join", *button_theme);
         if released {
@@ -183,7 +187,7 @@ menu :: () {
         l, r := NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
-            game_mode = .MAIN_MENU;
+            game_menu = .MAIN_MENU;
         }
         _, _, released = UI.button(r, "Play", *button_theme);
         if released {
@@ -196,13 +200,8 @@ menu :: () {
         r := NextRect(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Back", *button_theme);
         if released || esc_pressed {
-            game_mode = .MAIN_MENU;
+            game_menu = .MAIN_MENU;
         }
-
-    // nocommit Remove these
-    case .END_PROGRAM;
-    case .GAME_PLAYING;
-
     }
 
 

@@ -19,7 +19,7 @@ PADDLE_EXTENTS :: Vector2.{2.00, 0.25};
 PADDLE_SPEED :: #run (GAME_EXTENTS.x / 0.35);
 PADDLE_DENSITY :: 1000;
 PADDLE_FRICTION :: 1.;
-PADDLE_RESTITUTION :: 1.3;
+PADDLE_RESTITUTION :: 1.2;
 
 friction := PADDLE_FRICTION;
 restitution := PADDLE_RESTITUTION;
@@ -36,20 +36,19 @@ window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / G
 font : *Simp.Dynamic_Font;
 
 // @Cleanup Menus should be a state machine using this enum
-Game_Mode :: enum {
+Game_Menu :: enum u8 {
+    NONE;
     MAIN_MENU;
     PLAY_LOCAL_GAME_MENU;
     JOIN_NETWORK_GAME_MENU;
     HOST_NETWORK_GAME_MENU;
     SETTINGS_MENU;
-
-    // nocommit Make is_paused a boolean, since in settings we want to paused if game is playing
-    GAME_PAUSED_MENU;  // -> MAIN_MENU | GAME_PLAYING
-    GAME_PLAYING; // -> GAME_PAUSED_MENU
-    END_PROGRAM;
+    PAUSE_MENU;
 }
 
-game_mode := Game_Mode.MAIN_MENU;
+quitting : bool;
+
+game_menu := Game_Menu.MAIN_MENU;
 
 Player_State :: struct {
     position : float; // In the "player coordinate system" where left/right are determined by direction player is facing
@@ -62,7 +61,7 @@ Ball_State :: struct {
 };
 
 Game_State :: struct {
-    mode : Game_Mode; // .GAME_PLAYING or .GAME_PAUSED_MENU only
+    menu : Game_Menu;
     level : Level_Id;
     ball_shape : Ball_Shape;
     paddle_shape : Paddle_Shape;
@@ -183,11 +182,15 @@ get_player_state :: (player : Player) -> Player_State {
 
 get_game_state :: () -> Game_State {
     result : Game_State;
-    result.mode = game_mode;
+    result.menu = game_menu;
     result.level = xx current_level;
     result.ball_shape = xx current_ball_shape;
     result.paddle_shape = xx current_paddle_shape;
     return result;
+}
+
+initial_ball_velocity :: () -> Vector2 {
+    return .{.0, -GAME_EXTENTS.y / 1.};
 }
 
 main :: () {
@@ -244,7 +247,7 @@ main :: () {
 
     init_world(*contact_listener);
 
-    while game_mode != .END_PROGRAM {
+    while !quitting {
         reset_temporary_storage();
 
         current_time = seconds_since_init();
@@ -270,9 +273,7 @@ main :: () {
         update_sound_player(current_dt);
 
         // @Cleanup Just do this when we enter the game/menu
-        if #complete game_mode == {
-        case .GAME_PLAYING;
-
+        if game_menu == .NONE {
             hide_cursor();
 
             if is_server {
@@ -309,23 +310,8 @@ main :: () {
                 // Draws the physics/collision geometry
                 //b2World.DebugDraw(world);
             }
-
-        case .MAIN_MENU; #through;
-        case .SETTINGS_MENU; #through;
-        case .PLAY_LOCAL_GAME_MENU; #through;
-        case .JOIN_NETWORK_GAME_MENU; #through;
-        case .HOST_NETWORK_GAME_MENU; #through;
-        case .GAME_PAUSED_MENU;
-
+        } else {
             menu();
-
-
-            // @Incomplete
-
-        case .END_PROGRAM;
-
-            // Do nothing, we'll quit next frame
-
         }
 
         Simp.swap_buffers(window);
@@ -552,7 +538,7 @@ simulate :: () {
     for event : events_this_frame {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
             // @Cleanup Is this correct? What even is the QUIT event?
-            game_mode = .GAME_PAUSED_MENU;
+            game_menu = .PAUSE_MENU;
             break;
         }
 
@@ -571,7 +557,7 @@ simulate :: () {
                 case #char "R";
                     start_position := Vector2.{0., 0.}; // pitch center
                     start_angle := 0.;
-                    start_linear_velocity := Vector2.{.0, -GAME_EXTENTS.y / 1.0};
+                    start_linear_velocity := initial_ball_velocity();
 
                     for live_balls {
                         b2Body.SetLinearVelocity(it.body, start_linear_velocity);
@@ -664,14 +650,14 @@ simulate :: () {
     countdown(*ball_spawn_countdown);
 
     if !live_balls {
-        if ball_spawn_countdown <= 0 {
+        for 0..2 if ball_spawn_countdown <= 0 {
             ball : *Ball = New(Ball);
 
             body_def : b2BodyDef;
             b2BodyDef.Constructor(*body_def);
             body_def.type = .b2_dynamicBody;
             body_def.position = Vector2.{0., 0.}; // pitch center
-            body_def.linearVelocity = Vector2.{.0, -GAME_EXTENTS.y / .5};
+            body_def.linearVelocity = initial_ball_velocity();
             body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast so better make it a bullet
 
             ball.body = b2World.CreateBody(world, *body_def);

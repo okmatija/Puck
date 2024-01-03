@@ -123,6 +123,7 @@ A pong game to play at work in breaks
 # Gameplay
 
 [x] Kinematic obstructions in the play area
+[ ] Three balls was really fun (Will playtest)
 [ ] Countdown to unpause
 [ ] Implement a simple AI
 [ ] Sharp corners are bad because its hard to predict what the ball will do when it collides, which feels bad
