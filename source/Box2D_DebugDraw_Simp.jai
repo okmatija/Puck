@@ -42,7 +42,7 @@ simp : *Simp.Immediate_State;
 
 HALF_PI :: #run .5 * PI;
 
-// nocommit These should be configurable in Box2D_Debug_Draw
+// @Think Should be configurable in Box2D_Debug_Draw?
 CIRCLE_SEGMENTS :: 16;
 CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
 POINT_CIRCLE_SEGMENTS :: 4;

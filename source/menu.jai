@@ -153,6 +153,9 @@ menu :: () {
         _, _, released = UI.button(r, "Play", *button_theme);
         if released {
             game_menu = .NONE;
+            is_network_game = false;
+            is_server = true;
+            is_client = true;
             init_game();
         }
 
@@ -188,6 +191,9 @@ menu :: () {
         _, _, released = UI.button(r, "Join", *button_theme);
         if released {
             // @Incomplete
+            is_network_game = true;
+            is_server = false;
+            is_client = true;
         }
 
     case .HOST_NETWORK_GAME_MENU;
@@ -204,9 +210,13 @@ menu :: () {
         if released || esc_pressed {
             game_menu = .MAIN_MENU;
         }
-        _, _, released = UI.button(r, "Play", *button_theme);
+        _, _, released = UI.button(r, "Host", *button_theme);
         if released {
-            // @Incomplete
+            game_menu = .NONE;
+            is_network_game = true;
+            is_server = true;
+            is_client = true;
+            init_game();
         }
 
     case .SETTINGS_MENU;

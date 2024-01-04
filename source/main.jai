@@ -31,6 +31,7 @@ player_name: string; // @Cleanup move to Player struct
 socket_address: string;
 server_address: string;
 host_info : Host_Info;
+is_network_game : bool;
 
 window : Window_Type;
 window_height : s32 = WINDOW_HEIGHT_INITIAL;
@@ -48,11 +49,12 @@ Game_Menu :: enum u8 {
     PAUSE_MENU;
 }
 
+game_frame_index : u32; // Used as a sequence number for network packets
 quitting : bool;
-
 game_menu := Game_Menu.MAIN_MENU;
 
 Player_State :: struct {
+    index : Player_Index;
     position : float; // In the "player coordinate system" where left/right are determined by direction player is facing
 };
 
@@ -71,11 +73,20 @@ Game_State :: struct {
 
 // This data is sent by the server to all connected clients
 // @TODO Generate the members using notes
-Game_Snapshot :: struct {
+Server_State :: struct {
+    // A number representing the game protocol hashed with the protocol version number
+    // all UDP packages have the first 4 bytes inspected, packets with numbers not matching
+    // this protocol_id are discarded, otherwise we parse the rest of the payload
+    protocol_id : u32;
     player1_state : Player_State;
     player2_state : Player_State;
     ball_state : Ball_State; // @Incomplete support more than one ball
     game_state : Game_State; // @TODO Only send this when game starts
+}
+
+Client_Input :: struct {
+    left_down : bool;
+    right_down : bool;
 }
 
 // Networking.
@@ -94,6 +105,7 @@ last_time:  float64;
 
 player1 : Player;
 player2 : Player;
+
 level : Level;
 live_balls : [..] *Ball;
 ball_spawn_countdown := 0.;
@@ -136,34 +148,27 @@ Paddle_Shape :: enum {
     // Capsule; // aka a half capsule cut along the line connecting circle centers
 };
 
-Level_Id :: enum {
-    Empty;
-    Fixed_Box;
-    Spinning_Box;
-};
+Level_Id :: enum { Empty; Fixed_Box; Spinning_Box; };
 
 Ball :: struct {
     radius : float = BALL_RADIUS_INITIAL;
     color := Vector4.{0, 1, 0, 1};
 
-    last_hit_player : int; // 1/2 => player1/player2
+    last_hit_player : Player_Index;
 
     // We get the transform from the physics simulation via this pointer
     // Note: The body shape is collision geometry not render geometry
     body : *b2Body;
 }
 
-Player_Index :: enum {
-    P1;
-    P2;
-    //P3;
-    //P4;
-}
+Player_Index :: enum { P1; P2; /*P3; P4;*/ }
 
 Player :: struct {
-    index : Player_Index; // 1 => player 1, 2 => player 2 etc
+    connected : bool; // nocommit Game does not start until all players are connected
     ip_address : u32 = #run Socket.inet_addr("127.0.0.1");
     port : u16 = 0;
+
+    index : Player_Index;
 
     color : Vector4;
 
@@ -176,9 +181,11 @@ Player :: struct {
     body : *b2Body;
 }
 
-get_player_state :: (player : Player) -> Player_State {
+get_player_state :: (using player : Player) -> Player_State {
     result : Player_State;
-
+    p := apply_transform(b2Body.GetTransform(body), b2Body.GetWorldCenter(body));
+    result.position = p.x;
+    result.index = index;
     return result;
 }
 
@@ -258,6 +265,7 @@ main :: () {
 
     init_world(*contact_listener);
 
+    // @TODOOO Figure out the order of things in this loop e.g., read input, simulate then render (to use the latest input). Don't update things that don't need updating e.g., sound stuff if we are a server but not a client
     while !quitting {
         reset_temporary_storage();
 
@@ -287,20 +295,53 @@ main :: () {
         if game_menu == .NONE {
             hide_cursor();
 
+            for event : events_this_frame {
+                if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
+                    // @Cleanup Is this correct? What even is the QUIT event?
+                    game_menu = .PAUSE_MENU;
+                    break;
+                }
+
+                if event.type == .KEYBOARD {
+                    if event.key_code == {
+                        case #char "J";
+                            player1.left =  event.key_pressed;
+                        case #char "L";
+                            player1.right = event.key_pressed;
+
+                        case #char "A";
+                            player2.left =  event.key_pressed;
+                        case #char "D";
+                            player2.right = event.key_pressed;
+
+                        case #char "R";
+                            start_position := Vector2.{0., 0.}; // pitch center
+                            start_angle := 0.;
+                            start_linear_velocity := initial_ball_velocity();
+
+                            for live_balls {
+                                b2Body.SetLinearVelocity(it.body, start_linear_velocity);
+                                b2Body.SetAngularVelocity(it.body, 0.);
+                                b2Body.SetTransform(it.body, start_position, start_angle);
+                            }
+                    }
+                }
+            }
+
             if is_server {
                 simulate();
 
-                game_snapshot : Game_Snapshot;
-                game_snapshot.game_state = get_game_state();
-                game_snapshot.player1_state = get_player_state(player1);
-                game_snapshot.player2_state = get_player_state(player2);
-                // if live_balls game_snapshot.ball_state = get_ball_state(live_balls[0]);
+                server_state : Server_State;
+                server_state.game_state = get_game_state();
+                server_state.player1_state = get_player_state(player1);
+                server_state.player2_state = get_player_state(player2);
+                // if live_balls server_state.ball_state = get_ball_state(live_balls[0]);
 
-                send_game_state_to_clients :: () {
+                send_server_state_to_clients :: () {
 
                 }
 
-                send_game_state_to_clients();
+                send_server_state_to_clients();
             }
 
             if is_client {
@@ -326,6 +367,7 @@ main :: () {
         }
 
         Simp.swap_buffers(window);
+        game_frame_index += 1;
 
         // memory_visualizer_per_frame_update();
     }
@@ -391,7 +433,7 @@ init_sounds :: (window : *Window_Type) {
     // some kind of asset catalog where you would use handles (or
     // maybe just the string name) when you play sound effects.
 
-    // nocommit Rename the sounds
+    // @Cleanup Rename the sounds
     // sound_start_game = load_sound("start_game");
     sound_start_game = load_sound("collision1");
     sound_collision1 = load_sound("collision1");
@@ -546,38 +588,6 @@ draw_score :: () {
 }
 
 simulate :: () {
-    for event : events_this_frame {
-        if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
-            // @Cleanup Is this correct? What even is the QUIT event?
-            game_menu = .PAUSE_MENU;
-            break;
-        }
-
-        if event.type == .KEYBOARD {
-            if event.key_code == {
-                case #char "J";
-                    player1.left =  event.key_pressed;
-                case #char "L";
-                    player1.right = event.key_pressed;
-
-                case #char "A";
-                    player2.left =  event.key_pressed;
-                case #char "D";
-                    player2.right = event.key_pressed;
-
-                case #char "R";
-                    start_position := Vector2.{0., 0.}; // pitch center
-                    start_angle := 0.;
-                    start_linear_velocity := initial_ball_velocity();
-
-                    for live_balls {
-                        b2Body.SetLinearVelocity(it.body, start_linear_velocity);
-                        b2Body.SetAngularVelocity(it.body, 0.);
-                        b2Body.SetTransform(it.body, start_position, start_angle);
-                    }
-            }
-        }
-    }
 
     apply_impulse_to_move_player :: (using player : Player) {
 
@@ -651,8 +661,8 @@ simulate :: () {
     // // Apply a small force toward other player to prevent the ball getting stuck in a horizontal bounce
     // for ball : live_balls {
     //     if ball.last_hit_player == {
-    //         case 1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
-    //         case 2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
+    //         case .P1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
+    //         case .P2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
     //     }
     // }
 
@@ -762,6 +772,7 @@ init_game :: () {
     init_level();
     init_player(*player1, .P1);
     init_player(*player2, .P2);
+    game_frame_index = 0;
 }
 
 draw_level :: () {

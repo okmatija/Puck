@@ -35,7 +35,7 @@ main :: () {
     server_addr : Socket.sockaddr_in;
     server_addr.sin_family = Socket.AF_INET;
     server_addr.sin_port = Socket.htons(port);
-    server_addr.sin_addr.S_un.S_addr = Socket.inet_addr("127.0.0.1");// nocommit
+    server_addr.sin_addr.S_un.S_addr = Socket.inet_addr("127.0.0.1");
 
     send_string :: (data : []u8, send_socket : Socket.SOCKET, dest_addr : Socket.sockaddr_in) {
         // print("Sending a datagram to the receiver...\n");

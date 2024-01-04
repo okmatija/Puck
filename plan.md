@@ -107,6 +107,10 @@ A pong game to play at work in breaks
 
 # Networking
 
+[ ] Implment Snapshot Interpolation. This does physics simulation only on the server, which is good since we don't rely on phyics running on clients (mobile?)
+[ ] Use bounding and quantization to send floating point numbers to the clients (we know max velocity of paddle, then we can quanitize that range and send an integer and reverse the process on the client)
+[ ] Think about packet size in bytes and how many packets per second we will send (ie determine bandwidth)
+[ ] Aim for latency of 50ms max, 
 [ ] Support up to 4 players on differently shaped game boards
 [ ] Basic network play
 [ ] Get a free invite code when you buy a copy
