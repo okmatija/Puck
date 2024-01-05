@@ -72,19 +72,29 @@ main :: () {
         }
     }
 
-    Client_Input :: struct {
-        left_down : bool;
-        right_down : bool;
-        boost_down : bool;
+
+    Player_Index :: enum u8 #specified {
+        P1 :: 1;
+        P2 :: 2;
+        //P3 :: 3;
+        //P4 :: 4;
     }
 
-    inputs : Client_Input;
-    inputs.left_down = true;
-    inputs.right_down = false;
-    inputs.boost_down = true;
+    Client_Input :: struct {
+        player_index : Player_Index;
+        left_down : bool;
+        right_down : bool;
+        reset_ball : bool;
+    }
+
+    input : Client_Input;
+    input.player_index = .P2;
+    input.left_down = false;
+    input.right_down = true;
+    input.reset_ball = true;
 
     packet : []u8;
-    packet.data = xx *inputs;
+    packet.data = xx *input;
     packet.count = size_of(Client_Input);
     send_packet(packet, send_socket, server_addr);
 

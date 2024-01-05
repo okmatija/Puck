@@ -33,7 +33,6 @@ DEFAULT_PORT :: 55555;
 host_info : Host_Info;
 host_socket : Socket.SOCKET;
 server_address: string;
-server_socket : Socket.SOCKET;
 is_network_game : bool;
 
 window : Window_Type;
@@ -128,7 +127,12 @@ Ball :: struct {
     body : *b2Body;
 }
 
-Player_Index :: enum { P1; P2; /*P3; P4;*/ }
+Player_Index :: enum u8 #specified {
+    P1 :: 1;
+    P2 :: 2;
+    //P3 :: ;
+    //P4 :: 4;
+}
 
 Player :: struct {
     index : Player_Index;
@@ -190,7 +194,7 @@ main :: () {
 
     // Get info about the host this program is running on
     init_host_info();
-    host_socket = init_host_socket(host_info.ipv4, host_info.port);
+    host_socket = init_socket(host_info.ipv4, host_info.port);
     server_address = ipv4_to_string(host_info.ipv4); // @Leak?
 
     defer Socket.close_and_reset(*host_socket); // To unbind the socket we need to close it completely
@@ -278,68 +282,6 @@ main :: () {
                 }
             }
 
-            server_state : Server_State;
-
-            if is_server {
-                simulate();
-
-                server_state.game_state = get_game_state();
-                server_state.player1_state = get_player_state(player1);
-                server_state.player2_state = get_player_state(player2);
-                server_state.level_state.level = xx current_level;
-                // if live_balls server_state.ball_state = get_ball_state(live_balls[0]);
-
-
-                // Send the server state to the client
-                send_state_to_client :: (player : Player, state : Server_State) {
-                    player_address := ipv4_to_string(player.ipv4,,temp);
-                    player_endpoint : Socket.sockaddr_in = get_endpoint(player_address, player.port);
-                    sent_bytes : s32 = Socket.sendto(host_socket, cast(*u8)*state, size_of(Server_State), 0, cast(*Socket.SOCKADDR)*player_endpoint, size_of(type_of(player_endpoint)));
-                    if sent_bytes == Socket.SOCKET_ERROR {
-                        error := Socket.get_last_socket_error();
-                        print("error = %\n", error);
-                        log_error("Socket.sendto error: %", System.get_error_string(xx error));
-                        // wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-                        // closesocket(SendSocket);
-                        // WSACleanup();
-                        // return 1;
-                    }
-                }
-
-                receive_inputs_from_client :: (player : *Player) {
-                    sender_addr : Socket.SOCKADDR;
-                    sender_addr_size : s32 = size_of(Socket.SOCKADDR);
-
-                    // Note: Any packet larger than this buffer will be silently discarded!
-
-                    // packet_buffer : [1024]u8;
-                    packet_buffer : [size_of(Client_Input)]u8;
-
-                    packet_size : s32 = Socket.recvfrom(server_socket, packet_buffer.data, packet_buffer.count, 0, *sender_addr, *sender_addr_size);
-                    if packet_size == Socket.SOCKET_ERROR {
-                        error := Socket.get_last_socket_error();
-                        if error == Socket.SOCKET_WOULDBLOCK {
-                            // No data to be read from the socket
-                        } else {
-                            print("error = %\n", error);
-                            log_error("Socket.recvfrom error: %", System.get_error_string(xx error));
-                            return;
-                        }
-                    }
-
-                    packet : []u8;
-                    packet.data = packet_buffer.data;
-                    packet.count = max(packet_size, 0);
-                    received_string : string = cast(string)packet;
-                }
-
-                send_state_to_client(player1, server_state);
-                send_state_to_client(player2, server_state);
-
-                receive_inputs_from_client(*player1);
-                receive_inputs_from_client(*player2);
-            }
-
             if is_client {
                 // nocommit Uh... which player are we??
                 // send_inputs_to_server();
@@ -356,6 +298,105 @@ main :: () {
                 // Draws the physics/collision geometry
                 //b2World.DebugDraw(world);
             }
+
+
+            if is_server {
+
+                receive_inputs_from_client :: (player : *Player) {
+                    sender_addr : Socket.SOCKADDR;
+                    sender_addr_size : s32 = size_of(Socket.SOCKADDR);
+
+                    // Note: Packets larger than this buffer will be silently discarded!
+                    // packet : [size_of(Client_Input)]u8; // Can't do this because, if Client_Input is small then we hit error 10040 (WSAEMSGSIZE)
+                    packet : [128]u8;
+                    #assert(packet.count > size_of(Client_Input));
+
+                    packet_size := Socket.recvfrom(host_socket, packet.data, packet.count, 0, *sender_addr, *sender_addr_size);
+                    if packet_size == Socket.SOCKET_ERROR {
+                        error := Socket.get_last_socket_error();
+                        if error == Socket.SOCKET_WOULDBLOCK {
+                            // An expected case. No data to be read from the socket
+                        } else {
+                            log_error("Server error when receiving client inputs. % (Error no. %)", System.get_error_string(xx error), error);
+                            // @Robustness What do here??
+                        }
+                    }
+
+                    if packet_size == size_of(Client_Input) {
+                        // sender_ipv4, _ := get_ipv4(cast(*Socket.sockaddr_in)*sender_addr);
+                        // sender_ipv4_string := ipv4_to_string(player.ipv4,,temp);
+                        // printv(sender_ipv4_string);
+
+                        input : Client_Input = (cast(*Client_Input)packet.data).*;
+                        printv(input);
+
+                        if #complete input.player_index == {
+                        case .P1;
+                            player1.left = xx input.left_down;
+                            player1.right = xx input.right_down;
+                        case .P2;
+                            player2.left = xx input.left_down;
+                            player2.right = xx input.right_down;
+                        }
+
+                        if input.reset_ball {
+                            start_position := Vector2.{0., 0.}; // pitch center
+                            start_angle := 0.;
+                            start_linear_velocity := initial_ball_velocity();
+
+                            for live_balls {
+                                b2Body.SetLinearVelocity(it.body, start_linear_velocity);
+                                b2Body.SetAngularVelocity(it.body, 0.);
+                                b2Body.SetTransform(it.body, start_position, start_angle);
+                            }
+                        }
+
+                    }
+                }
+
+                receive_inputs_from_client(*player1);
+                receive_inputs_from_client(*player2);
+
+                simulate();
+
+                server_state : Server_State;
+                server_state.game_state = get_game_state();
+                server_state.player1_state = get_player_state(player1);
+                server_state.player2_state = get_player_state(player2);
+                server_state.level_state.level = xx current_level;
+                // if live_balls server_state.ball_state = get_ball_state(live_balls[0]);
+
+                // Send the server state to the client
+                send_state_to_client :: (player : Player, state : Server_State) {
+                    player_address := ipv4_to_string(player.ipv4,,temp);
+                    player_endpoint : Socket.sockaddr_in = get_endpoint(player_address, player.port);
+
+                    sent_bytes : s32 = Socket.sendto(host_socket, cast(*u8)*state, size_of(Server_State), 0, cast(*Socket.SOCKADDR)*player_endpoint, size_of(type_of(player_endpoint)));
+                    if sent_bytes == Socket.SOCKET_ERROR {
+                        error := Socket.get_last_socket_error();
+                        log_error("Server error when sending state to client. % (Error no. %)", System.get_error_string(xx error), error);
+                        // @Robustness What do here??
+                        // wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
+                        // closesocket(SendSocket);
+                        // WSACleanup();
+                        // return 1;
+                    }
+                }
+
+                // @Hack For now we distinguish messages recieved based on their size in bytes.
+                #assert(size_of(Server_State) != size_of(Client_Input));
+
+                // @TODOOOO We are using the host_socket to send and recieve data and it looks like sending too much causes receiving to take multiple seconds. Perhaps we are conjesting the network/socket. Try using separate sockets for sending/receiving data or tweak socket settings
+
+                // @TODO Figure out how often we need to send game state
+                if game_frame_index % 2 != 0
+                {
+                    send_state_to_client(player1, server_state);
+                    send_state_to_client(player2, server_state);
+                }
+
+            }
+
         } else {
             menu();
         }
@@ -596,6 +637,7 @@ simulate :: () {
         //     then .MOUSE_SET_POSITION_NFRAME_ACCELERATION
         //     else .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
         control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
+        // control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
 
         if control_mode == {
             case .KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
@@ -856,6 +898,7 @@ init_level :: () {
 init_player :: (using player : *Player, player_index : Player_Index) {
 
     index = player_index;
+    player.ipv4 = host_info.ipv4;
 
     center_y := ifx index == .P1
         then -GAME_EXTENTS.y + PADDLE_EXTENTS.y

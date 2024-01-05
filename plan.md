@@ -116,6 +116,16 @@ A pong game to play at work in breaks
 [ ] Basic network play
 [ ] Get a free invite code when you buy a copy
 [ ] How to implement auto updates
+[ ] How does alignment affect networking??
+
+    // The size of a struct, measured in bytes of memory, includes enough storage for all
+    // its elements, including potential padding between elements. Different platforms
+    // may have different alignment requirements. So your struct could end up being different
+    // sizes on different target machines, *but*, you are able to query everything about the struct
+    // and know these facts at compile time.
+    // 
+    // Furthermore, you can control padding and alignment manually with compiler directives,
+    // which we'll talk about much later in a different file.
 
 # Controls
 
@@ -230,3 +240,21 @@ Random notes:
 
 Make a mobile app for twitch chats, make it flash when you get a new message so when you stream you can use your phone to read the chat and you don't miss things
 
+---
+
+Investigate possible UDP conjestion:
+
+
+jmpy_91: Welcome back
+jmpy_91: I did some playing around, still not sure it is actual congestion 
+:D
+ https://pasteboard.co/ph7nV5OmzmzK.png
+jmpy_91: but definitely something weird going on
+jmpy_91: let's follow the get it working plan
+jmpy_91: thats on a vm local traffic
+jmpy_91: it is showing we are getting way more throughput than the packet per frame
+jmpy_91: its a testing tool, its not jai
+jmpy_91: something you could do is record the traffic with wireshark how your packets look
+jmpy_91: or you can get it working and do that investigation some other time
+jmpy_91: 
+:)

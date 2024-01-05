@@ -85,18 +85,18 @@ main :: () {
             }
         }
 
-        packet : []u8 = .{max(packet_size, 0), packet_buffer.data};
-
+        // packet : []u8 = .{max(packet_size, 0), packet_buffer.data};
         // received_string : string = cast(string)packet;
         // print("received(string) = '%'\n", received_string);
 
-        Client_Inputs :: struct {
-            left_down : bool;
-            right_down : bool;
-            boost_down : bool;
-        }
-        received := (cast(*Client_Inputs)packet.data).*;
-        print("received(struct) = '%'\n", received);
+        
+
+        // Client_Input :: struct {
+        //     left_down : bool;
+        //     right_down : bool;
+        // }
+        // received := (cast(*Client_Input)packet_buffer.data).*;
+        // print("received(struct) = '%'\n", received);
 
         Sleep(200);
     }

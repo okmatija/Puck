@@ -43,8 +43,10 @@ Server_State :: struct {
 }
 
 Client_Input :: struct {
+    player_index : Player_Index;
     left_down : bool;
     right_down : bool;
+    reset_ball : bool;
 }
 
 get_player_state :: (using player : Player) -> Player_State {
@@ -72,7 +74,7 @@ init_host_info :: () {
 }
 
 // nocommit rename
-init_host_socket :: (ipv4 : u32, port : u16) -> Socket.SOCKET #must {
+init_socket :: (ipv4 : u32, port : u16) -> Socket.SOCKET #must {
     // Create a IPv4 UDP socket
     socket := Socket.socket(Socket.AF_INET, .SOCK_DGRAM, .IPPROTO_UDP);
     if socket == Socket.INVALID_SOCKET {
@@ -116,7 +118,7 @@ ipv4_to_u32 :: (ipv4 : string) -> u32 {
     return Socket.inet_addr(ipv4.data);
 }
 
-get_endpoint :: (ipv4 : string, port : u16) -> Endpoint {
+get_endpoint :: (ipv4 : string, port : u16) -> Socket.sockaddr_in {
     result : Socket.sockaddr_in;
     result.sin_family = Socket.AF_INET;
     result.sin_port = Socket.htons(port); // Convert to network byte order
@@ -124,7 +126,8 @@ get_endpoint :: (ipv4 : string, port : u16) -> Endpoint {
     return result;
 }
 
-get_ipv4 :: (endpoint : Endpoint) -> u32, string {
+// @Cleanup remove the string return value, use ipv4_to_string above to get that
+get_ipv4 :: (endpoint : Socket.sockaddr_in) -> u32, string {
     ipv4 := endpoint.sin_addr.S_un.S_addr;
     ipv4_string := copy_string(Socket.to_string(endpoint));
     return ipv4, ipv4_string;
