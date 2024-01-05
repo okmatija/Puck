@@ -180,8 +180,8 @@ menu :: () {
 
         r := NextRect(4*k.x, .75*k.y);
         text_theme.alignment = .Center;
-        action_b, new_socket_address := UI.text_input(r, socket_address, *text_theme);
-        if action_b & .ENTERED  modify_string(*socket_address, new_socket_address);
+        action_b, new_server_address := UI.text_input(r, server_address, *text_theme);
+        if action_b & .ENTERED  modify_string(*server_address, new_server_address);
 
         l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
@@ -203,7 +203,7 @@ menu :: () {
         // @Cleanup This should not be editable
         r := NextRect(4*k.x, .75*k.y);
         text_theme.alignment = .Center;
-        UI.text_input(r, host_info.ipv4_string, *text_theme);
+        UI.text_input(r, ipv4_to_string(host_info.ipv4,,temp), *text_theme);
 
         l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);

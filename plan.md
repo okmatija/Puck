@@ -110,6 +110,7 @@ A pong game to play at work in breaks
 [ ] Implment Snapshot Interpolation. This does physics simulation only on the server, which is good since we don't rely on phyics running on clients (mobile?)
 [ ] Use bounding and quantization to send floating point numbers to the clients (we know max velocity of paddle, then we can quanitize that range and send an integer and reverse the process on the client)
 [ ] Think about packet size in bytes and how many packets per second we will send (ie determine bandwidth)
+[ ] Error checking for port numbers etc
 [ ] Aim for latency of 50ms max, 
 [ ] Support up to 4 players on differently shaped game boards
 [ ] Basic network play
@@ -127,6 +128,9 @@ A pong game to play at work in breaks
 # Gameplay
 
 [x] Kinematic obstructions in the play area
+[ ] Maybe there should be an option to play as a the "level/game master" who gets to control the level e.g., how fast things spin etc. Create fun situations where someone can play favourites
+[ ] Should be able to launch a ball from your paddle, to make it easier to create the fun situations where you can hit a ball with another ball
+[ ] Slow time powerup to temporarily slow down time
 [ ] Three balls was really fun (Will playtest)
 [ ] Countdown to unpause
 [ ] Implement a simple AI

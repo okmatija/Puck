@@ -4,7 +4,22 @@ String :: #import "String";
 Windows :: #import "Windows"; // For OS_Error_Code
 System :: #import "System";
 
-#load "carpet.jai";
+socket_deinit :: () -> bool {
+    System :: #import "System";
+    #import "Windows";
+
+    #if OS == .WINDOWS {
+        result := Socket.WSACleanup();
+        if result == Socket.SOCKET_ERROR {
+            log_error("Could not terminate Winsock2: % %", result, System.get_error_string(cast (OS_Error_Code)result));
+            return false;
+        }
+    } else {
+        // Nothing to do on Unix
+    }
+
+    return true;
+}
 
 // This is the server
 
@@ -12,10 +27,11 @@ System :: #import "System";
 
 main :: () {
 
-    port : u16 = 5555; // @Cleaup Use 0 here to get an OS allocated socket?
+    port : u16 = 55555; // @Cleaup Use 0 here to get an OS allocated socket?
     // Note: "localhost" is not supported by Socket.bind (Socket module.jai) since it calls inet_addr which does not support "localhost"
-    socket_address := "127.0.0.1";
+    // socket_address := "127.0.0.1";
     // socket_address := "0.0.0.0";
+    socket_address := "192.168.55.106";
     assert(Socket.inet_addr("0.0.0.0") == Socket.INADDR_ANY); // Just a test
 
 
@@ -69,24 +85,20 @@ main :: () {
             }
         }
 
-        packet : []u8;
-        packet.data = packet_buffer.data;
-        packet.count = max(packet_size, 0);
-        received_string : string = cast(string)packet;
-        print("received_string = '%'\n", received_string);
+        packet : []u8 = .{max(packet_size, 0), packet_buffer.data};
 
-        to_upper :: (s: string) -> string {
-            copy := copy_string(s);
-            String.to_upper_in_place(copy);
-            return copy;
+        // received_string : string = cast(string)packet;
+        // print("received(string) = '%'\n", received_string);
+
+        Client_Inputs :: struct {
+            left_down : bool;
+            right_down : bool;
+            boost_down : bool;
         }
+        received := (cast(*Client_Inputs)packet.data).*;
+        print("received(struct) = '%'\n", received);
 
         Sleep(200);
-
-        reply := to_upper(received_string);
-        // Socket.send(server_socket, reply.data, xx reply.count, .BCAST);
-        // print("reply = '%'\n", reply);
-
     }
 
     /*

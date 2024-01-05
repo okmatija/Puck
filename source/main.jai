@@ -25,12 +25,15 @@ friction := PADDLE_FRICTION;
 restitution := PADDLE_RESTITUTION;
 
 INITIAL_PLAYER_NAME :: "Lord Dimwit Flathead";
-INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
+// INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
+DEFAULT_PORT :: 55555;
 
-player_name: string; // @Cleanup move to Player struct
-socket_address: string;
-server_address: string;
+// player_name: string; // @Cleanup move to Player struct
+// server_address: string;
 host_info : Host_Info;
+host_socket : Socket.SOCKET;
+server_address: string;
+server_socket : Socket.SOCKET;
 is_network_game : bool;
 
 window : Window_Type;
@@ -52,42 +55,6 @@ Game_Menu :: enum u8 {
 game_frame_index : u32; // Used as a sequence number for network packets
 quitting : bool;
 game_menu := Game_Menu.MAIN_MENU;
-
-Player_State :: struct {
-    index : Player_Index;
-    position : float; // In the "player coordinate system" where left/right are determined by direction player is facing
-};
-
-Ball_State :: struct {
-    position : Vector2;
-    rotation : float;
-    velocity : Vector2;
-};
-
-Game_State :: struct {
-    menu : Game_Menu;
-    level : Level_Id;
-    ball_shape : Ball_Shape;
-    paddle_shape : Paddle_Shape;
-}
-
-// This data is sent by the server to all connected clients
-// @TODO Generate the members using notes
-Server_State :: struct {
-    // A number representing the game protocol hashed with the protocol version number
-    // all UDP packages have the first 4 bytes inspected, packets with numbers not matching
-    // this protocol_id are discarded, otherwise we parse the rest of the payload
-    protocol_id : u32;
-    player1_state : Player_State;
-    player2_state : Player_State;
-    ball_state : Ball_State; // @Incomplete support more than one ball
-    game_state : Game_State; // @TODO Only send this when game starts
-}
-
-Client_Input :: struct {
-    left_down : bool;
-    right_down : bool;
-}
 
 // Networking.
 // One program will host the game and will be the server.
@@ -164,11 +131,10 @@ Ball :: struct {
 Player_Index :: enum { P1; P2; /*P3; P4;*/ }
 
 Player :: struct {
-    connected : bool; // nocommit Game does not start until all players are connected
-    ip_address : u32 = #run Socket.inet_addr("127.0.0.1");
-    port : u16 = 0;
-
     index : Player_Index;
+
+    ipv4 : u32 = #run Socket.inet_addr("127.0.0.1");
+    port : u16 = DEFAULT_PORT;
 
     color : Vector4;
 
@@ -181,29 +147,12 @@ Player :: struct {
     body : *b2Body;
 }
 
-get_player_state :: (using player : Player) -> Player_State {
-    result : Player_State;
-    p := apply_transform(b2Body.GetTransform(body), b2Body.GetWorldCenter(body));
-    result.position = p.x;
-    result.index = index;
-    return result;
-}
-
-get_game_state :: () -> Game_State {
-    result : Game_State;
-    result.menu = game_menu;
-    result.level = xx current_level;
-    result.ball_shape = xx current_ball_shape;
-    result.paddle_shape = xx current_paddle_shape;
-    return result;
-}
-
 initial_ball_velocity :: () -> Vector2 {
     return .{.0, -GAME_EXTENTS.y / 1.};
 }
 
 main :: () {
-    path := path_strip_filename(get_path_of_running_executable());
+    path := path_strip_filename(System.get_path_of_running_executable());
     data_folder = join(path, "data");
     print("data_folder is '%'\n", data_folder);
 
@@ -236,14 +185,15 @@ main :: () {
     // strings are user-modified, we heap-allocate them. You don't
     // have to do this; you just need some consistent way of
     // storing the strings.
-    player_name = copy_string(INITIAL_PLAYER_NAME);
-    socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
+    // player_name = copy_string(INITIAL_PLAYER_NAME);
+    // socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
 
     // Get info about the host this program is running on
-    hostname0_found:, host_info.hostname = get_hostname0();
-    assert(hostname0_found);
-    ip_found:, host_info.ipv4, host_info.ipv4_string = get_host_info(host_info.hostname);
-    assert(ip_found);
+    init_host_info();
+    host_socket = init_host_socket(host_info.ipv4, host_info.port);
+    server_address = ipv4_to_string(host_info.ipv4); // @Leak?
+
+    defer Socket.close_and_reset(*host_socket); // To unbind the socket we need to close it completely
 
     contact_listener : b2ContactListener;
     begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
@@ -328,29 +278,73 @@ main :: () {
                 }
             }
 
+            server_state : Server_State;
+
             if is_server {
                 simulate();
 
-                server_state : Server_State;
                 server_state.game_state = get_game_state();
                 server_state.player1_state = get_player_state(player1);
                 server_state.player2_state = get_player_state(player2);
+                server_state.level_state.level = xx current_level;
                 // if live_balls server_state.ball_state = get_ball_state(live_balls[0]);
 
-                send_server_state_to_clients :: () {
 
+                // Send the server state to the client
+                send_state_to_client :: (player : Player, state : Server_State) {
+                    player_address := ipv4_to_string(player.ipv4,,temp);
+                    player_endpoint : Socket.sockaddr_in = get_endpoint(player_address, player.port);
+                    sent_bytes : s32 = Socket.sendto(host_socket, cast(*u8)*state, size_of(Server_State), 0, cast(*Socket.SOCKADDR)*player_endpoint, size_of(type_of(player_endpoint)));
+                    if sent_bytes == Socket.SOCKET_ERROR {
+                        error := Socket.get_last_socket_error();
+                        print("error = %\n", error);
+                        log_error("Socket.sendto error: %", System.get_error_string(xx error));
+                        // wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
+                        // closesocket(SendSocket);
+                        // WSACleanup();
+                        // return 1;
+                    }
                 }
 
-                send_server_state_to_clients();
+                receive_inputs_from_client :: (player : *Player) {
+                    sender_addr : Socket.SOCKADDR;
+                    sender_addr_size : s32 = size_of(Socket.SOCKADDR);
+
+                    // Note: Any packet larger than this buffer will be silently discarded!
+
+                    // packet_buffer : [1024]u8;
+                    packet_buffer : [size_of(Client_Input)]u8;
+
+                    packet_size : s32 = Socket.recvfrom(server_socket, packet_buffer.data, packet_buffer.count, 0, *sender_addr, *sender_addr_size);
+                    if packet_size == Socket.SOCKET_ERROR {
+                        error := Socket.get_last_socket_error();
+                        if error == Socket.SOCKET_WOULDBLOCK {
+                            // No data to be read from the socket
+                        } else {
+                            print("error = %\n", error);
+                            log_error("Socket.recvfrom error: %", System.get_error_string(xx error));
+                            return;
+                        }
+                    }
+
+                    packet : []u8;
+                    packet.data = packet_buffer.data;
+                    packet.count = max(packet_size, 0);
+                    received_string : string = cast(string)packet;
+                }
+
+                send_state_to_client(player1, server_state);
+                send_state_to_client(player2, server_state);
+
+                receive_inputs_from_client(*player1);
+                receive_inputs_from_client(*player2);
             }
 
             if is_client {
-                receive_game_state_from_server :: () {
+                // nocommit Uh... which player are we??
+                // send_inputs_to_server();
 
-                }
-
-                receive_game_state_from_server();
-
+                // Draw game state
                 Simp.clear_render_target(1, 0, 0, 1);
                 draw_game_background();
                 draw_level();
@@ -380,7 +374,7 @@ main :: () {
 init_fonts :: () {
     // So that we can load our font, set to path of running executable.
     // @Incomplete: Pack a default font into Simp.
-    path := path_strip_filename(get_path_of_running_executable());
+    path := path_strip_filename(System.get_path_of_running_executable());
 
     set_working_directory(path);
     pixel_height := window_height / 24;
@@ -936,7 +930,6 @@ modify_string :: (ps: *string, new_value: string) {
 
 #import "Basic";
 #import "String";
-#import "System";
 #import "Input";
 #import "Sound_Player";
 #import "Wav_File";
@@ -948,6 +941,7 @@ modify_string :: (ps: *string, new_value: string) {
 #import "File";
 UI :: #import "GetRect_LeftHanded";
 Socket :: #import "Socket";
+System :: #import "System";
 Simp :: #import "Simp";
 Texture :: Simp.Texture;
 
@@ -958,6 +952,7 @@ Texture :: Simp.Texture;
 #import,dir "ThirdParty/JaiBox2D";
 #load "Box2D_DebugDraw_Simp.jai";
 
+#load "networking.jai";
 #load "sound.jai";
 #load "menu.jai";
 #load "carpet.jai";

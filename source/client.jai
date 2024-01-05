@@ -3,13 +3,30 @@ System :: #import "System";
 
 #import "Basic";
 #import "Math";
-#load "carpet.jai";
+
+socket_deinit :: () -> bool {
+    System :: #import "System";
+    #import "Windows";
+
+    #if OS == .WINDOWS {
+        result := Socket.WSACleanup();
+        if result == Socket.SOCKET_ERROR {
+            log_error("Could not terminate Winsock2: % %", result, System.get_error_string(cast (OS_Error_Code)result));
+            return false;
+        }
+    } else {
+        // Nothing to do on Unix
+    }
+
+    return true;
+}
+
 
 // This is the client
 
 main :: () {
 
-    port : u16 = 5555;
+    port : u16 = 55555;
     // Note: "localhost" is not supported by Socket.bind (Socket module.jai) since it calls inet_addr which does not support "localhost"
     //socket_address := "127.0.0.1";
     // socket_address := "0.0.0.0";
@@ -35,9 +52,10 @@ main :: () {
     server_addr : Socket.sockaddr_in;
     server_addr.sin_family = Socket.AF_INET;
     server_addr.sin_port = Socket.htons(port);
-    server_addr.sin_addr.S_un.S_addr = Socket.inet_addr("127.0.0.1");
+    // server_addr.sin_addr.S_un.S_addr = Socket.inet_addr("127.0.0.1");
+    server_addr.sin_addr.S_un.S_addr = Socket.inet_addr("192.168.55.106");
 
-    send_string :: (data : []u8, send_socket : Socket.SOCKET, dest_addr : Socket.sockaddr_in) {
+    send_packet :: (data : []u8, send_socket : Socket.SOCKET, dest_addr : Socket.sockaddr_in) {
         // print("Sending a datagram to the receiver...\n");
 
         // @Cleanup use packet to name the sent data
@@ -54,9 +72,27 @@ main :: () {
         }
     }
 
-    send_string(xx "What the heck", send_socket, server_addr);
-    send_string(xx "The second message", send_socket, server_addr);
-    send_string(xx "Three is my favourite number", send_socket, server_addr);
+    Client_Input :: struct {
+        left_down : bool;
+        right_down : bool;
+        boost_down : bool;
+    }
+
+    inputs : Client_Input;
+    inputs.left_down = true;
+    inputs.right_down = false;
+    inputs.boost_down = true;
+
+    packet : []u8;
+    packet.data = xx *inputs;
+    packet.count = size_of(Client_Input);
+    send_packet(packet, send_socket, server_addr);
+
+
+
+    // send_packet(xx "What the heck", send_socket, server_addr);
+    // send_packet(xx "The second message", send_socket, server_addr);
+    // send_packet(xx "Three is my favourite number", send_socket, server_addr);
 
     // send(client_socket, sent.data, sent.count, .bcast);
     // sendto(client_socket, sent.data, sent.count, .bcast, null, 0);
