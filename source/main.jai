@@ -24,16 +24,18 @@ PADDLE_RESTITUTION :: 1.2;
 friction := PADDLE_FRICTION;
 restitution := PADDLE_RESTITUTION;
 
-INITIAL_PLAYER_NAME :: "Lord Dimwit Flathead";
-// INITIAL_SOCKET_ADDRESS :: "127.0.0.1:4269";
-DEFAULT_PORT :: 55555;
+DEFAULT_PORT : u16 : 42698;
 
 // player_name: string; // @Cleanup move to Player struct
 // server_address: string;
 host_info : Host_Info;
+host_port_string : string;
+
 host_socket : Socket.SOCKET;
-server_address: string;
-is_network_game : bool;
+
+server_address : string;
+server_port : u16 = DEFAULT_PORT;
+server_port_string : string;
 
 window : Window_Type;
 window_height : s32 = WINDOW_HEIGHT_INITIAL;
@@ -42,32 +44,35 @@ font : *Simp.Dynamic_Font;
 
 // @Cleanup Menus should be a state machine using this enum
 Game_Menu :: enum u8 {
-    NONE;
-    MAIN_MENU;
+    MAIN_MENU :: 0;
     PLAY_LOCAL_GAME_MENU;
     JOIN_NETWORK_GAME_MENU;
     HOST_NETWORK_GAME_MENU;
+    WAITING_FOR_PLAYERS_MENU;
     SETTINGS_MENU;
     PAUSE_MENU;
 }
 
+Game_Mode :: enum u8 {
+    NOT_STARTED :: 0;
+    PLAYING;
+    PAUSED;
+}
+
 game_frame_index : u32; // Used as a sequence number for network packets
-quitting : bool;
-game_menu := Game_Menu.MAIN_MENU;
+game_quitting : bool;
+game_menu : Game_Menu;
+game_menu_if_waiting_cancelled : Game_Menu;
+game_mode : Game_Mode;
 
-// Networking.
-// One program will host the game and will be the server.
-// The server program will also be a client conneted via the loopback address
-// The other player(s) will be connected via the clients IP address
-// Server game loop: read client input from UDP packets, simulate the game and compute a current game state which will be sent to the clients
+connection_retry_count : int = INITIAL_CONNECTION_RETRY_COUNT;
+connection_retry_countdown : float = INITIAL_CONNECTION_RETRY_COUNTDOWN;
+INITIAL_CONNECTION_RETRY_COUNT :: 50;
+INITIAL_CONNECTION_RETRY_COUNTDOWN : float : .1; // Seconds
 
-// Clients will send their input to the server
-is_server : bool = true;
-is_client : bool = true;
-
-current_dt: float = 1. / 60.;
-current_time: float64;
-last_time:  float64;
+current_dt: float = 1. / 60.; // Seconds
+current_time: float64; // Seconds
+last_time:  float64; // Seconds
 
 player1 : Player;
 player2 : Player;
@@ -137,7 +142,7 @@ Player_Index :: enum u8 #specified {
 Player :: struct {
     index : Player_Index;
 
-    ipv4 : u32 = #run Socket.inet_addr("127.0.0.1");
+    ipv4 : u32 = U32_MAX;
     port : u16 = DEFAULT_PORT;
 
     color : Vector4;
@@ -156,6 +161,13 @@ initial_ball_velocity :: () -> Vector2 {
 }
 
 main :: () {
+    // args : []string = get_command_line_arguments();
+    // defer array_free(args);
+    // for 1..args.count-1 {
+    //     n, success, _ := to_integer(args[it]);
+    //     host_port.port = ifx success then n else DEFAULT_PORT;
+    // }
+
     path := path_strip_filename(System.get_path_of_running_executable());
     data_folder = join(path, "data");
     print("data_folder is '%'\n", data_folder);
@@ -185,19 +197,19 @@ main :: () {
     init_textures();
     UI.ui_init();
 
+    // Get info about the host this program is running on
+    init_host_info();
+
     // So that we have consistent memory handling after these
     // strings are user-modified, we heap-allocate them. You don't
     // have to do this; you just need some consistent way of
     // storing the strings.
-    // player_name = copy_string(INITIAL_PLAYER_NAME);
-    // socket_address = copy_string(INITIAL_SOCKET_ADDRESS);
+    server_address = ipv4_to_string(host_info.ipv4);
+    server_port_string = copy_string(tprint("%", DEFAULT_PORT));
+    host_port_string = copy_string(tprint("%", DEFAULT_PORT));
 
-    // Get info about the host this program is running on
-    init_host_info();
-    host_socket = init_socket(host_info.ipv4, host_info.port);
-    server_address = ipv4_to_string(host_info.ipv4); // @Leak?
 
-    defer Socket.close_and_reset(*host_socket); // To unbind the socket we need to close it completely
+    // defer Socket.close_and_reset(*host_socket); // @Cleanup To unbind the socket we need to close it completely
 
     contact_listener : b2ContactListener;
     begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
@@ -219,8 +231,9 @@ main :: () {
 
     init_world(*contact_listener);
 
-    // @TODOOO Figure out the order of things in this loop e.g., read input, simulate then render (to use the latest input). Don't update things that don't need updating e.g., sound stuff if we are a server but not a client
-    while !quitting {
+    // @TODOOO Figure out the order of things in this loop e.g., read input, simulate then render (to use the latest input).
+    // Don't update things that don't need updating e.g., sound stuff if we are a server but not a client
+    while !game_quitting {
         reset_temporary_storage();
 
         current_time = seconds_since_init();
@@ -245,164 +258,118 @@ main :: () {
 
         update_sound_player(current_dt);
 
-        // @Cleanup Just do this when we enter the game/menu
-        if game_menu == .NONE {
+        if game_mode == .PLAYING {
+
+            /*
+            Network Game:
+            On the server     player1.ipv4==host_addr     player2.ipv4==remote_addr
+            On the client     player1.ipv4==remote_addr   player2.ipv4==host_addr
+
+            Local Game:
+            On the machine    player1.ipv4==host_addr     player2.ipv4==host_addr
+            */
+
+            is_network_game_client := player1.ipv4 != host_info.ipv4;
+            is_network_game_server := player2.ipv4 != host_info.ipv4;
+            is_local\ _game := player1.ipv4 == host_info.ipv4 && player2.ipv4 == host_info.ipv4;
+
+            defer game_frame_index += 1;
+
             hide_cursor();
 
-            for event : events_this_frame {
-                if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
-                    // @Cleanup Is this correct? What even is the QUIT event?
-                    game_menu = .PAUSE_MENU;
-                    break;
-                }
+            // Always read all input
+            input1, input2 : Client_Input;
+            {
+                input1.player_index = .P1;
+                input2.player_index = .P2;
+                for event : events_this_frame {
+                    if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
+                        // @Cleanup Is this correct? What even is the QUIT event?
+                        game_menu = .PAUSE_MENU;
+                        game_mode = .PAUSED;
+                        break;
+                    }
 
-                if event.type == .KEYBOARD {
-                    if event.key_code == {
-                        case #char "J";
-                            player1.left =  event.key_pressed;
-                        case #char "L";
-                            player1.right = event.key_pressed;
-
+                    if event.type == .KEYBOARD {
+                        if event.key_code == {
                         case #char "A";
-                            player2.left =  event.key_pressed;
+                            input1.left_down = xx event.key_pressed;
                         case #char "D";
-                            player2.right = event.key_pressed;
-
+                            input1.right_down = xx event.key_pressed;
                         case #char "R";
-                            start_position := Vector2.{0., 0.}; // pitch center
-                            start_angle := 0.;
-                            start_linear_velocity := initial_ball_velocity();
+                            input1.reset_ball = true;
 
-                            for live_balls {
-                                b2Body.SetLinearVelocity(it.body, start_linear_velocity);
-                                b2Body.SetAngularVelocity(it.body, 0.);
-                                b2Body.SetTransform(it.body, start_position, start_angle);
-                            }
+                        // Only for local play!
+                        case #char "J";
+                            input2.left_down =  xx event.key_pressed;
+                        case #char "L";
+                            input2.right_down = xx event.key_pressed;
+                        }
                     }
                 }
             }
 
-            if is_client {
-                // nocommit Uh... which player are we??
-                // send_inputs_to_server();
-
-                // Draw game state
-                Simp.clear_render_target(1, 0, 0, 1);
-                draw_game_background();
-                draw_level();
-                draw_player_at(player1);
-                draw_player_at(player2);
-                for live_balls draw_ball_at(it);
-                draw_score();
-
-                // Draws the physics/collision geometry
-                //b2World.DebugDraw(world);
-            }
-
-
-            if is_server {
-
-                receive_inputs_from_client :: (player : *Player) {
-                    sender_addr : Socket.SOCKADDR;
-                    sender_addr_size : s32 = size_of(Socket.SOCKADDR);
-
-                    // Note: Packets larger than this buffer will be silently discarded!
-                    // packet : [size_of(Client_Input)]u8; // Can't do this because, if Client_Input is small then we hit error 10040 (WSAEMSGSIZE)
-                    packet : [128]u8;
-                    #assert(packet.count > size_of(Client_Input));
-
-                    packet_size := Socket.recvfrom(host_socket, packet.data, packet.count, 0, *sender_addr, *sender_addr_size);
-                    if packet_size == Socket.SOCKET_ERROR {
-                        error := Socket.get_last_socket_error();
-                        if error == Socket.SOCKET_WOULDBLOCK {
-                            // An expected case. No data to be read from the socket
-                        } else {
-                            log_error("Server error when receiving client inputs. % (Error no. %)", System.get_error_string(xx error), error);
-                            // @Robustness What do here??
-                        }
-                    }
-
-                    if packet_size == size_of(Client_Input) {
-                        // sender_ipv4, _ := get_ipv4(cast(*Socket.sockaddr_in)*sender_addr);
-                        // sender_ipv4_string := ipv4_to_string(player.ipv4,,temp);
-                        // printv(sender_ipv4_string);
-
-                        input : Client_Input = (cast(*Client_Input)packet.data).*;
-                        printv(input);
-
-                        if #complete input.player_index == {
-                        case .P1;
-                            player1.left = xx input.left_down;
-                            player1.right = xx input.right_down;
-                        case .P2;
-                            player2.left = xx input.left_down;
-                            player2.right = xx input.right_down;
-                        }
-
-                        if input.reset_ball {
-                            start_position := Vector2.{0., 0.}; // pitch center
-                            start_angle := 0.;
-                            start_linear_velocity := initial_ball_velocity();
-
-                            for live_balls {
-                                b2Body.SetLinearVelocity(it.body, start_linear_velocity);
-                                b2Body.SetAngularVelocity(it.body, 0.);
-                                b2Body.SetTransform(it.body, start_position, start_angle);
-                            }
-                        }
-
-                    }
+            player1.left = xx input1.left_down;
+            player1.right = xx input1.right_down;
+            if is_local_game {
+                player2.left = xx input2.left_down;
+                player2.right = xx input2.right_down;
+            } else {
+                if is_network_game_client {
+                    send_input_to_server(input2);
                 }
 
-                receive_inputs_from_client(*player1);
-                receive_inputs_from_client(*player2);
+                if is_network_game_server {
+                    input2=, received := receive_input_from_client();
+                }
+            }
 
+            if input1.reset_ball || input2.reset_ball reset_balls();
+
+            if is_local_game {
                 simulate();
+            } else {
+                if is_network_game_server {
+                    simulate();
+                    // @TODO Figure out how often we need to send game state
+                    if game_frame_index % 2 != 0
+                    {
+                        server_state : Server_State; // nocommit
 
-                server_state : Server_State;
-                server_state.game_state = get_game_state();
-                server_state.player1_state = get_player_state(player1);
-                server_state.player2_state = get_player_state(player2);
-                server_state.level_state.level = xx current_level;
-                // if live_balls server_state.ball_state = get_ball_state(live_balls[0]);
+                        // server_state : Server_State;
+                        // server_state.game_state = get_game_state();
+                        // server_state.player1_state = get_player_state(player1);
+                        // server_state.player2_state = get_player_state(player2);
+                        // server_state.level_state.level = xx current_level;
+                        // // if live_balls server_state.ball_state = get_ball_state(live_balls[0]);
 
-                // Send the server state to the client
-                send_state_to_client :: (player : Player, state : Server_State) {
-                    player_address := ipv4_to_string(player.ipv4,,temp);
-                    player_endpoint : Socket.sockaddr_in = get_endpoint(player_address, player.port);
-
-                    sent_bytes : s32 = Socket.sendto(host_socket, cast(*u8)*state, size_of(Server_State), 0, cast(*Socket.SOCKADDR)*player_endpoint, size_of(type_of(player_endpoint)));
-                    if sent_bytes == Socket.SOCKET_ERROR {
-                        error := Socket.get_last_socket_error();
-                        log_error("Server error when sending state to client. % (Error no. %)", System.get_error_string(xx error), error);
-                        // @Robustness What do here??
-                        // wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-                        // closesocket(SendSocket);
-                        // WSACleanup();
-                        // return 1;
+                        send_state_to_client(player2, server_state);
                     }
                 }
-
-                // @Hack For now we distinguish messages recieved based on their size in bytes.
-                #assert(size_of(Server_State) != size_of(Client_Input));
-
-                // @TODOOOO We are using the host_socket to send and recieve data and it looks like sending too much causes receiving to take multiple seconds. Perhaps we are conjesting the network/socket. Try using separate sockets for sending/receiving data or tweak socket settings
-
-                // @TODO Figure out how often we need to send game state
-                if game_frame_index % 2 != 0
-                {
-                    send_state_to_client(player1, server_state);
-                    send_state_to_client(player2, server_state);
-                }
-
             }
 
+            // // @Hack For now we distinguish messages recieved based on their size in bytes.
+            // #assert(size_of(Server_State) != size_of(Client_Input));
+
+            // // @TODOOOO We are using the host_socket to send and recieve data and it looks like sending too much causes receiving to take multiple seconds. Perhaps we are conjesting the network/socket. Try using separate sockets for sending/receiving data or tweak socket settings
+
+
+            // Draw game state
+            Simp.clear_render_target(1, 0, 0, 1);
+            draw_game_background();
+            draw_level();
+            draw_player_at(player1);
+            draw_player_at(player2);
+            for live_balls draw_ball_at(it);
+            draw_score();
+
+            // Draws the physics/collision geometry
+            //b2World.DebugDraw(world);
         } else {
             menu();
         }
 
         Simp.swap_buffers(window);
-        game_frame_index += 1;
 
         // memory_visualizer_per_frame_update();
     }
@@ -607,6 +574,18 @@ draw_ball_at :: (using ball: Ball) {
 
 }
 
+reset_balls :: () {
+    start_position := Vector2.{0., 0.}; // pitch center
+    start_angle := 0.;
+    start_linear_velocity := initial_ball_velocity();
+
+    for live_balls {
+        b2Body.SetLinearVelocity(it.body, start_linear_velocity);
+        b2Body.SetAngularVelocity(it.body, 0.);
+        b2Body.SetTransform(it.body, start_position, start_angle);
+    }
+}
+
 // @Incompleteee This should use the rendering geometry..!
 draw_player_at :: (using player: Player) {
     Simp.set_shader_for_color();
@@ -746,6 +725,7 @@ simulate :: () {
     }
 
 
+    // @TODO Ignore score updates when we are waiting for players
     for ball : live_balls {
         center := b2Body.GetPosition(ball.body);
         if center.y > GAME_EXTENTS.y {
@@ -804,11 +784,15 @@ deinit_game :: () {
     deinit_level();
 }
 
-init_game :: () {
+// @TODO When the client inits the game it doesn't need the Box2D stuff that only needs to happen on the server
+init_game :: (player1_ipv4 : u32, player2_ipv4 : u32) {
+
     init_level();
-    init_player(*player1, .P1);
-    init_player(*player2, .P2);
+    init_player(*player1, .P1, player1_ipv4);
+    init_player(*player2, .P2, player2_ipv4);
+
     game_frame_index = 0;
+    game_mode = .PLAYING;
 }
 
 draw_level :: () {
@@ -895,17 +879,17 @@ init_level :: () {
     }
 }
 
-init_player :: (using player : *Player, player_index : Player_Index) {
+init_player :: (using player : *Player, player_index : Player_Index, player_ipv4 : u32) {
 
     index = player_index;
-    player.ipv4 = host_info.ipv4;
+    ipv4 = player_ipv4;
+    color = ifx index == .P1
+        then Vector4.{1., .1, .1, 1.}
+        else Vector4.{.1, .1, 1., 1.};
 
     center_y := ifx index == .P1
         then -GAME_EXTENTS.y + PADDLE_EXTENTS.y
         else  GAME_EXTENTS.y - PADDLE_EXTENTS.y;
-    color = ifx index == .P1
-        then Vector4.{1., .1, .1, 1.}
-        else Vector4.{.1, .1, 1., 1.};
 
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);

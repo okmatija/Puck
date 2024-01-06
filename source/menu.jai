@@ -16,8 +16,7 @@ menu :: () {
     x, y, width, height := get_dimensions(window, true);
     UI.ui_per_frame_update(window, window_width, window_height, current_time);
 
-    ui_theme : UI.Overall_Theme = UI.default_theme_procs[xx UI.Default_Themes.Default]();  // This gets filled out by calling the Theme_Proc for current_theme.
-    UI.set_default_theme(ui_theme);  // Just in case we don't explicitly pass themes sometimes...!
+    using ui_state := make_ui_state();
 
     button_theme := ui_theme.button_theme;
     button_theme.font = font;
@@ -28,12 +27,6 @@ menu :: () {
     text_theme.font = font;
 
     dropdown_theme := *ui_theme.dropdown_theme;
-
-
-    // 'k' is some resolution-adjusting unit of distance. Right now it is
-    // 1/10 of the screen width/height, so, 192/108 pixels at 1920x1080.
-    k := Vector2.{window_width * .1, window_height * .1};
-    padding := Vector2.{.1*k.x, .1*k.y}; // x/y is horizontal/vertical space between widgets
 
     // The 'dropdown' function causes a popup to be created, which
     // gets rendered at the end of the frame when we call draw_popups().
@@ -69,29 +62,7 @@ menu :: () {
     }
 
 
-    // Returns the next rect to use and moves the cursor to the bottom center of the rect
-    NextRect :: (w: float, h: float) -> UI.Rect #expand {
-        r := UI.get_rect(`cursor.x - w*.5, `cursor.y, w, h);
-        `cursor.y += h + `padding.y;
-        return r;
-    }
-
-    NextRect2 :: (w: float, h: float) -> UI.Rect, UI.Rect #expand {
-        l := UI.get_rect(`cursor.x - padding.x*.5 - w , `cursor.y, w, h);
-        r := UI.get_rect(`cursor.x + padding.x*.5,      `cursor.y, w, h);
-        `cursor.y += h + `padding.y;
-        return l, r;
-    }
-
-    CenteredCursor :: (init_y : float) -> Vector2 #expand {
-        return .{5.*k.x, init_y};
-    }
-
     if #complete game_menu == {
-    case .NONE;
-
-        assert(false); // We should not get here
-
     case .MAIN_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
@@ -123,7 +94,7 @@ menu :: () {
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Quit", *button_theme);
         if released {
-            quitting = true;
+            game_quitting = true;
         }
 
     case .PLAY_LOCAL_GAME_MENU;
@@ -152,11 +123,7 @@ menu :: () {
         }
         _, _, released = UI.button(r, "Play", *button_theme);
         if released {
-            game_menu = .NONE;
-            is_network_game = false;
-            is_server = true;
-            is_client = true;
-            init_game();
+            init_game(host_info.ipv4, host_info.ipv4);
         }
 
     case .PAUSE_MENU;
@@ -166,7 +133,7 @@ menu :: () {
         l, r := NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Resume", *button_theme);
         if released {
-            game_menu = .NONE;
+            game_mode = .PLAYING;
         }
         _, _, released = UI.button(l, "Leave", *button_theme);
         if released {
@@ -180,8 +147,26 @@ menu :: () {
 
         r := NextRect(4*k.x, .75*k.y);
         text_theme.alignment = .Center;
-        action_b, new_server_address := UI.text_input(r, server_address, *text_theme);
-        if action_b & .ENTERED  modify_string(*server_address, new_server_address);
+        action, new_server_address := UI.text_input(r, server_address, *text_theme);
+        if action & .ENTERED {
+            modify_string(*server_address, new_server_address);
+        }
+
+        r = NextRect(4*k.x, .75*k.y);
+        text_theme.alignment = .Center;
+        action=, new_server_port_string := UI.text_input(r, server_port_string, *text_theme);
+        if action & .ENTERED {
+            port, success, _ := to_integer(new_server_port_string);
+            if success && (port >= 1024 && port <= 49151) {
+                modify_string(*server_port_string, new_server_port_string);
+                server_port = cast(u16)port;
+            } else {
+                // From: https://www.ibm.com/docs/en/ztpf/2023?topic=overview-port-numbers
+                // Port numbers [1024,  49151] are reserved for user server applications.
+                // Port numbers [49152, 65535] are reserved for clients.
+                log_error("Enter a valid port integer in the range [1024, 49151], got %", server_port);
+            }
+        }
 
         l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
@@ -190,10 +175,8 @@ menu :: () {
         }
         _, _, released = UI.button(r, "Join", *button_theme);
         if released {
-            // @Incomplete
-            is_network_game = true;
-            is_server = false;
-            is_client = true;
+            game_menu_if_waiting_cancelled = .JOIN_NETWORK_GAME_MENU;
+            game_menu = .WAITING_FOR_PLAYERS_MENU;
         }
 
     case .HOST_NETWORK_GAME_MENU;
@@ -201,9 +184,26 @@ menu :: () {
         cursor := CenteredCursor(5.2*k.y);
 
         // @Cleanup This should not be editable
+        // @CompilerBug When the program first starts this can be edited, but after going to the Join menu and back here it can't be
         r := NextRect(4*k.x, .75*k.y);
         text_theme.alignment = .Center;
         UI.text_input(r, ipv4_to_string(host_info.ipv4,,temp), *text_theme);
+
+        r = NextRect(4*k.x, .75*k.y);
+        text_theme.alignment = .Center;
+        action, new_host_port_string := UI.text_input(r, host_port_string, *text_theme);
+        if action & .ENTERED {
+            port, success, _ := to_integer(new_host_port_string);
+            if success && (port >= 1024 && port <= 49151) {
+                modify_string(*host_port_string, new_host_port_string);
+                host_info.port = cast(u16)port;
+            } else {
+                // From: https://www.ibm.com/docs/en/ztpf/2023?topic=overview-port-numbers
+                // Port numbers [1024,  49151] are reserved for user server applications.
+                // Port numbers [49152, 65535] are reserved for clients.
+                log_error("Enter a valid port integer in the range [1024, 49151], got %", server_port);
+            }
+        }
 
         l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
@@ -212,11 +212,72 @@ menu :: () {
         }
         _, _, released = UI.button(r, "Host", *button_theme);
         if released {
-            game_menu = .NONE;
-            is_network_game = true;
-            is_server = true;
-            is_client = true;
-            init_game();
+            game_menu_if_waiting_cancelled = .HOST_NETWORK_GAME_MENU;
+            game_menu = .WAITING_FOR_PLAYERS_MENU;
+
+            host_socket = init_socket(host_info.ipv4, host_info.port);
+            // nocommit:
+            server_address = ipv4_to_string(host_info.ipv4); // @Leak?
+            server_port = host_info.port;
+        }
+
+    case .WAITING_FOR_PLAYERS_MENU;
+
+        countdown(*connection_retry_countdown);
+        remaining_time := connection_retry_countdown + connection_retry_count * INITIAL_CONNECTION_RETRY_COUNTDOWN;
+        remaining_time_formatted := FormatFloat.{value=remaining_time, trailing_width=2, zero_removal=.NO};
+
+        label_theme := ui_theme.label_theme;
+        label_theme.text_color = .{0, 0, 0, 1};
+
+        message : string;
+        if game_menu_if_waiting_cancelled == .HOST_NETWORK_GAME_MENU {
+            message = tprint("Waiting for Players... %s", remaining_time_formatted);
+        } else {
+            message = tprint("Connecting to Server... %s", remaining_time_formatted);
+        }
+
+        cursor := CenteredCursor(5*k.y);
+        r := NextRect(5*k.x, .75*k.y);
+        label_theme.alignment = .Left;
+        UI.label(r, message, *label_theme);
+
+        // Only send a connection request (implemented via a dummy Client_Input) when the countdown expires
+        if connection_retry_countdown <= 0 {
+            // Send a null input to the server
+            input : Client_Input;
+            send_input_to_server(input);
+            connection_retry_countdown = INITIAL_CONNECTION_RETRY_COUNTDOWN;
+            connection_retry_count -= 1;
+        }
+
+        connected := false;
+        {
+            // TODO Receive a game state from the server
+        }
+
+        if connected {
+            connection_ipv4 : u32;
+            if game_menu_if_waiting_cancelled == .HOST_NETWORK_GAME_MENU {
+                client_ipv4 := connection_ipv4;
+                init_game(host_info.ipv4, client_ipv4);
+            } else if game_menu_if_waiting_cancelled == .JOIN_NETWORK_GAME_MENU {
+                server_ipv4 := connection_ipv4;
+                init_game(server_ipv4, host_info.ipv4);
+            }
+
+        } else {
+
+            r = NextRect(1.25*k.x, .75*k.y);
+            _, _, released := UI.button(r, "Cancel", *button_theme);
+            if released || remaining_time <= 0 {
+                game_menu = game_menu_if_waiting_cancelled;
+                connection_retry_count = INITIAL_CONNECTION_RETRY_COUNT;
+                connection_retry_countdown = INITIAL_CONNECTION_RETRY_COUNTDOWN;
+
+                Socket.close_and_reset(*host_socket);
+            }
+
         }
 
     case .SETTINGS_MENU;

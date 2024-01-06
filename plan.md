@@ -1,3 +1,23 @@
+This is confusing because one program is the client, the server, or both
+
+
+local play: P1 and P2 in the same program
+
+network play (hosting): we are P1, which is the server. P2 is the client
+P2 h
+
+network play (joining): we are P2, which is the client. P1 is the server
+
+
+
+
+
+
+
+
+
+
+
 Menu flow for main game:
 
     [ Play Local Game ]

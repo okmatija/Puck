@@ -81,4 +81,43 @@ hide_cursor :: inline ()
 	}
 }
 
+UI_State :: struct {
+    // 'k' is some resolution-adjusting unit of distance. Right now it is
+    // 1/10 of the screen width/height, so, 192/108 pixels at 1920x1080.
+    k : Vector2;
+
+    // x/y is horizontal/vertical space between widgets
+    padding : Vector2;
+
+    ui_theme : UI.Overall_Theme;
+}
+
+make_ui_state :: () -> UI_State {
+    using state : UI_State;
+    k = Vector2.{window_width * .1, window_height * .1};
+    padding = Vector2.{.1*k.x, .1*k.y}; // x/y is horizontal/vertical space between widgets
+    ui_theme = UI.default_theme_procs[xx UI.Default_Themes.Default]();
+    UI.set_default_theme(ui_theme);  // Just in case we don't explicitly pass themes sometimes...!
+    return state;
+}
+
+CenteredCursor :: (init_y : float) -> Vector2 #expand {
+    return .{5.*`k.x, init_y};
+}
+
+// Returns the next rect to use and moves the cursor to the bottom center of the rect
+NextRect :: (w: float, h: float) -> UI.Rect #expand {
+    r := UI.get_rect(`cursor.x - w*.5, `cursor.y, w, h);
+    `cursor.y += h + `padding.y;
+    return r;
+}
+
+NextRect2 :: (w: float, h: float) -> UI.Rect, UI.Rect #expand {
+    l := UI.get_rect(`cursor.x - `padding.x*.5 - w , `cursor.y, w, h);
+    r := UI.get_rect(`cursor.x + `padding.x*.5,      `cursor.y, w, h);
+    `cursor.y += h + `padding.y;
+    return l, r;
+}
+
+
 #import "Math";
