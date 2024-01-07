@@ -4,7 +4,7 @@
 // - Game playable area is padded left and right by GAME_PADDING
 GAME_EXTENTS :: Vector2.{10.0, 10.0}; // half-width/height in meters
 GAME_PADDING :: 3.0; // Applied to both sides of game
-WINDOW_HEIGHT_INITIAL :: 1440;
+WINDOW_HEIGHT_INITIAL :: 900;//1440;
 DT_MAX : float : 0.15;
 
 BALL_RADIUS_INITIAL :: 0.2;
@@ -47,8 +47,9 @@ Game_Menu :: enum u8 {
     MAIN_MENU :: 0;
     PLAY_LOCAL_GAME_MENU;
     JOIN_NETWORK_GAME_MENU;
-    HOST_NETWORK_GAME_MENU;
+    SERVE_NETWORK_GAME_MENU;
     WAITING_FOR_PLAYERS_MENU;
+    CONNECTING_TO_SERVER_MENU;
     SETTINGS_MENU;
     PAUSE_MENU;
 }
@@ -62,12 +63,11 @@ Game_Mode :: enum u8 {
 game_frame_index : u32; // Used as a sequence number for network packets
 game_quitting : bool;
 game_menu : Game_Menu;
-game_menu_if_waiting_cancelled : Game_Menu;
 game_mode : Game_Mode;
 
 connection_retry_count : int = INITIAL_CONNECTION_RETRY_COUNT;
 connection_retry_countdown : float = INITIAL_CONNECTION_RETRY_COUNTDOWN;
-INITIAL_CONNECTION_RETRY_COUNT :: 50;
+INITIAL_CONNECTION_RETRY_COUNT :: 500;
 INITIAL_CONNECTION_RETRY_COUNTDOWN : float : .1; // Seconds
 
 current_dt: float = 1. / 60.; // Seconds
@@ -160,6 +160,11 @@ initial_ball_velocity :: () -> Vector2 {
     return .{.0, -GAME_EXTENTS.y / 1.};
 }
 
+
+// Important these are global and persist across frames to preserve previous key down state
+input1 : Client_Input;
+input2 : Client_Input;
+
 main :: () {
     // args : []string = get_command_line_arguments();
     // defer array_free(args);
@@ -182,7 +187,9 @@ main :: () {
         Windows.timeBeginPeriod(1);
     }
 
-    window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=1100, window_y=400);
+    // window_x, window_y := 1100, 400; 
+    window_x, window_y := 200, 200; 
+    window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=window_x, window_y=window_y);
     Simp.set_render_target(window);
 
     // We'll draw the cursor manually when we're in the menu
@@ -232,6 +239,7 @@ main :: () {
     init_world(*contact_listener);
 
     // @TODOOO Figure out the order of things in this loop e.g., read input, simulate then render (to use the latest input).
+    // @TODOOO Split the game loop into a server loop and a client loop, currently they are interleaved which makes it confusing
     // Don't update things that don't need updating e.g., sound stuff if we are a server but not a client
     while !game_quitting {
         reset_temporary_storage();
@@ -278,7 +286,6 @@ main :: () {
             hide_cursor();
 
             // Always read all input
-            input1, input2 : Client_Input;
             {
                 input1.player_index = .P1;
                 input2.player_index = .P2;
@@ -292,18 +299,20 @@ main :: () {
 
                     if event.type == .KEYBOARD {
                         if event.key_code == {
+
                         case #char "A";
                             input1.left_down = xx event.key_pressed;
                         case #char "D";
                             input1.right_down = xx event.key_pressed;
-                        case #char "R";
-                            input1.reset_ball = true;
 
-                        // Only for local play!
                         case #char "J";
                             input2.left_down =  xx event.key_pressed;
                         case #char "L";
                             input2.right_down = xx event.key_pressed;
+
+                        case #char "R";
+                            input1.reset_ball = true;
+                            input2.reset_ball = true;
                         }
                     }
                 }
@@ -321,30 +330,50 @@ main :: () {
 
                 if is_network_game_server {
                     input2=, received := receive_input_from_client();
+                    printv(input2);
                 }
             }
 
-            if input1.reset_ball || input2.reset_ball reset_balls();
+            // @Cleanup move this to simulate?
+            if input1.reset_ball || input2.reset_ball {
+                reset_balls();
+            }
 
             if is_local_game {
+
                 simulate();
-            } else {
-                if is_network_game_server {
-                    simulate();
-                    // @TODO Figure out how often we need to send game state
-                    if game_frame_index % 2 != 0
-                    {
-                        server_state : Server_State; // nocommit
 
-                        // server_state : Server_State;
-                        // server_state.game_state = get_game_state();
-                        // server_state.player1_state = get_player_state(player1);
-                        // server_state.player2_state = get_player_state(player2);
-                        // server_state.level_state.level = xx current_level;
-                        // // if live_balls server_state.ball_state = get_ball_state(live_balls[0]);
+            } else if is_network_game_server {
 
-                        send_state_to_client(player2, server_state);
-                    }
+                simulate();
+
+                // @TODO Figure out how often we need to send game state
+                if game_frame_index % 2 != 0
+                {
+                    server_state : Server_State; // nocommit
+
+                    server_state.game_state = get_game_state();
+                    server_state.player1_state = get_player_state(player1);
+                    server_state.player2_state = get_player_state(player2);
+                    server_state.level_state.level = xx current_level;
+                    // if live_balls {
+                    //     // @Incompleteeee send all the balls...!
+                    //     server_state.ball_state = get_ball_state(live_balls[0]); 
+                    // }
+
+                    send_state_to_client(player2, server_state);
+                }
+            }
+
+            if is_network_game_client {
+                game_state, received := receive_state_from_server();
+                if received {
+
+                    // b2Body.SetTransform(live_balls[0].body, game_state.player1_state.position, 0.);
+                    b2Body.SetTransform(player1.body, game_state.player1_state.position, 0.);
+                    b2Body.SetTransform(player2.body, game_state.player2_state.position, 0.);
+
+                    printv(game_state);
                 }
             }
 

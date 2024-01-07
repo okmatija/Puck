@@ -9,6 +9,11 @@ to_degrees :: (radians : float) -> float {
     return radians * scale;
 }
 
+// Note: argument must have type Any, this doesn't work with float
+time_format :: (seconds : Any) -> FormatFloat {
+    return .{value=seconds, trailing_width=2, zero_removal=.NO};
+}
+
 get_enum_count :: ($enum_type : Type) -> s64 {
     info := type_info(enum_type);
     assert(info.type == Type_Info_Tag.ENUM);

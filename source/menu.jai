@@ -82,7 +82,7 @@ menu :: () {
         r = NextRect(3.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Host Network Game", *button_theme);
         if released {
-            game_menu = .HOST_NETWORK_GAME_MENU;
+            game_menu = .SERVE_NETWORK_GAME_MENU;
         }
 
         r = NextRect(1.75*k.x, .75*k.y);
@@ -138,6 +138,7 @@ menu :: () {
         _, _, released = UI.button(l, "Leave", *button_theme);
         if released {
             game_menu = .MAIN_MENU;
+            game_mode = .NOT_STARTED;
             deinit_game();
         }
 
@@ -175,11 +176,12 @@ menu :: () {
         }
         _, _, released = UI.button(r, "Join", *button_theme);
         if released {
-            game_menu_if_waiting_cancelled = .JOIN_NETWORK_GAME_MENU;
-            game_menu = .WAITING_FOR_PLAYERS_MENU;
+            game_menu = .CONNECTING_TO_SERVER_MENU;
+            // host_info.port += 1; // @HACK? @TODOOO
+            host_socket = init_socket(host_info.ipv4, host_info.port);
         }
 
-    case .HOST_NETWORK_GAME_MENU;
+    case .SERVE_NETWORK_GAME_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
 
@@ -212,35 +214,22 @@ menu :: () {
         }
         _, _, released = UI.button(r, "Host", *button_theme);
         if released {
-            game_menu_if_waiting_cancelled = .HOST_NETWORK_GAME_MENU;
             game_menu = .WAITING_FOR_PLAYERS_MENU;
-
             host_socket = init_socket(host_info.ipv4, host_info.port);
-            // nocommit:
-            server_address = ipv4_to_string(host_info.ipv4); // @Leak?
-            server_port = host_info.port;
         }
 
-    case .WAITING_FOR_PLAYERS_MENU;
+    case .CONNECTING_TO_SERVER_MENU;
 
         countdown(*connection_retry_countdown);
         remaining_time := connection_retry_countdown + connection_retry_count * INITIAL_CONNECTION_RETRY_COUNTDOWN;
-        remaining_time_formatted := FormatFloat.{value=remaining_time, trailing_width=2, zero_removal=.NO};
 
         label_theme := ui_theme.label_theme;
         label_theme.text_color = .{0, 0, 0, 1};
 
-        message : string;
-        if game_menu_if_waiting_cancelled == .HOST_NETWORK_GAME_MENU {
-            message = tprint("Waiting for Players... %s", remaining_time_formatted);
-        } else {
-            message = tprint("Connecting to Server... %s", remaining_time_formatted);
-        }
-
         cursor := CenteredCursor(5*k.y);
         r := NextRect(5*k.x, .75*k.y);
         label_theme.alignment = .Left;
-        UI.label(r, message, *label_theme);
+        UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
 
         // Only send a connection request (implemented via a dummy Client_Input) when the countdown expires
         if connection_retry_countdown <= 0 {
@@ -253,25 +242,23 @@ menu :: () {
 
         connected := false;
         {
-            // TODO Receive a game state from the server
+            game_state, received := receive_state_from_server();
+            if received {
+                printv(game_state);
+                connected = true;
+            }
         }
 
         if connected {
-            connection_ipv4 : u32;
-            if game_menu_if_waiting_cancelled == .HOST_NETWORK_GAME_MENU {
-                client_ipv4 := connection_ipv4;
-                init_game(host_info.ipv4, client_ipv4);
-            } else if game_menu_if_waiting_cancelled == .JOIN_NETWORK_GAME_MENU {
-                server_ipv4 := connection_ipv4;
-                init_game(server_ipv4, host_info.ipv4);
-            }
+
+            init_game(ipv4_to_u32(server_address), host_info.ipv4);
 
         } else {
 
             r = NextRect(1.25*k.x, .75*k.y);
             _, _, released := UI.button(r, "Cancel", *button_theme);
             if released || remaining_time <= 0 {
-                game_menu = game_menu_if_waiting_cancelled;
+                game_menu = .JOIN_NETWORK_GAME_MENU;
                 connection_retry_count = INITIAL_CONNECTION_RETRY_COUNT;
                 connection_retry_countdown = INITIAL_CONNECTION_RETRY_COUNTDOWN;
 
@@ -279,6 +266,42 @@ menu :: () {
             }
 
         }
+
+    case .WAITING_FOR_PLAYERS_MENU;
+
+        label_theme := ui_theme.label_theme;
+        label_theme.text_color = .{0, 0, 0, 1};
+
+        cursor := CenteredCursor(5*k.y);
+        r := NextRect(5*k.x, .75*k.y);
+        label_theme.alignment = .Center;
+        UI.label(r, "Waiting for players...", *label_theme);
+
+        connected := false;
+        {
+            input, received := receive_input_from_client();
+            if received {
+                printv(input);
+                connected = true;
+            }
+        }
+
+        if connected {
+
+            // @Cleanupppp The initialization of the address in the Player structs is weird
+            init_game(host_info.ipv4, player2.ipv4);
+
+        } else {
+
+            r = NextRect(1.25*k.x, .75*k.y);
+            _, _, released := UI.button(r, "Cancel", *button_theme);
+            if released {
+                game_menu = .SERVE_NETWORK_GAME_MENU;
+                Socket.close_and_reset(*host_socket);
+            }
+
+        }
+
 
     case .SETTINGS_MENU;
 
