@@ -123,7 +123,8 @@ menu :: () {
         }
         _, _, released = UI.button(r, "Play", *button_theme);
         if released {
-            init_game(host_info.ipv4, host_info.ipv4);
+            host_type = .LOCAL;
+            init_game();
         }
 
     case .PAUSE_MENU;
@@ -137,7 +138,17 @@ menu :: () {
         }
         _, _, released = UI.button(l, "Leave", *button_theme);
         if released {
-            game_menu = .MAIN_MENU;
+
+            if host_type == .CLIENT {
+                game_menu = .JOIN_NETWORK_GAME_MENU;
+                deinit_client();
+            } else if host_type == .SERVER {
+                game_menu = .SERVE_NETWORK_GAME_MENU;
+                deinit_server();
+            } else {
+                game_menu = .PLAY_LOCAL_GAME_MENU;
+            }
+
             game_mode = .NOT_STARTED;
             deinit_game();
         }
@@ -177,8 +188,7 @@ menu :: () {
         _, _, released = UI.button(r, "Join", *button_theme);
         if released {
             game_menu = .CONNECTING_TO_SERVER_MENU;
-            // host_info.port += 1; // @HACK? @TODOOO
-            host_socket = init_socket(host_info.ipv4, host_info.port);
+            init_client(server_address, server_port);
         }
 
     case .SERVE_NETWORK_GAME_MENU;
@@ -215,13 +225,10 @@ menu :: () {
         _, _, released = UI.button(r, "Host", *button_theme);
         if released {
             game_menu = .WAITING_FOR_PLAYERS_MENU;
-            host_socket = init_socket(host_info.ipv4, host_info.port);
+            init_server();
         }
 
     case .CONNECTING_TO_SERVER_MENU;
-
-        countdown(*connection_retry_countdown);
-        remaining_time := connection_retry_countdown + connection_retry_count * INITIAL_CONNECTION_RETRY_COUNTDOWN;
 
         label_theme := ui_theme.label_theme;
         label_theme.text_color = .{0, 0, 0, 1};
@@ -229,42 +236,25 @@ menu :: () {
         cursor := CenteredCursor(5*k.y);
         r := NextRect(5*k.x, .75*k.y);
         label_theme.alignment = .Left;
-        UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
+        // UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
+        UI.label(r, "Connecting to Server...", *label_theme);
 
-        // Only send a connection request (implemented via a dummy Client_Input) when the countdown expires
-        if connection_retry_countdown <= 0 {
-            // Send a null input to the server
-            input : Client_Input;
-            send_input_to_server(input);
-            connection_retry_countdown = INITIAL_CONNECTION_RETRY_COUNTDOWN;
-            connection_retry_count -= 1;
-        }
-
-        connected := false;
-        {
-            game_state, received := receive_state_from_server();
-            if received {
-                printv(game_state);
-                connected = true;
+        timed_out := false;
+        for event : network_events_this_frame {
+            if event.type == {
+            case .CONNECT;
+                init_game();
+            case .DISCONNECT; #through;
+            case .DISCONNECT_TIMEOUT;
+                timed_out = true;
             }
         }
 
-        if connected {
-
-            init_game(ipv4_to_u32(server_address), host_info.ipv4);
-
-        } else {
-
-            r = NextRect(1.25*k.x, .75*k.y);
-            _, _, released := UI.button(r, "Cancel", *button_theme);
-            if released || remaining_time <= 0 {
-                game_menu = .JOIN_NETWORK_GAME_MENU;
-                connection_retry_count = INITIAL_CONNECTION_RETRY_COUNT;
-                connection_retry_countdown = INITIAL_CONNECTION_RETRY_COUNTDOWN;
-
-                Socket.close_and_reset(*host_socket);
-            }
-
+        r = NextRect(1.25*k.x, .75*k.y);
+        _, _, released := UI.button(r, "Cancel", *button_theme);
+        if timed_out || released {
+            game_menu = .JOIN_NETWORK_GAME_MENU;
+            deinit_client();
         }
 
     case .WAITING_FOR_PLAYERS_MENU;
@@ -277,29 +267,23 @@ menu :: () {
         label_theme.alignment = .Center;
         UI.label(r, "Waiting for players...", *label_theme);
 
-        connected := false;
-        {
-            input, received := receive_input_from_client();
-            if received {
-                printv(input);
-                connected = true;
+        timed_out := false;
+
+        for event : network_events_this_frame {
+            if event.type == {
+            case .CONNECT;
+                init_game();
+            case .DISCONNECT; #through;
+            case .DISCONNECT_TIMEOUT;
+                timed_out = true;
             }
         }
 
-        if connected {
-
-            // @Cleanupppp The initialization of the address in the Player structs is weird
-            init_game(host_info.ipv4, player2.ipv4);
-
-        } else {
-
-            r = NextRect(1.25*k.x, .75*k.y);
-            _, _, released := UI.button(r, "Cancel", *button_theme);
-            if released {
-                game_menu = .SERVE_NETWORK_GAME_MENU;
-                Socket.close_and_reset(*host_socket);
-            }
-
+        r = NextRect(1.25*k.x, .75*k.y);
+        _, _, released := UI.button(r, "Cancel", *button_theme);
+        if timed_out || released {
+            game_menu = .SERVE_NETWORK_GAME_MENU;
+            deinit_server();
         }
 
 
@@ -317,20 +301,7 @@ menu :: () {
 
     UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
 
+    draw_cursor();
+
     // Draw cursor
-    {
-        Simp.set_shader_for_color(true);
-
-        v : [4]Vector2;
-
-        mouse_x, mouse_y, _ := get_mouse_pointer_position();
-        D :: 20;
-        v[0] = .{cast(float) mouse_x + D/2, window_height - cast(float)mouse_y - D};
-        v[1] = .{cast(float) mouse_x + D/2, window_height - cast(float)mouse_y - D/2};
-        v[2] = .{cast(float) mouse_x + D,   window_height - cast(float)mouse_y - D/2};
-        v[3] = .{cast(float) mouse_x,       window_height - cast(float)mouse_y};
-        color := Vector4.{1,1,1,1};
-
-        Simp.immediate_quad(v[0], v[1], v[2], v[3], color);
-    }
 }

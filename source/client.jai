@@ -84,14 +84,12 @@ main :: () {
         player_index : Player_Index;
         left_down : bool;
         right_down : bool;
-        reset_ball : bool;
     }
 
     input : Client_Input;
     input.player_index = .P2;
     input.left_down = false;
     input.right_down = true;
-    input.reset_ball = true;
 
     packet : []u8;
     packet.data = xx *input;

@@ -6,10 +6,12 @@ Host_Info :: struct {
 
 Player_State :: struct {
     position : Vector2; // In the "player coordinate system" where left/right are determined by direction player is facing
+    score : int;
 };
 
 Ball_State :: struct {
-    position : Vector2;
+    live : bool;
+    position : Vector2 = .{FLOAT32_INFINITY, FLOAT32_INFINITY};
     rotation : float;
     //velocity : Vector2;
 };
@@ -29,9 +31,9 @@ Game_State :: struct {
 Server_State :: struct {
     player1_state : Player_State;
     player2_state : Player_State;
-    ball_state : Ball_State; // @Incomplete support more than one ball
     level_state : Level_State;
     game_state : Game_State;
+    ball_state : [BALL_COUNT_MAX]Ball_State;
 }
 
 
@@ -48,15 +50,22 @@ Client_Input :: struct {
     player_index : Player_Index;
     left_down : bool;
     right_down : bool;
-    reset_ball : bool;
     esc_down : bool;
+}
+
+// @TODOOO Send the transform (position/orientation)
+get_ball_state :: (using ball : Ball) -> Ball_State {
+    result : Ball_State;
+    result.live = live;
+    result.position = ifx live then b2Body.GetWorldCenter(body).* else Vector2.{};
+    result.rotation = ifx live then b2Body.GetAngle(body) else 0.;
+    return result;
 }
 
 get_player_state :: (using player : Player) -> Player_State {
     result : Player_State;
-    // p := apply_transform(b2Body.GetTransform(body), b2Body.GetWorldCenter(body));
-    p := b2Body.GetWorldCenter(body);
-    result.position = p;
+    result.position = b2Body.GetWorldCenter(body);
+    result.score = score;
     return result;
 }
 
@@ -207,122 +216,126 @@ get_host_info :: (hostname : string) -> bool, u32 {
 }
 
 send_input_to_server :: (input : Client_Input, loc := #caller_location) {
-    endpoint : Socket.sockaddr_in = get_endpoint(server_address, server_port);
-
-    sent_bytes : s32 = Socket.sendto(host_socket, cast(*u8)*input, size_of(type_of(input)), 0, cast(*Socket.SOCKADDR)*endpoint, size_of(type_of(endpoint)));
-    if sent_bytes == Socket.SOCKET_ERROR {
-        error := Socket.get_last_socket_error();
-        log_error("%:% Client error when sending input to server. % (Error no. %)",
-            loc.fully_pathed_filename,
-            loc.line_number,
-            System.get_error_string(xx error),
-            error);
-        // @Robustness What do here??
-        // wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-        // closesocket(SendSocket);
-        // WSACleanup();
-        // return 1;
-    }
+    // @TODO Ensure the client is connected
+    
+    // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
+    packet := Enet.packet_create(*input, .RELIABLE);
+    Enet.peer_send(peer=client.peer, channel_id=0, packet=packet);
+    
+    // Sleep(16); // @@nocommit??
 }
 
 // Send the server state to the client
 send_state_to_client :: (player : Player, state : Server_State, loc := #caller_location) {
-    player_address := ipv4_to_string(player.ipv4,,temp);
-    player_endpoint : Socket.sockaddr_in = get_endpoint(player_address, player.port);
-
-    sent_bytes : s32 = Socket.sendto(host_socket, cast(*u8)*state, size_of(Server_State), 0, cast(*Socket.SOCKADDR)*player_endpoint, size_of(type_of(player_endpoint)));
-    if sent_bytes == Socket.SOCKET_ERROR {
-        error := Socket.get_last_socket_error();
-        log_error("%:% Server error when sending state to client. % (Error no. %)",
-            loc.fully_pathed_filename,
-            loc.line_number,
-            System.get_error_string(xx error),
-            error);
-
-        // @Robustness What do here??
-        // wprintf(L"sendto failed with error: %d\n", WSAGetLastError());
-        // closesocket(SendSocket);
-        // WSACleanup();
-        // return 1;
+    assert(server.host.peers.count == 1);
+    for * peer: server.host.peers {
+        if peer.state == .CONNECTED {
+            packet := Enet.packet_create(*state, .RELIABLE);
+            Enet.peer_send(peer=peer, channel_id=0, packet=packet);
+        }
     }
 }
 
 
 
 receive_input_from_client :: (loc := #caller_location) -> Client_Input, bool {
-    sender_addr : Socket.sockaddr_in;
-    sender_addr_size : s32 = size_of(Socket.sockaddr_in);
 
-    // Note: Packets larger than this buffer will be silently discarded!
-    // packet : [size_of(Client_Input)]u8; // Can't do this because, if Client_Input is small then we hit error 10040 (WSAEMSGSIZE)
-    packet : [128]u8;
-    #assert(packet.count > size_of(Client_Input));
+    for event : network_events_this_frame {
+        if event.type == .RECEIVE {
+            if event.packet.data_length == size_of(Client_Input) {
 
-    packet_size := Socket.recvfrom(host_socket, packet.data, packet.count, 0, cast(*Socket.SOCKADDR)*sender_addr, *sender_addr_size);
-    if packet_size == Socket.SOCKET_ERROR {
-        error := Socket.get_last_socket_error();
-        if error == Socket.SOCKET_WOULDBLOCK {
-            // An expected case. No data to be read from the socket
-        } else {
-            log_error("%:% Server error when receiving client inputs. % (Error no. %)",
-                loc.fully_pathed_filename,
-                loc.line_number,
-                System.get_error_string(xx error),
-                error);
-            // @Robustness What do here??
+                input : Client_Input = (cast(*Client_Input)event.packet.data).*;
+                Enet.packet_destroy(event.packet);
+                remove;
+
+                return input, true;
+            }
         }
-    }
-
-    sender_ipv4, _ := get_ipv4(sender_addr);
-    sender_port := Socket.htons(sender_addr.sin_port);
-
-    // @Cleanup We don't properly support dedicated servers so the client currently always player2
-    if packet_size == size_of(Client_Input) {
-        input : Client_Input = (cast(*Client_Input)packet.data).*;
-        player := ifx input.player_index == .P1 then *player1 else *player2;
-        player.ipv4 = sender_ipv4;
-        player.port = sender_port;
-        return input, true;
     }
 
     return .{}, false;
 }
 
 receive_state_from_server :: (loc := #caller_location) -> Server_State, bool {
-    sender_addr : Socket.sockaddr_in;
-    sender_addr_size : s32 = size_of(Socket.sockaddr_in);
 
-    // Note: Packets larger than this buffer will be silently discarded!
-    // packet : [size_of(Client_Input)]u8; // Can't do this because, if Client_Input is small then we hit error 10040 (WSAEMSGSIZE)
-    packet : [128]u8;
-    #assert(packet.count > size_of(Client_Input));
+    for event : network_events_this_frame {
+        if event.type == .RECEIVE {
+            if event.packet.data_length == size_of(Server_State) {
 
-    packet_size := Socket.recvfrom(host_socket, packet.data, packet.count, 0, cast(*Socket.SOCKADDR)*sender_addr, *sender_addr_size);
-    if packet_size == Socket.SOCKET_ERROR {
-        error := Socket.get_last_socket_error();
-        if error == Socket.SOCKET_WOULDBLOCK {
-            // An expected case. No data to be read from the socket
-        } else {
-            log_error("%:% Client error when receiving state from server. % (Error no. %)",
-                loc.fully_pathed_filename,
-                loc.line_number,
-                System.get_error_string(xx error),
-                error);
-            // @Robustness What do here??
+                state : Server_State = (cast(*Server_State)event.packet.data).*;
+                Enet.packet_destroy(event.packet);
+                remove;
+
+                return state, true;
+            }
         }
-    }
-   
-    // @Cleanup We don't properly support dedicated servers so the client currently always player2
-    if packet_size == size_of(Server_State) {
-        // This should match server_address and server_port
-        sender_ipv4, _ := get_ipv4(sender_addr);
-        sender_port := Socket.htons(sender_addr.sin_port);
-        assert(ipv4_to_string(sender_ipv4) == server_address);
-        assert(sender_port == server_port);
-
-        state : Server_State = (cast(*Server_State)packet.data).*;
-        return state, true;
     }
 
     return .{}, false;
+}
+
+
+
+
+
+
+Server :: struct {
+    using host : *Enet.Host;
+}
+
+init_server :: (server_port := DEFAULT_PORT) {
+    host_type = .SERVER;
+
+    success : bool;
+
+    address : Enet.Address;
+    address.host = Enet.HOST_ANY;
+    address.port = server_port;
+    server.host, success = Enet.host_create(
+        address=*address,
+        peer_count=1, 
+        channel_limit=1,
+        // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
+        incoming_bandwidth=0,
+        outgoing_bandwidth=0);
+
+    assert(success, "Failed to create server!\n");
+}
+
+deinit_server :: () {
+    host_type = .UNKNOWN;
+    Enet.host_destroy(server.host);
+}
+
+
+
+Client :: struct {
+    using host : *Enet.Host;
+    peer : *Enet.Peer;
+}
+
+init_client :: (server_address : string, server_port : u16) {
+    host_type = .CLIENT;
+
+    success : bool;
+
+    client.host, success = Enet.host_create(
+        address=null,
+        peer_count=1,
+        channel_limit=1,
+        // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
+        incoming_bandwidth=0,
+        outgoing_bandwidth=0);
+    assert(success, "Failed to create server!\n");
+
+    address := Enet.get_host_ip_address(server_address);
+    address.port = server_port;
+
+    print("Connecting to server %:%\n", server_address, server_port);
+    client.peer = Enet.host_connect(host=client.host, address=*address, channel_count=1, data=0); 
+}
+
+deinit_client ::() {
+    host_type = .UNKNOWN;
+    Enet.host_destroy(client.host);
 }

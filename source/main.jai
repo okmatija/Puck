@@ -11,6 +11,7 @@ BALL_RADIUS_INITIAL :: 0.2;
 BALL_DENSITY :: 1.0;
 BALL_FRICTION :: 0.3;
 BALL_RESTITUTION :: 1.0;
+BALL_COUNT_MAX :: 3;
 
 WALL_FRICTION :: 0.0; // Set to zero because otherwise we get into situations where the ball bounces back and forth horizontally... also it seems better to have the spin only affected by player movement
 WALL_RESTITUTION :: 0.0;
@@ -30,8 +31,6 @@ DEFAULT_PORT : u16 : 42698;
 // server_address: string;
 host_info : Host_Info;
 host_port_string : string;
-
-host_socket : Socket.SOCKET;
 
 server_address : string;
 server_port : u16 = DEFAULT_PORT;
@@ -60,11 +59,12 @@ Game_Mode :: enum u8 {
     PAUSED;
 }
 
-game_frame_index : u32; // Used as a sequence number for network packets
+game_frame_index : u32; // nocommti Remove this Used as a sequence number for network packets
 game_quitting : bool;
 game_menu : Game_Menu;
 game_mode : Game_Mode;
 
+// nocommit Remove these
 connection_retry_count : int = INITIAL_CONNECTION_RETRY_COUNT;
 connection_retry_countdown : float = INITIAL_CONNECTION_RETRY_COUNTDOWN;
 INITIAL_CONNECTION_RETRY_COUNT :: 500;
@@ -76,9 +76,9 @@ last_time:  float64; // Seconds
 
 player1 : Player;
 player2 : Player;
+balls : [BALL_COUNT_MAX]Ball;
 
 level : Level;
-live_balls : [..] *Ball;
 ball_spawn_countdown := 0.;
 
 world : *b2World;
@@ -87,6 +87,26 @@ world_debug_draw : *b2Draw;
 Level :: struct {
     edges : *b2Body;
     obstruction : *b2Body;
+}
+
+DeadBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags) #expand {
+    for *=cast(bool)(flags & .POINTER) ball, ball_index : ball_array.* {
+        if !ball.live {
+            `it_index := ball_index;
+            `it := ball;
+            #insert body;
+        }
+    }
+}
+
+LiveBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags) #expand {
+    for *=cast(bool)(flags & .POINTER) ball, ball_index : ball_array.* {
+        if ball.live {
+            `it_index := ball_index;
+            `it := ball;
+            #insert body;
+        }
+    }
 }
 
 data_folder: string;
@@ -122,6 +142,7 @@ Paddle_Shape :: enum {
 Level_Id :: enum { Empty; Fixed_Box; Spinning_Box; };
 
 Ball :: struct {
+    live : bool;
     radius : float = BALL_RADIUS_INITIAL;
     color := Vector4.{0, 1, 0, 1};
 
@@ -142,9 +163,6 @@ Player_Index :: enum u8 #specified {
 Player :: struct {
     index : Player_Index;
 
-    ipv4 : u32 = U32_MAX;
-    port : u16 = DEFAULT_PORT;
-
     color : Vector4;
 
     left : u32;
@@ -160,18 +178,48 @@ initial_ball_velocity :: () -> Vector2 {
     return .{.0, -GAME_EXTENTS.y / 1.};
 }
 
+Host_Type :: enum {
+    UNKNOWN;
+    LOCAL;
+    CLIENT;
+    SERVER;
+}
+
+host_type : Host_Type = .UNKNOWN;
+
+GetHost :: () -> *Enet.Host #expand {
+    if `host_type == .SERVER return server.host;
+    if `host_type == .CLIENT return client.host;
+    return null;
+}
+
+server : Server;
+client : Client;
+network_events_this_frame : [..]Enet.Event;
+
 
 // Important these are global and persist across frames to preserve previous key down state
 input1 : Client_Input;
 input2 : Client_Input;
 
 main :: () {
-    // args : []string = get_command_line_arguments();
-    // defer array_free(args);
-    // for 1..args.count-1 {
-    //     n, success, _ := to_integer(args[it]);
-    //     host_port.port = ifx success then n else DEFAULT_PORT;
-    // }
+    args : []string = get_command_line_arguments();
+    print("%\n", args);
+    defer array_free(args);
+
+    if args.count != 1 && args.count != 3 {
+        print("Expected zero arguments or two arguments, the (x,y) window offset.");
+        return;
+    }
+
+    window_x, window_y := 200, 50; 
+    if args.count == 3 {
+        success := false;
+        window_x, success, _ = to_integer(args[1]);
+        if !success { print("Unexpected window_x argument, got %\n", window_x); return; }
+        window_y, success, _ = to_integer(args[2]);
+        if !success { print("Unexpected window_y argument, got %\n", window_y); return; }
+    }
 
     path := path_strip_filename(System.get_path_of_running_executable());
     data_folder = join(path, "data");
@@ -187,8 +235,6 @@ main :: () {
         Windows.timeBeginPeriod(1);
     }
 
-    // window_x, window_y := 1100, 400; 
-    window_x, window_y := 200, 50; 
     window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=window_x, window_y=window_y);
     Simp.set_render_target(window);
 
@@ -198,6 +244,12 @@ main :: () {
 
     Socket.socket_init();
     defer socket_deinit();
+
+    if !Enet.initialize() {
+        print("Failed to initialize enet\n");
+        return;
+    }
+    defer Enet.deinitialize();
 
     init_sounds(window);
     init_fonts();
@@ -214,9 +266,6 @@ main :: () {
     server_address = ipv4_to_string(host_info.ipv4);
     server_port_string = copy_string(tprint("%", DEFAULT_PORT));
     host_port_string = copy_string(tprint("%", DEFAULT_PORT));
-
-
-    // defer Socket.close_and_reset(*host_socket); // @Cleanup To unbind the socket we need to close it completely
 
     contact_listener : b2ContactListener;
     begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
@@ -266,20 +315,21 @@ main :: () {
 
         update_sound_player(current_dt);
 
+        is_network_game := host_type == .CLIENT || host_type == .SERVER;
+        if is_network_game {
+            array_reset_keeping_memory(*network_events_this_frame);
+            event : Enet.Event;
+            while Enet.host_service(GetHost(), *event, 0) == .SUCCESS {
+                array_add(*network_events_this_frame, event);
+            }
+        }
+
         if game_mode == .PLAYING {
 
-            /*
-            Network Game:
-            On the server     player1.ipv4==host_addr     player2.ipv4==remote_addr
-            On the client     player1.ipv4==remote_addr   player2.ipv4==host_addr
-
-            Local Game:
-            On the machine    player1.ipv4==host_addr     player2.ipv4==host_addr
-            */
-
-            is_network_game_client := player1.ipv4 != host_info.ipv4;
-            is_network_game_server := player2.ipv4 != host_info.ipv4;
-            is_local\ _game := player1.ipv4 == host_info.ipv4 && player2.ipv4 == host_info.ipv4;
+            // nocommit Remove these booleans
+            is_network_game_client := host_type == .CLIENT;
+            is_network_game_server := host_type == .SERVER;
+            is_local_game :=          host_type == .LOCAL;;
 
             defer game_frame_index += 1;
 
@@ -310,9 +360,6 @@ main :: () {
                         case #char "L";
                             input2.right_down = xx event.key_pressed;
 
-                        case #char "R";
-                            input1.reset_ball = true;
-                            input2.reset_ball = true;
                         }
                     }
                 }
@@ -326,7 +373,6 @@ main :: () {
             } else {
                 if is_network_game_client {
                     send_input_to_server(input2);
-                    printv(input2);
                 }
 
                 if is_network_game_server {
@@ -336,52 +382,53 @@ main :: () {
                 }
             }
 
-            // @Cleanup move this to simulate?
-            if input1.reset_ball || input2.reset_ball {
-                reset_balls();
+            if is_local_game || is_network_game_server {
+                simulate();
             }
+             
+            if is_network_game_server {
 
-            if is_local_game {
-
-                simulate();
-
-            } else if is_network_game_server {
-
-                simulate();
-
-                // @TODO Figure out how often we need to send game state
-                if game_frame_index % 2 != 0
-                {
-                    server_state : Server_State; // nocommit
-
-                    server_state.game_state = get_game_state();
-                    server_state.player1_state = get_player_state(player1);
-                    server_state.player2_state = get_player_state(player2);
-                    server_state.level_state.level = xx current_level;
-                    // if live_balls {
-                    //     // @Incompleteeee send all the balls...!
-                    //     server_state.ball_state = get_ball_state(live_balls[0]); 
-                    // }
-
-                    send_state_to_client(player2, server_state);
+                // @TODOOO Add score
+                server_state : Server_State;
+                server_state.game_state = get_game_state();
+                server_state.player1_state = get_player_state(player1);
+                server_state.player2_state = get_player_state(player2);
+                server_state.level_state.level = xx current_level;
+                for ball : balls {
+                    if ball.live {
+                        assert(ball.body != null);
+                        server_state.ball_state[it_index] = get_ball_state(ball);
+                    }
                 }
+
+                send_state_to_client(player2, server_state);
             }
 
             if is_network_game_client {
+
                 game_state, received := receive_state_from_server();
                 if received {
 
-                    // b2Body.SetTransform(live_balls[0].body, game_state.player1_state.position, 0.);
-                    b2Body.SetTransform(player1.body, game_state.player1_state.position, 0.);
-                    b2Body.SetTransform(player2.body, game_state.player2_state.position, 0.);
+                    using game_state;
+                    b2Body.SetTransform(player1.body, player1_state.position, 0.);
+                    b2Body.SetTransform(player2.body, player2_state.position, 0.);
+                    for ball_state {
+                        ball := *balls[it_index];
+                        ball.live = it.live;
+                        if ball.live {
+                            init_ball(ball);
+                            assert(ball.body != null);
+                            b2Body.SetTransform(ball.body, it.position, it.rotation);
+                        } else {
+                            deinit_ball(ball);
+                        }
+                    }
                 }
+
             }
 
             // // @Hack For now we distinguish messages recieved based on their size in bytes.
             // #assert(size_of(Server_State) != size_of(Client_Input));
-
-            // // @TODOOOO We are using the host_socket to send and recieve data and it looks like sending too much causes receiving to take multiple seconds. Perhaps we are conjesting the network/socket. Try using separate sockets for sending/receiving data or tweak socket settings
-
 
             // Draw game state
             Simp.clear_render_target(1, 0, 0, 1);
@@ -389,8 +436,9 @@ main :: () {
             draw_level();
             draw_player_at(player1);
             draw_player_at(player2);
-            for live_balls draw_ball_at(it);
+            for :LiveBalls balls draw_ball_at(it);
             draw_score();
+            // draw_cursor();
 
             // Draws the physics/collision geometry
             //b2World.DebugDraw(world);
@@ -599,20 +647,9 @@ draw_body :: (body : *b2Body, color : Vector4) {
 draw_ball_at :: (using ball: Ball) {
     Simp.set_shader_for_color(true);
 
+    assert(ball.live);
+    assert(ball.body != null);
     draw_body(ball.body, ball.color);
-
-}
-
-reset_balls :: () {
-    start_position := Vector2.{0., 0.}; // pitch center
-    start_angle := 0.;
-    start_linear_velocity := initial_ball_velocity();
-
-    for live_balls {
-        b2Body.SetLinearVelocity(it.body, start_linear_velocity);
-        b2Body.SetAngularVelocity(it.body, 0.);
-        b2Body.SetTransform(it.body, start_position, start_angle);
-    }
 }
 
 // @Incompleteee This should use the rendering geometry..!
@@ -628,6 +665,22 @@ draw_score :: () {
     text_w := Simp.prepare_text(font, text);
     scale := 0.5;
     Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
+}
+
+draw_cursor :: () {
+    Simp.set_shader_for_color(true);
+
+    v : [4]Vector2;
+
+    mouse_x, mouse_y, _ := get_mouse_pointer_position();
+    D :: 20;
+    v[0] = .{cast(float) mouse_x + D/2, window_height - cast(float)mouse_y - D};
+    v[1] = .{cast(float) mouse_x + D/2, window_height - cast(float)mouse_y - D/2};
+    v[2] = .{cast(float) mouse_x + D,   window_height - cast(float)mouse_y - D/2};
+    v[3] = .{cast(float) mouse_x,       window_height - cast(float)mouse_y};
+    color := Vector4.{1,1,1,1};
+
+    Simp.immediate_quad(v[0], v[1], v[2], v[3], color);
 }
 
 simulate :: () {
@@ -712,63 +765,27 @@ simulate :: () {
 
     b2World.Step(world, current_dt, 6, 2);
 
-    countdown(*ball_spawn_countdown);
+    // If there are any dead balls revive one after the spawn countdown
+    for * :DeadBalls balls {
+        countdown(*ball_spawn_countdown);
 
-    if !live_balls {
-        for 0..2 if ball_spawn_countdown <= 0 {
-            ball : *Ball = New(Ball);
-
-            body_def : b2BodyDef;
-            b2BodyDef.Constructor(*body_def);
-            body_def.type = .b2_dynamicBody;
-            body_def.position = Vector2.{0., 0.}; // pitch center
-            body_def.linearVelocity = initial_ball_velocity();
-            body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast so better make it a bullet
-
-            ball.body = b2World.CreateBody(world, *body_def);
-            b2Body.SetSleepingAllowed(ball.body, false);
-
-            circle_shape : b2CircleShape;
-            b2CircleShape.Constructor(*circle_shape);
-            circle_shape.m_radius = ball.radius;
-
-            square_shape : b2PolygonShape;
-            b2PolygonShape.Constructor(*square_shape);
-            b2PolygonShape.SetAsBox(*square_shape, ball.radius, ball.radius, .{0., 0.}, 0);
-
-            fixture_def : b2FixtureDef;
-            b2FixtureDef.Constructor(*fixture_def);
-            if cast(Ball_Shape)current_ball_shape == {
-                case .Circle; fixture_def.shape = *circle_shape;
-                case .Square; fixture_def.shape = *square_shape;
-            }
-            fixture_def.density = BALL_DENSITY;
-            fixture_def.friction = BALL_FRICTION;
-            fixture_def.restitution = BALL_RESTITUTION;
-            b2Body.CreateFixture(ball.body, *fixture_def);
-
-            array_add(*live_balls, ball);
-
-            // play_sound(sound_start_game); // @todo find a nicer sound for this!
+        if ball_spawn_countdown <= 0  {
+            init_ball(it);
+            ball_spawn_countdown = 2.;
         }
+
+        break; // Just spawn one new ball
     }
 
 
-    // @TODO Ignore score updates when we are waiting for players
-    for ball : live_balls {
+    for * :LiveBalls ball : balls {
         center := b2Body.GetPosition(ball.body);
         if center.y > GAME_EXTENTS.y {
+            deinit_ball(ball);
             player1.score += 1;
-            deinit(ball);
-            remove ball;
-            free(ball);
-            ball_spawn_countdown = 2.;
         } else if center.y < -GAME_EXTENTS.y {
+            deinit_ball(ball);
             player2.score += 1;
-            deinit(ball);
-            remove ball;
-            free(ball);
-            ball_spawn_countdown = 2.;
         }
     }
 
@@ -791,34 +808,23 @@ init_world :: (contact_listener : *b2ContactListener) {
     b2World.SetContactListener(world, contact_listener);
 }
 
-deinit :: (ball : *Ball) {
-    b2World.DestroyBody(world, ball.body);
-}
-
 deinit :: (player : *Player) {
     player.score = 0;
     b2World.DestroyBody(world, player.body);
 }
 
 deinit_game :: () {
-    for ball : live_balls {
-        deinit(ball);
-        remove ball;
-        free(ball);
-    }
-    ball_spawn_countdown = 2.;
-
     deinit(*player2);
     deinit(*player1);
     deinit_level();
 }
 
 // @TODO When the client inits the game it doesn't need the Box2D stuff that only needs to happen on the server
-init_game :: (player1_ipv4 : u32, player2_ipv4 : u32) {
+init_game :: () {
 
     init_level();
-    init_player(*player1, .P1, player1_ipv4);
-    init_player(*player2, .P2, player2_ipv4);
+    init_player(*player1, .P1);
+    init_player(*player2, .P2);
 
     game_frame_index = 0;
     game_mode = .PLAYING;
@@ -834,6 +840,48 @@ draw_level :: () {
 deinit_level :: () {
     if level.obstruction b2World.DestroyBody(world, level.obstruction);
     b2World.DestroyBody(world, level.edges);
+}
+
+deinit_ball :: (ball : *Ball) {
+    assert(ball.body && ball.body != null);
+    ball.live = false;
+    b2World.DestroyBody(world, ball.body);
+}
+
+
+init_ball :: (ball : *Ball) {
+    ball.live = true;
+
+    body_def : b2BodyDef;
+    b2BodyDef.Constructor(*body_def);
+    body_def.type = .b2_dynamicBody;
+    body_def.position = Vector2.{0., 0.}; // pitch center
+    body_def.linearVelocity = initial_ball_velocity();
+    body_def.bullet=true; // Since ball restitution can be bigger than 1 it can move very fast so better make it a bullet
+
+    ball.body = b2World.CreateBody(world, *body_def);
+    b2Body.SetSleepingAllowed(ball.body, false);
+
+    circle_shape : b2CircleShape;
+    b2CircleShape.Constructor(*circle_shape);
+    circle_shape.m_radius = ball.radius;
+
+    square_shape : b2PolygonShape;
+    b2PolygonShape.Constructor(*square_shape);
+    b2PolygonShape.SetAsBox(*square_shape, ball.radius, ball.radius, .{0., 0.}, 0);
+
+    fixture_def : b2FixtureDef;
+    b2FixtureDef.Constructor(*fixture_def);
+    if cast(Ball_Shape)current_ball_shape == {
+        case .Circle; fixture_def.shape = *circle_shape;
+        case .Square; fixture_def.shape = *square_shape;
+    }
+    fixture_def.density = BALL_DENSITY;
+    fixture_def.friction = BALL_FRICTION;
+    fixture_def.restitution = BALL_RESTITUTION;
+    b2Body.CreateFixture(ball.body, *fixture_def);
+
+    // play_sound(sound_start_game); // @todo find a nicer sound for this!
 }
 
 init_level :: () {
@@ -908,10 +956,9 @@ init_level :: () {
     }
 }
 
-init_player :: (using player : *Player, player_index : Player_Index, player_ipv4 : u32) {
+init_player :: (using player : *Player, player_index : Player_Index) {
 
     index = player_index;
-    ipv4 = player_ipv4;
     color = ifx index == .P1
         then Vector4.{1., .1, .1, 1.}
         else Vector4.{.1, .1, 1., 1.};
@@ -995,8 +1042,9 @@ modify_string :: (ps: *string, new_value: string) {
 #import "Math";
 #import "Random";
 #import "File";
-UI :: #import "GetRect_LeftHanded";
+Enet :: #import "enet";
 Socket :: #import "Socket";
+UI :: #import "GetRect_LeftHanded";
 System :: #import "System";
 Simp :: #import "Simp";
 Texture :: Simp.Texture;
