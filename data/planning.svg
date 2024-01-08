@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   sodipodi:docname="planning.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.20725694"
+     inkscape:cx="-967.39822"
+     inkscape:cy="663.42771"
+     inkscape:window-width="2617"
+     inkscape:window-height="1547"
+     inkscape:window-x="957"
+     inkscape:window-y="538"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="rect1"
+       width="88.723404"
+       height="88.723404"
+       x="-809.76648"
+       y="147.08282"
+       rx="0"
+       ry="0" />
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="path1"
+       cx="-721.04309"
+       cy="235.80623"
+       r="21.58456" />
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="circle1"
+       cx="-742.62762"
+       cy="168.46581"
+       r="21.58456" />
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="circle1-7"
+       cx="-785.922"
+       cy="-210.423"
+       r="21.58456" />
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="circle2"
+       cx="-809.76648"
+       cy="147.08282"
+       r="21.58456" />
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="circle3"
+       cx="-809.76648"
+       cy="235.80623"
+       r="21.58456" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="rect3"
+       width="88.723404"
+       height="88.723404"
+       x="-807.96106"
+       y="-555.49487"
+       rx="0"
+       ry="0" />
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="path7"
+       cx="-763.59937"
+       cy="-785.54785"
+       r="45.585819" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="rect8"
+       width="88.723404"
+       height="88.723404"
+       x="-809.76648"
+       y="-12.581268"
+       rx="0"
+       ry="23.936171" />
+    <text
+       xml:space="preserve"
+       style="font-size:50.8px;fill:#1a1a1a;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       x="-604.80194"
+       y="-769.09149"
+       id="text8"><tspan
+         sodipodi:role="line"
+         style="fill:#1a1a1a;stroke-width:1"
+         x="-604.80194"
+         y="-769.09149"
+         id="tspan17">Circle/capsule</tspan></text>
+    <path
+       sodipodi:type="star"
+       style="fill:#1a1a1a;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="path10"
+       inkscape:flatsided="false"
+       sodipodi:sides="5"
+       sodipodi:cx="-770.89679"
+       sodipodi:cy="-376.42154"
+       sodipodi:r1="65.598892"
+       sodipodi:r2="44.607246"
+       sodipodi:arg1="0.97134384"
+       sodipodi:arg2="1.5996624"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m -733.88652,-322.26017 -38.29773,-9.57271 -38.78626,7.34699 -2.73046,-39.38144 -18.97302,-34.61759 36.61022,-14.76635 27.0603,-28.74183 25.35681,30.25532 35.6972,16.85417 -20.93884,33.46517 z"
+       inkscape:transform-center-x="-0.585077"
+       inkscape:transform-center-y="-5.7050899"
+       transform="translate(1.805379,25.206771)" />
+    <path
+       sodipodi:type="star"
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="path11"
+       inkscape:flatsided="true"
+       sodipodi:sides="8"
+       sodipodi:cx="-765.95746"
+       sodipodi:cy="-172.34042"
+       sodipodi:r1="66.235512"
+       sodipodi:r2="53.585659"
+       sodipodi:arg1="1.089909"
+       sodipodi:arg2="1.4826081"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m -735.31916,-113.61702 -50.49746,4.46486 -38.86424,-32.54996 -4.46486,-50.49747 32.54996,-38.86423 50.49747,-4.46487 38.86423,32.54997 4.46486,50.49746 z"
+       inkscape:transform-center-x="-3.0066978"
+       inkscape:transform-center-y="-3.3967815" />
+    <text
+       xml:space="preserve"
+       style="font-size:50.8px;fill:#1a1a1a;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       x="-598.72339"
+       y="-519.57446"
+       id="text11"><tspan
+         sodipodi:role="line"
+         id="tspan11"
+         style="stroke-width:1"
+         x="-598.72339"
+         y="-519.57446">polygon with n sides or rounding</tspan></text>
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="circle11"
+       cx="-753.38025"
+       cy="-213.30028"
+       r="21.58456" />
+    <path
+       sodipodi:type="star"
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="path12"
+       inkscape:flatsided="false"
+       sodipodi:sides="8"
+       sodipodi:cx="-291.06381"
+       sodipodi:cy="-205.53191"
+       sodipodi:r1="10.212766"
+       sodipodi:r2="6.9446812"
+       sodipodi:arg1="3.1415927"
+       sodipodi:arg2="3.5342917"
+       inkscape:rounded="1"
+       inkscape:randomized="0"
+       d="m -301.27658,-205.53191 c 0,-4.63443 2.0232,1.62405 3.79672,-2.65761 1.77352,-4.28166 -4.08251,-1.28686 -0.80547,-4.5639 3.27704,-3.27704 0.28225,2.57899 4.5639,0.80547 4.28166,-1.77353 -1.97682,-3.79672 2.65762,-3.79672 4.63443,0 -1.62405,2.02319 2.65761,3.79671 4.28166,1.77353 1.28686,-4.0825 4.5639,-0.80546 3.27704,3.27704 -2.57898,0.28224 -0.80546,4.5639 1.77352,4.28166 3.79671,-1.97682 3.79671,2.65761 0,4.63444 -2.02319,-1.62404 -3.79671,2.65762 -1.77352,4.28166 4.0825,1.28686 0.80546,4.5639 -3.27704,3.27704 -0.28224,-2.57899 -4.5639,-0.80547 -4.28166,1.77352 1.97682,3.79672 -2.65761,3.79672 -4.63444,0 1.62404,-2.0232 -2.65762,-3.79672 -4.28166,-1.77352 -1.28686,4.08251 -4.5639,0.80547 -3.27704,-3.27704 2.57899,-0.28224 0.80547,-4.5639 -1.77352,-4.28166 -3.79672,1.97682 -3.79672,-2.65762 z"
+       inkscape:transform-center-x="-3.6669458e-06"
+       inkscape:transform-center-y="2.5893784e-06" />
+    <text
+       xml:space="preserve"
+       style="font-size:50.8px;fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       x="-613.58331"
+       y="-1119.9674"
+       id="text13"><tspan
+         sodipodi:role="line"
+         id="tspan13"
+         style="stroke-width:1"
+         x="-613.58331"
+         y="-1119.9674">Random per serve</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:1"
+         x="-613.58331"
+         y="-1056.4674"
+         id="tspan14">Random per game</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:50.8px;fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       x="-603.82977"
+       y="-358.72342"
+       id="text15"><tspan
+         sodipodi:role="line"
+         id="tspan15"
+         style="stroke-width:1"
+         x="-603.82977"
+         y="-358.72342">Star with n points</tspan><tspan
+         sodipodi:role="line"
+         style="stroke-width:1"
+         x="-603.82977"
+         y="-295.22342"
+         id="tspan16" /></text>
+    <circle
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:square"
+       id="circle18"
+       cx="-813.3866"
+       cy="-785.54785"
+       r="45.585819" />
+  </g>
+</svg>
