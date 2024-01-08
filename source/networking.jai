@@ -54,7 +54,8 @@ Client_Input :: struct {
 
 get_player_state :: (using player : Player) -> Player_State {
     result : Player_State;
-    p := apply_transform(b2Body.GetTransform(body), b2Body.GetWorldCenter(body));
+    // p := apply_transform(b2Body.GetTransform(body), b2Body.GetWorldCenter(body));
+    p := b2Body.GetWorldCenter(body);
     result.position = p;
     return result;
 }

@@ -4,7 +4,7 @@
 // - Game playable area is padded left and right by GAME_PADDING
 GAME_EXTENTS :: Vector2.{10.0, 10.0}; // half-width/height in meters
 GAME_PADDING :: 3.0; // Applied to both sides of game
-WINDOW_HEIGHT_INITIAL :: 900;//1440;
+WINDOW_HEIGHT_INITIAL :: 900; //1440;
 DT_MAX : float : 0.15;
 
 BALL_RADIUS_INITIAL :: 0.2;
@@ -188,7 +188,7 @@ main :: () {
     }
 
     // window_x, window_y := 1100, 400; 
-    window_x, window_y := 200, 200; 
+    window_x, window_y := 200, 50; 
     window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=window_x, window_y=window_y);
     Simp.set_render_target(window);
 
@@ -326,11 +326,13 @@ main :: () {
             } else {
                 if is_network_game_client {
                     send_input_to_server(input2);
+                    printv(input2);
                 }
 
                 if is_network_game_server {
                     input2=, received := receive_input_from_client();
-                    printv(input2);
+                    player2.left = xx input2.left_down;
+                    player2.right = xx input2.right_down;
                 }
             }
 
@@ -372,8 +374,6 @@ main :: () {
                     // b2Body.SetTransform(live_balls[0].body, game_state.player1_state.position, 0.);
                     b2Body.SetTransform(player1.body, game_state.player1_state.position, 0.);
                     b2Body.SetTransform(player2.body, game_state.player2_state.position, 0.);
-
-                    printv(game_state);
                 }
             }
 

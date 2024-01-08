@@ -1,99 +1,10 @@
-This is confusing because one program is the client, the server, or both
+[ ] Put the ball state in the game_state
+[ ] Unify the packet sending code to work with multiple types
+[ ] Add a sequence number to the packets and ignore old/out of order packets
+[ ]
 
 
-local play: P1 and P2 in the same program
-
-network play (hosting): we are P1, which is the server. P2 is the client
-P2 h
-
-network play (joining): we are P2, which is the client. P1 is the server
-
-
-
-
-
-
-
-
-
-
-
-Menu flow for main game:
-
-    [ Play Local Game ]
-          [  Ball ]
-          [ Paddle]
-          [ Level ]
-        [Back] [Play]
-    [Join Network Game]
-          [IP:Port]
-        [Back] [Join]
-    [Host Network Game]
-          <IP:Port>
-          [  Ball ]
-          [ Paddle]
-          [ Level ]
-          [Players]
-        [Back] [Play]
-    [Settings]
-        [Left  Key]
-        [Right Key]
-        [Boost Key]
-          [Back]
-    [Quit]
-
-Pause menu:
-       [Settings]
-    [Resume] [Leave]
-
-
-When hosting a game, you can play alone until the other player joins
-When either player presses Esc during the game it pauses everywhere
-
-
-// wait for all client inputs
-// simulate
-// send new game state to all clients
-
-Client_Input :: struct {
-    left_down : bool;
-    right_down : bool;
-}
-
-
-// TODO Use notes to generate entries of the Game_State struct
-Game_State :: struct {
-    Player_State :: struct {
-        position_x : float;
-    };
-
-    player1 : Player_State;
-    player2 : Player_State;
-
-    Ball_State :: struct {
-        position : Vector2;
-        velocity : Vector2;
-    };
-
-    ball : Vector2;
-}
-
-game_state : Game_State;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Why/What?
 
 A pong game to play at work in breaks
 
