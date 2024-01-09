@@ -1,7 +1,11 @@
-[ ] Put the ball state in the game_state
-[ ] Unify the packet sending code to work with multiple types
-[ ] Add a sequence number to the packets and ignore old/out of order packets
-[ ]
+[ ] Fix issue where client is initializing box2d
+[ ] Merge with main and delete this branch
+[ ] Add winning conditions
+[ ] Add an option for game mode e.g., best of/first to/rally (high scores)
+[ ] Add text to all the game settings
+[ ] Add color and player name customization
+[ ] Make pausing a quitting the game work better
+[ ] @TODOOO Use local versions of the GetRect and Simp modules
 
 
 # Why/What?
@@ -11,19 +15,16 @@ A pong game to play at work in breaks
 # General
 
 [x] Add a basic menu
-[ ] @TODOOO Use local versions of the GetRect and Simp modules
+[x] Add an option to toggle the ball type
+[x] Add an option to toggle the paddle type
+[x] Add an option to set the level/obstruction type
+[x] Add an option to set the socket address (aka ip_address:port_number)
 [ ] Add a restart button
 [ ] Options to have the window always on top
-[ ] Add an option to toggle the ball type
-
-[ ] Add an option to toggle the paddle type
-[ ] Add an option to set the level/obstruction type
-[ ] Add an option to set the socket address (aka ip_address:port_number)
-[ ] Add an option for game mode e.g., best of/first to/rally (high scores)
 
 # Payment
 
-[ ] $1.00 purchase cost, 2 invites per purchase? with some fraction to charity. $0.25 per invite after that?
+[ ] $1.00 purchase cost, get 2 licenses per purchase? to play in 2 player mode. Some fraction to charity? $0.25 per invite after that?
 [ ] Database for user accounts etc
 
 # Sound
@@ -69,6 +70,8 @@ A pong game to play at work in breaks
 # Gameplay
 
 [x] Kinematic obstructions in the play area
+[ ] Get 3 boosts which gradually replenish, its useful to reach for ball when its going really fast
+[ ] Make the paddle out of edge elements so you have finer control over the shape
 [ ] Maybe there should be an option to play as a the "level/game master" who gets to control the level e.g., how fast things spin etc. Create fun situations where someone can play favourites
 [ ] Should be able to launch a ball from your paddle, to make it easier to create the fun situations where you can hit a ball with another ball
 [ ] Slow time powerup to temporarily slow down time
@@ -89,10 +92,6 @@ A pong game to play at work in breaks
 [ ] Add vertical/jump (boost): if ball bounces during jump boost increase ball speed
 [ ] Experiment with no colliding balls?
 
-
-# Weird
-
-[ ] Add little legs to the paddle, upgrading these makes them bigger chad legs and you can accelerate faster
 
 # Notes
 - To hit the ball really fast you can hit it with the side of the paddle, but to do that you need to risk missing the ball entirely which is neat
