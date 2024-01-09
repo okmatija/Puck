@@ -5,35 +5,39 @@ Host_Info :: struct {
 }
 
 Player_State :: struct {
-    position : Vector2; // In the "player coordinate system" where left/right are determined by direction player is facing
+    shape : Paddle_Shape;
+
+    // nocommit cleanup
+    // ition : Vector2; // In the "player coordinate system" where left/right are determined by direction player is facing
+    transform : b2Transform;
+
     score : int;
 };
 
 Ball_State :: struct {
-    live : bool;
-    position : Vector2 = .{FLOAT32_INFINITY, FLOAT32_INFINITY};
-    rotation : float;
+    shape : Ball_Shape;
+
+    transform : b2Transform;
     //velocity : Vector2;
+
+    live : bool;
 };
 
 Level_State :: struct {
     level : Level_Id;
 }
 
-Game_State :: struct {
-    // @TODO Only send these when game starts?
-    ball_shape : Ball_Shape;
-    paddle_shape : Paddle_Shape;
-}
-
 // This data is sent by the server to all connected clients
 // @TODO Generate the members using notes
-Server_State :: struct {
+Game_State :: struct {
     player1_state : Player_State;
     player2_state : Player_State;
     level_state : Level_State;
-    game_state : Game_State;
     ball_state : [BALL_COUNT_MAX]Ball_State;
+}
+
+Game_State_Delta :: struct {
+    // TODOOOO Implement delta compression and send these instead
 }
 
 
@@ -57,22 +61,14 @@ Client_Input :: struct {
 get_ball_state :: (using ball : Ball) -> Ball_State {
     result : Ball_State;
     result.live = live;
-    result.position = ifx live then b2Body.GetWorldCenter(body).* else Vector2.{};
-    result.rotation = ifx live then b2Body.GetAngle(body) else 0.;
+    result.transform = b2Body.GetTransform(body);
     return result;
 }
 
 get_player_state :: (using player : Player) -> Player_State {
     result : Player_State;
-    result.position = b2Body.GetWorldCenter(body);
+    result.transform = b2Body.GetTransform(body);
     result.score = score;
-    return result;
-}
-
-get_game_state :: () -> Game_State {
-    result : Game_State;
-    result.ball_shape = xx current_ball_shape;
-    result.paddle_shape = xx current_paddle_shape;
     return result;
 }
 
@@ -131,7 +127,8 @@ get_host_info :: (hostname : string) -> bool, u32 {
     return true, ipv4;
 }
 
-send_input_to_server :: (input : Client_Input, loc := #caller_location) {
+// Send input from client to server
+send_input :: (input : Client_Input, loc := #caller_location) {
     // @TODO Ensure the client is connected
     
     // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
@@ -141,8 +138,8 @@ send_input_to_server :: (input : Client_Input, loc := #caller_location) {
     // Sleep(16); // @@nocommit??
 }
 
-// Send the server state to the client
-send_state_to_client :: (player : Player, state : Server_State, loc := #caller_location) {
+// Send game state from server to client
+send_state :: (player : Player, state : Game_State, loc := #caller_location) {
     assert(server.host.peers.count == 1);
     for * peer: server.host.peers {
         if peer.state == .CONNECTED {
@@ -152,9 +149,8 @@ send_state_to_client :: (player : Player, state : Server_State, loc := #caller_l
     }
 }
 
-
-
-receive_input_from_client :: (loc := #caller_location) -> Client_Input, bool {
+// Receive input sent from client to server
+receive_input :: (loc := #caller_location) -> Client_Input, bool {
 
     for event : network_events_this_frame {
         if event.type == .RECEIVE {
@@ -172,13 +168,14 @@ receive_input_from_client :: (loc := #caller_location) -> Client_Input, bool {
     return .{}, false;
 }
 
-receive_state_from_server :: (loc := #caller_location) -> Server_State, bool {
+// Receive game state sent from server to client
+receive_state :: (loc := #caller_location) -> Game_State, bool {
 
     for event : network_events_this_frame {
         if event.type == .RECEIVE {
-            if event.packet.data_length == size_of(Server_State) {
+            if event.packet.data_length == size_of(Game_State) {
 
-                state : Server_State = (cast(*Server_State)event.packet.data).*;
+                state := (cast(*Game_State)event.packet.data).*;
                 Enet.packet_destroy(event.packet);
                 remove;
 

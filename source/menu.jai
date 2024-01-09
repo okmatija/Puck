@@ -305,3 +305,13 @@ menu :: () {
 
     // Draw cursor
 }
+
+
+current_level : s32 = xx Level_Id.Spinning_Box;
+current_ball_shape : s32 = xx Ball_Shape.Circle;
+current_paddle_shape : s32 = xx Paddle_Shape.Prism;
+
+modify_string :: (ps: *string, new_value: string) {
+    free(ps.*);
+    ps.* = copy_string(new_value);
+}
