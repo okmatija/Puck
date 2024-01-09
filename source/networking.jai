@@ -86,90 +86,6 @@ init_host_info :: () {
     host_info.port = DEFAULT_PORT;
 }
 
-init_socket :: (ipv4 : u32, port : u16) -> Socket.SOCKET #must {
-    // Create a IPv4 UDP socket
-    socket := Socket.socket(Socket.AF_INET, .SOCK_DGRAM, .IPPROTO_UDP);
-    if socket == Socket.INVALID_SOCKET {
-        error := Socket.get_last_socket_error();
-        log_error("Socket.socket error: %", System.get_error_string(xx error));
-        assert(false);
-    }
-
-    ipv4_string := ipv4_to_string(ipv4,,temp);
-
-    // Associate the host address with the socket
-    if Socket.bind(socket, ipv4_string, port) == Socket.SOCKET_ERROR {
-        error := Socket.get_last_socket_error();
-        log_error("Socket.bind error: % (%)", System.get_error_string(xx error), error);
-        assert(false);
-    }
-
-    // Prevent the socket from blocking when calling recvfrom
-    Socket.set_blocking(socket, false);
-
-    // Enable broadcast permissions since we call sendto
-    enable_broadcast : s32 = 1;
-    if Socket.setsockopt(socket,
-        Socket.SOL_SOCKET,
-        Socket.SO_BROADCAST,
-        cast(*u8)*enable_broadcast,
-        size_of(type_of(enable_broadcast))) < 0 {
-
-        error := Socket.get_last_socket_error();
-        log_error("Socket.setsockopt error: % (%)", System.get_error_string(xx error), error);
-        assert(false);
-
-    }
-
-    return socket;
-}
-
-// @Cleanup rename to ipv4_as_string
-ipv4_to_string :: (ipv4 : u32) -> string {
-    builder: String_Builder;
-    Socket.append_address(*builder, ipv4);
-    return builder_to_string(*builder);
-}
-
-// @Cleanup rename to ipv4_as_u32
-ipv4_to_u32 :: (ipv4 : string) -> u32 {
-    return Socket.inet_addr(ipv4.data);
-}
-
-get_endpoint :: (ipv4 : string, port : u16) -> Socket.sockaddr_in {
-    result : Socket.sockaddr_in;
-    result.sin_family = Socket.AF_INET;
-    result.sin_port = Socket.htons(port); // Convert to network byte order
-    result.sin_addr.S_un.S_addr = Socket.inet_addr(ipv4.data);
-    return result;
-}
-
-// @Cleanup remove the string return value, use ipv4_to_string above to get that
-get_ipv4 :: (endpoint : Socket.sockaddr_in) -> u32, string {
-    ipv4 := endpoint.sin_addr.S_un.S_addr;
-    ipv4_string := copy_string(Socket.to_string(endpoint));
-    return ipv4, ipv4_string;
-}
-
-
-// @Cleanup Move this into the Socket module. See https://gafferongames.com/post/sending_and_receiving_packets/
-socket_deinit :: () -> bool {
-    System :: #import "System";
-    #import "Windows";
-
-    #if OS == .WINDOWS {
-        result := Socket.WSACleanup();
-        if result == Socket.SOCKET_ERROR {
-            log_error("Could not terminate Winsock2: % %", result, System.get_error_string(cast (OS_Error_Code)result));
-            return false;
-        }
-    } else {
-        // Nothing to do on Unix
-    }
-
-    return true;
-}
-
 // Returns a null-terminated hostname string (indicated by the 0)
 get_hostname0 :: () -> bool, string {
     buffer : [256]u8;
@@ -283,7 +199,7 @@ Server :: struct {
     using host : *Enet.Host;
 }
 
-init_server :: (server_port := DEFAULT_PORT) {
+init_server :: (server_port : u16) {
     host_type = .SERVER;
 
     success : bool;
@@ -338,4 +254,13 @@ init_client :: (server_address : string, server_port : u16) {
 deinit_client ::() {
     host_type = .UNKNOWN;
     Enet.host_destroy(client.host);
+}
+
+
+// @Cleanup rename to ipv4_as_string
+
+ipv4_to_string :: (ipv4 : u32) -> string {
+    builder: String_Builder;
+    Socket.append_address(*builder, ipv4);
+    return builder_to_string(*builder);
 }

@@ -30,7 +30,6 @@ DEFAULT_PORT : u16 : 42698;
 // player_name: string; // @Cleanup move to Player struct
 // server_address: string;
 host_info : Host_Info;
-host_port_string : string;
 
 server_address : string;
 server_port : u16 = DEFAULT_PORT;
@@ -242,9 +241,6 @@ main :: () {
     // Note: @CompilerBug show_cursor() and hide_cursor() didn't seem to work correctly when called in the game/menu, but its not clear why
     hide_cursor();
 
-    Socket.socket_init();
-    defer socket_deinit();
-
     if !Enet.initialize() {
         print("Failed to initialize enet\n");
         return;
@@ -265,7 +261,6 @@ main :: () {
     // storing the strings.
     server_address = ipv4_to_string(host_info.ipv4);
     server_port_string = copy_string(tprint("%", DEFAULT_PORT));
-    host_port_string = copy_string(tprint("%", DEFAULT_PORT));
 
     contact_listener : b2ContactListener;
     begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {

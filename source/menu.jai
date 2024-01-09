@@ -203,12 +203,12 @@ menu :: () {
 
         r = NextRect(4*k.x, .75*k.y);
         text_theme.alignment = .Center;
-        action, new_host_port_string := UI.text_input(r, host_port_string, *text_theme);
+        action, new_server_port_string := UI.text_input(r, server_port_string, *text_theme);
         if action & .ENTERED {
-            port, success, _ := to_integer(new_host_port_string);
+            port, success, _ := to_integer(new_server_port_string);
             if success && (port >= 1024 && port <= 49151) {
-                modify_string(*host_port_string, new_host_port_string);
-                host_info.port = cast(u16)port;
+                modify_string(*server_port_string, new_server_port_string);
+                server_port = cast(u16)port;
             } else {
                 // From: https://www.ibm.com/docs/en/ztpf/2023?topic=overview-port-numbers
                 // Port numbers [1024,  49151] are reserved for user server applications.
@@ -225,7 +225,7 @@ menu :: () {
         _, _, released = UI.button(r, "Host", *button_theme);
         if released {
             game_menu = .WAITING_FOR_PLAYERS_MENU;
-            init_server();
+            init_server(server_port);
         }
 
     case .CONNECTING_TO_SERVER_MENU;
