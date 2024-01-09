@@ -1,6 +1,8 @@
 [x] Merge with main
 [x] Use local versions of the GetRect and Simp modules
-[ ] Fix issue where client is initializing box2d
+[x] Fix issue where client is initializing box2d
+[ ] Fix crash when client leaves game
+[ ] Send the transform for the level obstructions
 [ ] Add winning conditions
 [ ] Add an option for game mode e.g., best of/first to/rally (high scores)
 [ ] Add text to all the game settings
@@ -40,6 +42,7 @@ A pong game to play at work in breaks
 
 # Networking
 
+[ ] Use more than one ENet channel.  From the features page: Since ENet will stall delivery of reliable packets to ensure proper sequencing, and consequently any packets of higher sequence number whether reliable or unreliable, in the event the reliable packet's predecessors have not yet arrived, this can introduce latency into the delivery of other packets which may not need to be as strictly ordered with respect to the packet that stalled their delivery.  To combat this latency and reduce the ordering restrictions on packets, ENet provides multiple channels of communication over a given connection. Each channel is independently sequenced, and so the delivery status of a packet in one channel will not stall the delivery of other packets in another channel.
 [ ] Implment Snapshot Interpolation. This does physics simulation only on the server, which is good since we don't rely on phyics running on clients (mobile?)
 [ ] Use bounding and quantization to send floating point numbers to the clients (we know max velocity of paddle, then we can quanitize that range and send an integer and reverse the process on the client)
 [ ] Think about packet size in bytes and how many packets per second we will send (ie determine bandwidth)

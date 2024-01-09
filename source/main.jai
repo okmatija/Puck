@@ -54,6 +54,7 @@ Game_Menu :: enum u8 {
 
 Game_Mode :: enum u8 {
     NOT_STARTED :: 0;
+    //INITIALIZING;
     PLAYING;
     PAUSED;
 }
@@ -73,20 +74,15 @@ current_dt: float = 1. / 60.; // Seconds
 current_time: float64; // Seconds
 last_time:  float64; // Seconds
 
+level : Level;
 player1 : Player;
 player2 : Player;
 balls : [BALL_COUNT_MAX]Ball;
 
-level : Level;
 ball_spawn_countdown := 0.;
 
 world : *b2World;
 world_debug_draw : *b2Draw;
-
-Level :: struct {
-    edges : *b2Body;
-    obstruction : *b2Body;
-}
 
 DeadBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags) #expand {
     for *=cast(bool)(flags & .POINTER) ball, ball_index : ball_array.* {
@@ -136,21 +132,6 @@ Paddle_Shape :: enum {
 
 Level_Id :: enum { Empty; Fixed_Box; Spinning_Box; };
 
-Ball :: struct {
-    live : bool;
-    shape : Ball_Shape;
-    radius : float = BALL_RADIUS_INITIAL;
-
-    mesh : Mesh;
-    color : Vector4 = .{0, 1, 0, 1};
-    transform : b2Transform;
-
-    last_hit_player : Player_Index;
-
-    // We get the transform from the physics simulation via this pointer
-    // Note: The body shape is collision geometry not render geometry
-    body : *b2Body; // Physics. This is not initialized or used by clients!
-}
 
 Player_Index :: enum u8 #specified {
     P1 :: 1;
@@ -164,14 +145,44 @@ Tuple3 :: struct (T : Type = s8) {
     #place i; component : [3] T = ---;
 }
 
-Mesh :: struct {
-    vertices : [..]Vector2;
-    triangles : [..]Tuple3;
+Obstruction :: struct {
+    live : bool;
+
+    mesh : Mesh;
+    color : Vector4;
+    transform : b2Transform;
+
+    body : *b2Body; // Physics. This is not initialized or used by clients!
 }
 
-deinit_mesh :: (mesh : Mesh) {
-    array_reset(*mesh.vertices);
-    array_reset(*mesh.triangles);
+Boundary :: struct {
+    mesh : Mesh;
+    color : Vector4;
+    transform : b2Transform;
+
+    body : *b2Body; // Physics. This is not initialized or used by clients!
+}
+
+Level :: struct {
+    obstructions : Obstruction;
+    boundary : Boundary;
+}
+
+Ball :: struct {
+    live : bool;
+
+    shape : Ball_Shape;
+    radius : float = BALL_RADIUS_INITIAL;
+
+    mesh : Mesh;
+    color : Vector4 = .{0, 1, 0, 1};
+    transform : b2Transform;
+
+    // Used on the server only:
+
+    // We get the transform from the physics simulation via this pointer
+    // Note: The body shape is collision geometry not render geometry
+    body : *b2Body; // Physics. This is not initialized or used by clients!
 }
 
 Player :: struct {
@@ -330,18 +341,13 @@ main :: () {
         if is_network_game {
             array_reset_keeping_memory(*network_events_this_frame);
             event : Enet.Event;
-            while Enet.host_service(GetHost(), *event, 0) == .SUCCESS {
+            timeout_milliseconds := 0; // http://enet.bespin.org/Tutorial.html says we should use 0 here to returns immediately
+            while Enet.host_service(GetHost(), *event, timeout_milliseconds) == .SUCCESS {
                 array_add(*network_events_this_frame, event);
             }
         }
 
         if game_mode == .PLAYING {
-
-            // nocommit Remove these booleans
-            is_network_game_client := host_type == .CLIENT;
-            is_network_game_server := host_type == .SERVER;
-            is_local_game :=          host_type == .LOCAL;
-
             defer game_frame_index += 1;
 
             hide_cursor();
@@ -381,69 +387,50 @@ main :: () {
 
             player1.left = xx input1.left_down;
             player1.right = xx input1.right_down;
-            if is_local_game {
+            if host_type == .LOCAL {
                 player2.left = xx input2.left_down;
                 player2.right = xx input2.right_down;
             } else {
-                if is_network_game_client {
+                if host_type == .CLIENT {
                     // Note: Sending input1 here since we would rather use those controls on the client computer
                     send_input(input1);
                 }
 
-                if is_network_game_server {
+                if host_type == .SERVER {
                     input, received := receive_input();
                     player2.left = xx input.left_down;
                     player2.right = xx input.right_down;
                 }
             }
 
-            if is_local_game || is_network_game_server {
+            if host_type != .CLIENT {
                 simulate();
             }
              
-            if is_network_game_server {
-
-                game_state : Game_State;
-                game_state.player1_state = get_player_state(player1);
-                game_state.player2_state = get_player_state(player2);
-                game_state.level_state.level = xx current_level;
-                for ball : balls game_state.ball_state[it_index] = get_ball_state(ball);
-
-                send_state(player2, game_state);
+            if host_type == .SERVER {
+                send_state(player2, get_game_state());
             }
 
-            if is_network_game_client {
-
+            if host_type == .CLIENT {
                 game_state, received := receive_state();
                 if received {
-
-                    using game_state;
-                    // b2Body.SetTransform(player1.body, player1_state.transform.p, b2Rot.GetAngle(*player1_state.transform.q));
-                    // b2Body.SetTransform(player2.body, player2_state.transform.p, b2Rot.GetAngle(*player2_state.transform.q));
-                    player1.transform = player1_state.transform;
-                    player2.transform = player2_state.transform;
-                    for ball_state {
-                        ball := *balls[it_index];
-                        ball.live = it.live;
-                        ball.shape = it.shape;
-                        ball.transform = it.transform;
-                    }
+                    set_game_state(game_state);
                 }
-
             }
 
-            // // @Hack For now we distinguish messages recieved based on their size in bytes.
-            // #assert(size_of(Server_State) != size_of(Client_Input));
-
             // Draw game state
-            Simp.clear_render_target(1, 0, 0, 1);
-            draw_game_background();
-            draw_level();
-
             {
+                Simp.clear_render_target(1, 0, 0, 1);
+                draw_game_background();
+
                 Simp.set_shader_for_color(true);
+
+                draw_body(level.boundary.body, Vector4.{1., 1., 1., 1.,});
+                draw_body(level.obstructions.body, Vector4.{1., 1., 1., 1.,});
+
                 draw_mesh(player1.mesh, player1.transform, player1.color);
                 draw_mesh(player2.mesh, player2.transform, player2.color);
+
                 for :LiveBalls balls {
                     draw_mesh(it.mesh, it.transform, it.color);
                 }
@@ -599,74 +586,6 @@ draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
     }
 }
 
-draw_body :: (body : *b2Body, color : Vector4) {
-    if body == null return;
-
-    fixture : *b2Fixture = b2Body.GetFixtureList(body);
-    while fixture != null {
-        defer fixture = b2Fixture.GetNext(fixture);
-
-        shape : *b2Shape = b2Fixture.GetShape(fixture);
-        shape_type : b2Shape.Type = b2Shape.GetType(shape);
-
-        transform :: (body : *b2Body, v : Vector2) -> Vector3 {
-            t := b2Body.GetTransform(body);
-            return .{xy=world_to_screen(apply_transform(t, v))};
-        }
-
-        if shape_type == .polygon {
-            using polygon_shape := cast(*b2PolygonShape)shape;
-
-            v0 : Vector3 = transform(body, m_vertices[0]);
-            for i : 1..m_count-2 {
-                v1 : Vector3 = transform(body, m_vertices[i]);
-                v2 : Vector3 = transform(body, m_vertices[i+1]);
-                Simp.immediate_triangle(v0, v1, v2, color, color, color);
-            }
-        } else if shape_type == .circle {
-            using circle_shape := cast(*b2CircleShape)shape;
-
-            CIRCLE_SEGMENTS :: 16;
-            CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
-
-            sinInc := sin(CIRCLE_INCREMENT);
-            cosInc := cos(CIRCLE_INCREMENT);
-            v0 : Vector3 = transform(body, m_p);
-            r1 : b2Vec2 = .{cosInc, sinInc};
-            v1 : Vector3 = transform(body, m_p + m_radius * r1);
-            for i : 0..CIRCLE_SEGMENTS-1 {
-                // Perform rotation to avoid additional trigonometry.
-                r2 : b2Vec2 = ---;
-                r2.x = cosInc * r1.x - sinInc * r1.y;
-                r2.y = sinInc * r1.x + cosInc * r1.y;
-                v2 : Vector3 = transform(body, m_p + m_radius * r2);
-                Simp.immediate_triangle(v0, v1, v2, color, color, color);
-                r1 = r2;
-                v1 = v2;
-            }
-        } else if shape_type == .edge {
-            using edge_shape := cast(*b2EdgeShape)shape;
-
-            SEGMENT_THICKNESS :: 1.; // Simp units aka pixels
-
-            start : Vector2 = transform(body, m_vertex1).xy;
-            end : Vector2 = transform(body, m_vertex2).xy;
-
-            // assert(start.z == 0. && end.z == 0.);
-            normal := unit_vector(end - start);
-            normal.x, normal.y = normal.y, -normal.x; // Rotate the unit direction by 90 degrees
-            q0 := start + normal * .5 * SEGMENT_THICKNESS;
-            q3 := start - normal * .5 * SEGMENT_THICKNESS;
-            q2 := end - normal * .5 * SEGMENT_THICKNESS;
-            q1 := end + normal * .5 * SEGMENT_THICKNESS;
-            Simp.immediate_quad(q0, q1, q2, q3, color, color, color, color);
-
-        } else {
-            assert(false); // @Incomplete
-        }
-    }
-}
-
 draw_score :: () {
     text := sprint("%:%", player1.score, player2.score);
     defer free(text);
@@ -763,15 +682,6 @@ simulate :: () {
     apply_impulse_to_move_player(player1);
     apply_impulse_to_move_player(player2);
 
-    // // Apply a small force toward other player to prevent the ball getting stuck in a horizontal bounce
-    // for ball : live_balls {
-    //     if ball.last_hit_player == {
-    //     case .P1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
-    //     case .P2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
-    //     }
-    // }
-
-
     // If there are any dead balls revive one after the spawn countdown
     for * :DeadBalls ball : balls {
         countdown(*ball_spawn_countdown);
@@ -843,10 +753,9 @@ deinit_game :: () {
     deinit_level();
 }
 
-// @TODO When the client inits the game it doesn't need the Box2D stuff that only needs to happen on the server
 init_game :: () {
 
-    init_level();
+    init_level(); // Must come before players since they are constrained relative to the level boundary
     init_player(*player1, .P1);
     init_player(*player2, .P2);
     for * ball : balls {
@@ -857,31 +766,12 @@ init_game :: () {
     game_mode = .PLAYING;
 }
 
-draw_level :: () {
-    Simp.set_shader_for_color(true);
-
-    draw_body(level.edges, Vector4.{1., 1., 1., 1.,});
-    draw_body(level.obstruction, Vector4.{1., 1., 1., 1.,});
-}
-
 deinit_level :: () {
     if host_type != .CLIENT {
-        if level.obstruction {
-            b2World.DestroyBody(world, level.obstruction);
+        if level.obstructions.body {
+            b2World.DestroyBody(world, level.obstructions.body);
         }
-        b2World.DestroyBody(world, level.edges);
-    }
-}
-
-AnyMesh :: struct {
-    transform : b2Transform;
-    body : *b2Body;
-}
-
-set_tranform :: (object : *$T/interface AnyMesh, transform : b2Transform) {
-    object.transform = transform;
-    if host_type != .CLIENT {
-        b2Body.SetTransform(object.body, transform.p, b2Rot.GetAngle(*transform.q));
+        b2World.DestroyBody(world, level.boundary.body);
     }
 }
 
@@ -931,37 +821,8 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
     ball.shape = initial_shape;
 
     if #complete shape == {
-    case .Circle;
-
-        CIRCLE_SEGMENTS :: 16;
-        CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
-        sinInc := sin(CIRCLE_INCREMENT);
-        cosInc := cos(CIRCLE_INCREMENT);
-
-        r1 : Vector2 = .{cosInc, sinInc};
-        v1 : Vector2 = radius * r1;
-        t0 : s8 = 0;
-        for i : 0..CIRCLE_SEGMENTS-1 {
-            // Perform rotation to avoid additional trigonometry.
-            r2 : b2Vec2 = ---;
-            r2.x = cosInc * r1.x - sinInc * r1.y;
-            r2.y = sinInc * r1.x + cosInc * r1.y;
-            v2 : Vector2 = radius * r2;
-            array_add(*mesh.vertices, .{0, 0});
-            array_add(*mesh.vertices, v1);
-            array_add(*mesh.vertices, v2);
-            array_add(*mesh.triangles, .{t0, t0+1, t0+2});
-            r1 = r2;
-            v1 = v2;
-            t0 += 3;
-        }
-
-    case .Square;
-
-        array_copy(*mesh.vertices, trapezoid_vertices(.{radius, radius}, 0.));
-        array_add(*mesh.triangles, .{0, 1, 2});
-        array_add(*mesh.triangles, .{0, 2, 3});
-
+    case .Circle; init_circle_mesh(mesh, radius);
+    case .Square; init_prism_mesh(mesh, .{radius, radius}, 0.);
     }
 
     // nocommit cleanup
@@ -975,42 +836,49 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
     // play_sound(sound_start_game); // @todo find a nicer sound for this!
 }
 
+init_boundary_physics :: () {
+    body_def : b2BodyDef;
+    b2BodyDef.Constructor(*body_def);
+    level.boundary.body = b2World.CreateBody(world, *body_def);
+
+    // Shape coordinates are local to the body
+
+    edge_shape : b2EdgeShape;
+    b2EdgeShape.Constructor(*edge_shape);
+
+    fixture_def : b2FixtureDef;
+    b2FixtureDef.Constructor(*fixture_def);
+    fixture_def.shape = *edge_shape;
+    fixture_def.density = 0.;
+    fixture_def.friction = WALL_FRICTION;
+    fixture_def.restitution = WALL_RESTITUTION;
+
+    // Left edge
+    b2EdgeShape.SetTwoSided(*edge_shape, -GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y});
+    b2Body.CreateFixture(level.boundary.body, *fixture_def);
+
+    // Right edge
+    b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
+    b2Body.CreateFixture(level.boundary.body, *fixture_def);
+
+    // // Top edge
+    //b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
+    //b2Body.CreateFixture(level.boundary.body, *fixture_def);
+}
+
+// Create edges bounding the play area
+init_boundary :: () {
+
+
+    if host_type != .CLIENT {
+        init_boundary_physics();
+    }
+}
+
 // nocommit init_level_physics();
 init_level :: () {
-    { // Create edges bounding the play area
-        // extents := Vector2.{GAME_EXTENTS.x, 1.}; //Vector2.{GAME_EXTENTS.x / 8., GAME_EXTENTS.y / 10.};
-        extents := .25 * GAME_EXTENTS;
-        center := Vector2.{0., -.75 * GAME_EXTENTS.y};
-        angle := 0.;
 
-        body_def : b2BodyDef;
-        b2BodyDef.Constructor(*body_def);
-        level.edges = b2World.CreateBody(world, *body_def);
-
-        // Shape coordinates are local to the body
-
-        edge_shape : b2EdgeShape;
-        b2EdgeShape.Constructor(*edge_shape);
-
-        fixture_def : b2FixtureDef;
-        b2FixtureDef.Constructor(*fixture_def);
-        fixture_def.shape = *edge_shape;
-        fixture_def.density = 0.;
-        fixture_def.friction = WALL_FRICTION;
-        fixture_def.restitution = WALL_RESTITUTION;
-
-        // Left edge
-        b2EdgeShape.SetTwoSided(*edge_shape, -GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y});
-        b2Body.CreateFixture(level.edges, *fixture_def);
-
-        // Right edge
-        b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
-        b2Body.CreateFixture(level.edges, *fixture_def);
-
-        // // Top edge
-        //b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
-        //b2Body.CreateFixture(level.edges, *fixture_def);
-    }
+    init_boundary();
 
     if #complete cast(Level_Id)current_level == {
     case .Empty;
@@ -1018,17 +886,16 @@ init_level :: () {
     case .Fixed_Box; #through;
     case .Spinning_Box;
         extents := .25 * GAME_EXTENTS;
-        center := Vector2.{0., -.75 * GAME_EXTENTS.y};
-        angle := 0.;
 
         body_def : b2BodyDef;
         b2BodyDef.Constructor(*body_def);
         body_def.type = .b2_kinematicBody;
-        level.obstruction = b2World.CreateBody(world, *body_def);
+        body := b2World.CreateBody(world, *body_def);
+        level.obstructions.body = body;
 
         shape : b2PolygonShape;
         b2PolygonShape.Constructor(*shape);
-        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, 0.);
 
         fixture_def : b2FixtureDef;
         b2FixtureDef.Constructor(*fixture_def);
@@ -1036,25 +903,15 @@ init_level :: () {
         fixture_def.density = 0.;
         fixture_def.friction = WALL_FRICTION;
         fixture_def.restitution = WALL_RESTITUTION;
-        b2Body.CreateFixture(level.obstruction, *fixture_def);
+        b2Body.CreateFixture(body, *fixture_def);
 
         joint_def : b2PrismaticJointDef;
         b2PrismaticJointDef.Constructor(*joint_def);
-        b2PrismaticJointDef.Initialize(*joint_def, level.edges, level.obstruction, .{}, .{1., 0.});
+        b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, .{}, .{1., 0.});
         if cast(Level_Id)current_level == .Spinning_Box {
-            b2Body.SetAngularVelocity(level.obstruction, .25);
+            b2Body.SetAngularVelocity(body, .25);
         }
     }
-}
-
-// Centered around the origin, short edge is above long edge
-trapezoid_vertices :: (extents : Vector2, short_over_long : float) -> [4]Vector2 {
-    return .[
-        .{-extents.x, -extents.y},
-        .{ extents.x, -extents.y},
-        .{ extents.x - short_over_long * extents.x, extents.y},
-        .{-extents.x + short_over_long * extents.x, extents.y}
-    ];
 }
 
 init_player_physics :: (using player : *Player) {
@@ -1088,7 +945,7 @@ init_player_physics :: (using player : *Player) {
     // Constrain player movement to within the GAME_EXTENTS
     joint_def : b2PrismaticJointDef;
     b2PrismaticJointDef.Constructor(*joint_def);
-    b2PrismaticJointDef.Initialize(*joint_def, level.edges, body, -GAME_EXTENTS, .{1., 0.});
+    b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, -GAME_EXTENTS, .{1., 0.});
     joint_def.lowerTranslation = -GAME_EXTENTS.x + PADDLE_EXTENTS.x;
     joint_def.upperTranslation =  GAME_EXTENTS.x - PADDLE_EXTENTS.x;
     joint_def.enableLimit = true;
@@ -1102,13 +959,9 @@ init_player :: (using player : *Player, player_index : Player_Index) {
 
     if #complete cast(Paddle_Shape)current_paddle_shape == {
     case .Box;
-        array_copy(*mesh.vertices, trapezoid_vertices(PADDLE_EXTENTS, 0.));
-        array_add(*mesh.triangles, .{0, 1, 2});
-        array_add(*mesh.triangles, .{0, 2, 3});
+        init_prism_mesh(mesh, PADDLE_EXTENTS, 0.);
     case .Prism;
-        array_copy(*mesh.vertices, trapezoid_vertices(PADDLE_EXTENTS, 1./3.));
-        array_add(*mesh.triangles, .{0, 1, 2});
-        array_add(*mesh.triangles, .{0, 2, 3});
+        init_prism_mesh(mesh, PADDLE_EXTENTS, 1./3.);
     }
 
     if host_type != .CLIENT {
@@ -1145,4 +998,5 @@ Enet :: #import "enet";
 #load "networking.jai";
 #load "sound.jai";
 #load "menu.jai";
+#load "mesh.jai";
 #load "carpet.jai";

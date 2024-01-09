@@ -125,4 +125,77 @@ NextRect2 :: (w: float, h: float) -> UI.Rect, UI.Rect #expand {
 }
 
 
+draw_body :: (body : *b2Body, color : Vector4) #deprecated "Render using mesh/transform data instead, this function only works on the server" {
+    if body == null {
+        log_error("draw_body only works on the servers, called from %\n", host_type);
+        return;
+    }
+
+    fixture : *b2Fixture = b2Body.GetFixtureList(body);
+    while fixture != null {
+        defer fixture = b2Fixture.GetNext(fixture);
+
+        shape : *b2Shape = b2Fixture.GetShape(fixture);
+        shape_type : b2Shape.Type = b2Shape.GetType(shape);
+
+        transform :: (body : *b2Body, v : Vector2) -> Vector3 {
+            t := b2Body.GetTransform(body);
+            return .{xy=world_to_screen(apply_transform(t, v))};
+        }
+
+        if shape_type == .polygon {
+            using polygon_shape := cast(*b2PolygonShape)shape;
+
+            v0 : Vector3 = transform(body, m_vertices[0]);
+            for i : 1..m_count-2 {
+                v1 : Vector3 = transform(body, m_vertices[i]);
+                v2 : Vector3 = transform(body, m_vertices[i+1]);
+                Simp.immediate_triangle(v0, v1, v2, color, color, color);
+            }
+        } else if shape_type == .circle {
+            using circle_shape := cast(*b2CircleShape)shape;
+
+            CIRCLE_SEGMENTS :: 16;
+            CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
+
+            sinInc := sin(CIRCLE_INCREMENT);
+            cosInc := cos(CIRCLE_INCREMENT);
+            v0 : Vector3 = transform(body, m_p);
+            r1 : b2Vec2 = .{cosInc, sinInc};
+            v1 : Vector3 = transform(body, m_p + m_radius * r1);
+            for i : 0..CIRCLE_SEGMENTS-1 {
+                // Perform rotation to avoid additional trigonometry.
+                r2 : b2Vec2 = ---;
+                r2.x = cosInc * r1.x - sinInc * r1.y;
+                r2.y = sinInc * r1.x + cosInc * r1.y;
+                v2 : Vector3 = transform(body, m_p + m_radius * r2);
+                Simp.immediate_triangle(v0, v1, v2, color, color, color);
+                r1 = r2;
+                v1 = v2;
+            }
+        } else if shape_type == .edge {
+            using edge_shape := cast(*b2EdgeShape)shape;
+
+            SEGMENT_THICKNESS :: 1.; // Simp units aka pixels
+
+            start : Vector2 = transform(body, m_vertex1).xy;
+            end : Vector2 = transform(body, m_vertex2).xy;
+
+            // assert(start.z == 0. && end.z == 0.);
+            normal := unit_vector(end - start);
+            normal.x, normal.y = normal.y, -normal.x; // Rotate the unit direction by 90 degrees
+            q0 := start + normal * .5 * SEGMENT_THICKNESS;
+            q3 := start - normal * .5 * SEGMENT_THICKNESS;
+            q2 := end - normal * .5 * SEGMENT_THICKNESS;
+            q1 := end + normal * .5 * SEGMENT_THICKNESS;
+            Simp.immediate_quad(q0, q1, q2, q3, color, color, color, color);
+
+        } else {
+            assert(false); // @Incomplete
+        }
+    }
+}
+
+
+
 #import "Math";

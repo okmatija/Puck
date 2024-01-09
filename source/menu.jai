@@ -217,6 +217,15 @@ menu :: () {
             }
         }
 
+        r = NextRect(2.*k.x, .5*k.y);
+        UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
+
+        r = NextRect(2.*k.x, .5*k.y);
+        UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+
+        r = NextRect(2.*k.x, .5*k.y);
+        UI.dropdown(r, level_choices, *current_level, dropdown_theme);
+
         l:, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
@@ -239,20 +248,21 @@ menu :: () {
         // UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
         UI.label(r, "Connecting to Server...", *label_theme);
 
-        timed_out := false;
+        disconnect := false;
         for event : network_events_this_frame {
             if event.type == {
             case .CONNECT;
                 init_game();
             case .DISCONNECT; #through;
             case .DISCONNECT_TIMEOUT;
-                timed_out = true;
+                disconnect = true;
+                // @Think Can this happen?
             }
         }
 
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Cancel", *button_theme);
-        if timed_out || released {
+        if disconnect || released {
             game_menu = .JOIN_NETWORK_GAME_MENU;
             deinit_client();
         }
@@ -267,21 +277,23 @@ menu :: () {
         label_theme.alignment = .Center;
         UI.label(r, "Waiting for players...", *label_theme);
 
-        timed_out := false;
-
+        disconnect := false;
         for event : network_events_this_frame {
             if event.type == {
             case .CONNECT;
                 init_game();
             case .DISCONNECT; #through;
             case .DISCONNECT_TIMEOUT;
-                timed_out = true;
+                disconnect = true;
+                // This could happen a previously connected player disconnects before the game started?
+                log("Disconnected peer %", event.peer.data);
+                //event.peer.data = null; // @Cleanup http://enet.bespin.org/Tutorial.html says we should do this?
             }
         }
 
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Cancel", *button_theme);
-        if timed_out || released {
+        if disconnect || released {
             game_menu = .HOST_NETWORK_GAME_MENU;
             deinit_server();
         }

@@ -7,8 +7,6 @@ Host_Info :: struct {
 Player_State :: struct {
     shape : Paddle_Shape;
 
-    // nocommit cleanup
-    // ition : Vector2; // In the "player coordinate system" where left/right are determined by direction player is facing
     transform : b2Transform;
 
     score : int;
@@ -18,13 +16,17 @@ Ball_State :: struct {
     shape : Ball_Shape;
 
     transform : b2Transform;
-    //velocity : Vector2;
 
     live : bool;
 };
 
+Obstruction_State :: struct {
+    transform : b2Transform;
+}
+
 Level_State :: struct {
-    level : Level_Id;
+    level_id : Level_Id;
+    obstructions : Obstruction_State;
 }
 
 // This data is sent by the server to all connected clients
@@ -70,6 +72,45 @@ get_player_state :: (using player : Player) -> Player_State {
     result.transform = b2Body.GetTransform(body);
     result.score = score;
     return result;
+}
+
+get_level_state :: () -> Level_State {
+    result : Level_State;
+
+    result.level_id = cast(Level_Id)current_level;
+    if result.level_id != .Empty {
+        result.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
+    }
+
+    return result;
+}
+
+get_game_state :: () -> Game_State {
+    result : Game_State;
+    result.player1_state = get_player_state(player1);
+    result.player2_state = get_player_state(player2);
+    result.level_state = get_level_state();
+    for ball : balls {
+        result.ball_state[it_index] = get_ball_state(ball);
+    }
+    return result;
+}
+
+set_game_state :: (using state : Game_State) {
+    player1.transform = player1_state.transform;
+    player2.transform = player2_state.transform;
+
+    current_level = xx level_state.level_id;
+    if cast(Level_Id)current_level != .Empty {
+        level.obstructions.transform = level_state.obstructions.transform;
+    }
+
+    for ball_state {
+        ball := *balls[it_index];
+        ball.live = it.live;
+        ball.shape = it.shape;
+        ball.transform = it.transform;
+    }
 }
 
 init_host_info :: () {
@@ -132,7 +173,7 @@ send_input :: (input : Client_Input, loc := #caller_location) {
     // @TODO Ensure the client is connected
     
     // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
-    packet := Enet.packet_create(*input, .RELIABLE);
+    packet := Enet.packet_create(*input, .RELIABLE); // nocommit Try UNRELIABLE here  @Leak also cleanup the packet!
     Enet.peer_send(peer=client.peer, channel_id=0, packet=packet);
     
     // Sleep(16); // @@nocommit??
@@ -141,9 +182,10 @@ send_input :: (input : Client_Input, loc := #caller_location) {
 // Send game state from server to client
 send_state :: (player : Player, state : Game_State, loc := #caller_location) {
     assert(server.host.peers.count == 1);
+    // @Cleanup use Enet.host_broadcast here
     for * peer: server.host.peers {
         if peer.state == .CONNECTED {
-            packet := Enet.packet_create(*state, .RELIABLE);
+            packet := Enet.packet_create(*state, .RELIABLE); // nocommit Try UNRELIABLE here  @Leak also cleanup the packet!
             Enet.peer_send(peer=peer, channel_id=0, packet=packet);
         }
     }
@@ -154,12 +196,13 @@ receive_input :: (loc := #caller_location) -> Client_Input, bool {
 
     for event : network_events_this_frame {
         if event.type == .RECEIVE {
+            defer Enet.packet_destroy(event.packet);
             if event.packet.data_length == size_of(Client_Input) {
 
                 input : Client_Input = (cast(*Client_Input)event.packet.data).*;
-                Enet.packet_destroy(event.packet);
                 remove;
 
+                // nocommit Maybe we should keep processing to get the most recent input??
                 return input, true;
             }
         }
@@ -173,12 +216,13 @@ receive_state :: (loc := #caller_location) -> Game_State, bool {
 
     for event : network_events_this_frame {
         if event.type == .RECEIVE {
+            defer Enet.packet_destroy(event.packet);
             if event.packet.data_length == size_of(Game_State) {
 
                 state := (cast(*Game_State)event.packet.data).*;
-                Enet.packet_destroy(event.packet);
                 remove;
 
+                // nocommit Maybe we should keep processing to get the most recent input??
                 return state, true;
             }
         }
@@ -201,16 +245,18 @@ init_server :: (server_port : u16) {
 
     success : bool;
 
+    // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
+    bandwidth_bytes_per_second := 0;
+
     address : Enet.Address;
     address.host = Enet.HOST_ANY;
     address.port = server_port;
     server.host, success = Enet.host_create(
         address=*address,
-        peer_count=1, 
+        peer_count=1, // player_count-1, currently only 2 players are supported
         channel_limit=1,
-        // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
-        incoming_bandwidth=0,
-        outgoing_bandwidth=0);
+        incoming_bandwidth=bandwidth_bytes_per_second,
+        outgoing_bandwidth=bandwidth_bytes_per_second);
 
     assert(success, "Failed to create server!\n");
 }
@@ -232,13 +278,15 @@ init_client :: (server_address : string, server_port : u16) {
 
     success : bool;
 
+    // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
+    bandwidth_bytes_per_second := 0;
+
     client.host, success = Enet.host_create(
         address=null,
-        peer_count=1,
+        peer_count=1, // Can only connect to one server
         channel_limit=1,
-        // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
-        incoming_bandwidth=0,
-        outgoing_bandwidth=0);
+        incoming_bandwidth=bandwidth_bytes_per_second,
+        outgoing_bandwidth=bandwidth_bytes_per_second);
     assert(success, "Failed to create server!\n");
 
     address := Enet.get_host_ip_address(server_address);
