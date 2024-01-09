@@ -1,11 +1,11 @@
+[x] Merge with main
+[x] Use local versions of the GetRect and Simp modules
 [ ] Fix issue where client is initializing box2d
-[ ] Merge with main and delete this branch
 [ ] Add winning conditions
 [ ] Add an option for game mode e.g., best of/first to/rally (high scores)
 [ ] Add text to all the game settings
 [ ] Add color and player name customization
 [ ] Make pausing a quitting the game work better
-[ ] @TODOOO Use local versions of the GetRect and Simp modules
 
 
 # Why/What?
@@ -21,6 +21,7 @@ A pong game to play at work in breaks
 [x] Add an option to set the socket address (aka ip_address:port_number)
 [ ] Add a restart button
 [ ] Options to have the window always on top
+[ ] Add Credits
 
 # Payment
 

@@ -1030,6 +1030,9 @@ modify_string :: (ps: *string, new_value: string) {
     ps.* = copy_string(new_value);
 }
 
+Texture :: Simp.Texture;
+
+// These are in jai/modules/
 #import "Basic";
 #import "String";
 #import "Input";
@@ -1041,20 +1044,18 @@ modify_string :: (ps: *string, new_value: string) {
 #import "Math";
 #import "Random";
 #import "File";
-Enet :: #import "enet";
 Socket :: #import "Socket";
 UI :: #import "GetRect_LeftHanded";
 System :: #import "System";
 Simp :: #import "Simp";
-Texture :: Simp.Texture;
+#if OS == .WINDOWS #import "Windows";
 
-#if OS == .WINDOWS {
-#import "Windows";
-}
+// These are in ./modules/
+Enet :: #import "enet";
+#import "JaiBox2D";
 
-#import,dir "ThirdParty/JaiBox2D";
+// These are in ./source/
 #load "Box2D_DebugDraw_Simp.jai";
-
 #load "networking.jai";
 #load "sound.jai";
 #load "menu.jai";
