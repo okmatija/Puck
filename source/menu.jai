@@ -82,7 +82,7 @@ menu :: () {
         r = NextRect(3.25*k.x, .75*k.y);
         _, _, released = UI.button(r, "Host Network Game", *button_theme);
         if released {
-            game_menu = .SERVE_NETWORK_GAME_MENU;
+            game_menu = .HOST_NETWORK_GAME_MENU;
         }
 
         r = NextRect(1.75*k.x, .75*k.y);
@@ -143,7 +143,7 @@ menu :: () {
                 game_menu = .JOIN_NETWORK_GAME_MENU;
                 deinit_client();
             } else if host_type == .SERVER {
-                game_menu = .SERVE_NETWORK_GAME_MENU;
+                game_menu = .HOST_NETWORK_GAME_MENU;
                 deinit_server();
             } else {
                 game_menu = .PLAY_LOCAL_GAME_MENU;
@@ -191,7 +191,7 @@ menu :: () {
             init_client(server_address, server_port);
         }
 
-    case .SERVE_NETWORK_GAME_MENU;
+    case .HOST_NETWORK_GAME_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
 
@@ -282,7 +282,7 @@ menu :: () {
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Cancel", *button_theme);
         if timed_out || released {
-            game_menu = .SERVE_NETWORK_GAME_MENU;
+            game_menu = .HOST_NETWORK_GAME_MENU;
             deinit_server();
         }
 

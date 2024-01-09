@@ -45,7 +45,7 @@ Game_Menu :: enum u8 {
     MAIN_MENU :: 0;
     PLAY_LOCAL_GAME_MENU;
     JOIN_NETWORK_GAME_MENU;
-    SERVE_NETWORK_GAME_MENU;
+    HOST_NETWORK_GAME_MENU;
     WAITING_FOR_PLAYERS_MENU;
     CONNECTING_TO_SERVER_MENU;
     SETTINGS_MENU;
@@ -159,14 +159,28 @@ Player_Index :: enum u8 #specified {
     //P4 :: 4;
 }
 
+Tuple3 :: struct (T : Type = s8) {
+    i, j, k : T;
+    #place i; component : [3] T = ---;
+}
+
+Mesh :: struct {
+    vertices : [..]Vector2;
+    triangles : [..]Tuple3;
+}
+
 Player :: struct {
     index : Player_Index;
 
+    mesh : Mesh;
     color : Vector4;
 
     left : u32;
     right : u32;
     score : int;
+
+    // Server only
+    //---------------------------------------
 
     // Some powerups will change the size of the player
     // Note: The body shape is collision geometry not render geometry
@@ -203,7 +217,6 @@ input2 : Client_Input;
 
 main :: () {
     args : []string = get_command_line_arguments();
-    print("%\n", args);
     defer array_free(args);
 
     if args.count != 1 && args.count != 3 {
@@ -222,7 +235,7 @@ main :: () {
 
     path := path_strip_filename(System.get_path_of_running_executable());
     data_folder = join(path, "data");
-    print("data_folder is '%'\n", data_folder);
+    //print("data_folder is '%'\n", data_folder);
 
     last_time = seconds_since_init();
 
@@ -956,57 +969,35 @@ init_level :: () {
     }
 }
 
-init_player :: (using player : *Player, player_index : Player_Index) {
+// Centered around the origin, short edge is above long edge
+trapezoid_vertices :: (extents : Vector2, short_over_long : float) -> [4]Vector2 {
+    return .[
+        .{-extents.x, -extents.y},
+        .{ extents.x, -extents.y},
+        .{ extents.x - short_over_long * extents.x, extents.y},
+        .{-extents.x + short_over_long * extents.x, extents.y}
+    ];
+}
 
-    index = player_index;
-    color = ifx index == .P1
-        then Vector4.{1., .1, .1, 1.}
-        else Vector4.{.1, .1, 1., 1.};
-
-    center_y := ifx index == .P1
-        then -GAME_EXTENTS.y + PADDLE_EXTENTS.y
-        else  GAME_EXTENTS.y - PADDLE_EXTENTS.y;
-
+init_player_physics :: (using player : *Player) {
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     body_def.type = .b2_dynamicBody;
-    body_def.position = Vector2.{0, center_y};
+    if index == {
+    case .P1;
+        body_def.position = Vector2.{0, -GAME_EXTENTS.y + PADDLE_EXTENTS.y};
+        body_def.angle = 0.;
+    case .P2;
+        body_def.position = Vector2.{0,  GAME_EXTENTS.y - PADDLE_EXTENTS.y};
+        body_def.angle = PI;
+    }
     body = b2World.CreateBody(world, *body_def);
 
     b2Body.SetSleepingAllowed(body, false);
 
-    trapezoid_paddle :: (extents : Vector2, short_over_long : float, player_index : Player_Index) -> b2PolygonShape {
-        shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*shape);
-        vertices : [4]b2Vec2 = ---;
-        if player_index == .P1 {
-            vertices = .[
-                .{-extents.x, -extents.y},
-                .{ extents.x, -extents.y},
-                .{ extents.x - short_over_long * extents.x, extents.y},
-                .{-extents.x + short_over_long * extents.x, extents.y}
-            ];
-        } else {
-            vertices = .[
-                .{-extents.x + short_over_long * extents.x, -extents.y},
-                .{ extents.x - short_over_long * extents.x, -extents.y},
-                .{ extents.x, extents.y},
-                .{-extents.x, extents.y}
-            ];
-        }
-        b2PolygonShape.Set(*shape, vertices.data, vertices.count);
-        return shape;
-    }
-
-    rectangle_paddle :: (extents : Vector2, short_over_long : float, player_index : Player_Index) -> b2PolygonShape {
-        return trapezoid_paddle(extents, 0., player_index);
-    }
-
     polygon_shape : b2PolygonShape;
-    if #complete cast(Paddle_Shape)current_paddle_shape == {
-    case .Box;   polygon_shape = rectangle_paddle(PADDLE_EXTENTS, 1./3., index);
-    case .Prism; polygon_shape = trapezoid_paddle(PADDLE_EXTENTS, 1./3., index);
-    }
+    b2PolygonShape.Constructor(*polygon_shape);
+    b2PolygonShape.Set(*polygon_shape, mesh.vertices.data, cast(s32)mesh.vertices.count);
 
     fixture_def : b2FixtureDef;
     b2FixtureDef.Constructor(*fixture_def);
@@ -1024,6 +1015,27 @@ init_player :: (using player : *Player, player_index : Player_Index) {
     joint_def.upperTranslation =  GAME_EXTENTS.x - PADDLE_EXTENTS.x;
     joint_def.enableLimit = true;
     b2World.CreateJoint(world, *joint_def);
+}
+
+init_player :: (using player : *Player, player_index : Player_Index) {
+
+    index = player_index;
+    color = ifx index == .P1 then Vector4.{1., .1, .1, 1.} else Vector4.{.1, .1, 1., 1.};
+
+    if #complete cast(Paddle_Shape)current_paddle_shape == {
+    case .Box;
+        array_copy(*mesh.vertices, trapezoid_vertices(PADDLE_EXTENTS, 0.));
+        array_add(*mesh.triangles, .{0, 1, 2});
+        array_add(*mesh.triangles, .{0, 2, 3});
+    case .Prism;
+        array_copy(*mesh.vertices, trapezoid_vertices(PADDLE_EXTENTS, 1./3.));
+        array_add(*mesh.triangles, .{0, 1, 2});
+        array_add(*mesh.triangles, .{0, 2, 3});
+    }
+
+    if host_type != .CLIENT {
+        init_player_physics(player);
+    }    
 }
 
 modify_string :: (ps: *string, new_value: string) {
