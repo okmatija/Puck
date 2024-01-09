@@ -700,54 +700,54 @@ simulate :: () {
         // control_mode : Control_Mode = .KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
 
         if control_mode == {
-            case .KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
+        case .KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
 
-                current_velocity := b2Body.GetLinearVelocity(body);
-                desired_velocity := 0.;
-                if left  desired_velocity = -PADDLE_SPEED;
-                if right desired_velocity =  PADDLE_SPEED;
+            current_velocity := b2Body.GetLinearVelocity(body);
+            desired_velocity := 0.;
+            if left  desired_velocity = -PADDLE_SPEED;
+            if right desired_velocity =  PADDLE_SPEED;
 
-                velocity_change := desired_velocity - current_velocity.x;
-                impulse := b2Body.GetMass(body) * velocity_change;
-                b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
+            velocity_change := desired_velocity - current_velocity.x;
+            impulse := b2Body.GetMass(body) * velocity_change;
+            b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
 
-            case .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
+        case .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
 
-                accel := (PADDLE_SPEED / (3 * current_dt));
-                decel := (PADDLE_SPEED / (1 * current_dt));
+            accel := (PADDLE_SPEED / (3 * current_dt));
+            decel := (PADDLE_SPEED / (1 * current_dt));
 
-                current_velocity := b2Body.GetLinearVelocity(body);
-                desired_velocity := 0.;
-                if left       desired_velocity = max(-PADDLE_SPEED, current_velocity.x - current_dt * accel);
-                else if right desired_velocity = min( PADDLE_SPEED, current_velocity.x + current_dt * accel);
-                else {
-                    if current_velocity.x < 0      desired_velocity = min(0., current_velocity.x + current_dt * decel);
-                    else if current_velocity.x > 0 desired_velocity = max(0., current_velocity.x - current_dt * decel);
-                }
+            current_velocity := b2Body.GetLinearVelocity(body);
+            desired_velocity := 0.;
+            if left       desired_velocity = max(-PADDLE_SPEED, current_velocity.x - current_dt * accel);
+            else if right desired_velocity = min( PADDLE_SPEED, current_velocity.x + current_dt * accel);
+            else {
+                if current_velocity.x < 0      desired_velocity = min(0., current_velocity.x + current_dt * decel);
+                else if current_velocity.x > 0 desired_velocity = max(0., current_velocity.x - current_dt * decel);
+            }
 
-                velocity_change := desired_velocity - current_velocity.x;
-                impulse := b2Body.GetMass(body) * velocity_change;
-                b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
+            velocity_change := desired_velocity - current_velocity.x;
+            impulse := b2Body.GetMass(body) * velocity_change;
+            b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
 
-            case .MOUSE_SET_POSITION_NFRAME_ACCELERATION;
+        case .MOUSE_SET_POSITION_NFRAME_ACCELERATION;
 
-                mouse_x, mouse_y, _ := get_mouse_pointer_position();
-                mouse : Vector2;
-                mouse.x, mouse.y = xx mouse_x, xx mouse_y;
+            mouse_x, mouse_y, _ := get_mouse_pointer_position();
+            mouse : Vector2;
+            mouse.x, mouse.y = xx mouse_x, xx mouse_y;
 
-                current_position_x := b2Body.GetPosition(body).x;
-                desired_position_x := screen_to_world(mouse).x;
-                desired_velocity := (desired_position_x - current_position_x) / current_dt;
-                // @Feel Stop the paddle bouncing against the level border
-                if desired_velocity < 0 {
-                    desired_velocity = max(desired_velocity, -PADDLE_SPEED);
-                } else {
-                    desired_velocity = min(desired_velocity, PADDLE_SPEED);
-                }
-                current_velocity := b2Body.GetLinearVelocity(body);
-                velocity_change := desired_velocity - current_velocity.x;
-                impulse := b2Body.GetMass(body) * velocity_change;
-                b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
+            current_position_x := b2Body.GetPosition(body).x;
+            desired_position_x := screen_to_world(mouse).x;
+            desired_velocity := (desired_position_x - current_position_x) / current_dt;
+            // @Feel Stop the paddle bouncing against the level border
+            if desired_velocity < 0 {
+                desired_velocity = max(desired_velocity, -PADDLE_SPEED);
+            } else {
+                desired_velocity = min(desired_velocity, PADDLE_SPEED);
+            }
+            current_velocity := b2Body.GetLinearVelocity(body);
+            velocity_change := desired_velocity - current_velocity.x;
+            impulse := b2Body.GetMass(body) * velocity_change;
+            b2Body.ApplyLinearImpulse(body, b2Vec2.{impulse, 0.}, b2Body.GetWorldCenter(body), true);
         }
     }
 
@@ -757,8 +757,8 @@ simulate :: () {
     // // Apply a small force toward other player to prevent the ball getting stuck in a horizontal bounce
     // for ball : live_balls {
     //     if ball.last_hit_player == {
-    //         case .P1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
-    //         case .P2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
+    //     case .P1; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., -100.}, true);
+    //     case .P2; b2Body.ApplyForceToCenter(ball.body, b2Vec2.{0., 100.}, true);
     //     }
     // }
 
@@ -872,8 +872,10 @@ init_ball :: (ball : *Ball) {
     fixture_def : b2FixtureDef;
     b2FixtureDef.Constructor(*fixture_def);
     if cast(Ball_Shape)current_ball_shape == {
-        case .Circle; fixture_def.shape = *circle_shape;
-        case .Square; fixture_def.shape = *square_shape;
+    case .Circle;
+        fixture_def.shape = *circle_shape;
+    case .Square;
+        fixture_def.shape = *square_shape;
     }
     fixture_def.density = BALL_DENSITY;
     fixture_def.friction = BALL_FRICTION;
@@ -919,39 +921,38 @@ init_level :: () {
         //b2Body.CreateFixture(level.edges, *fixture_def);
     }
 
-    // Central box obstruction
     if #complete cast(Level_Id)current_level == {
-        case .Empty;
-            // Do nothing
-        case .Fixed_Box; #through;
-        case .Spinning_Box;
-            extents := .25 * GAME_EXTENTS;
-            center := Vector2.{0., -.75 * GAME_EXTENTS.y};
-            angle := 0.;
+    case .Empty;
+        // Do nothing
+    case .Fixed_Box; #through;
+    case .Spinning_Box;
+        extents := .25 * GAME_EXTENTS;
+        center := Vector2.{0., -.75 * GAME_EXTENTS.y};
+        angle := 0.;
 
-            body_def : b2BodyDef;
-            b2BodyDef.Constructor(*body_def);
-            body_def.type = .b2_kinematicBody;
-            level.obstruction = b2World.CreateBody(world, *body_def);
+        body_def : b2BodyDef;
+        b2BodyDef.Constructor(*body_def);
+        body_def.type = .b2_kinematicBody;
+        level.obstruction = b2World.CreateBody(world, *body_def);
 
-            shape : b2PolygonShape;
-            b2PolygonShape.Constructor(*shape);
-            b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
+        shape : b2PolygonShape;
+        b2PolygonShape.Constructor(*shape);
+        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, angle);
 
-            fixture_def : b2FixtureDef;
-            b2FixtureDef.Constructor(*fixture_def);
-            fixture_def.shape = *shape;
-            fixture_def.density = 0.;
-            fixture_def.friction = WALL_FRICTION;
-            fixture_def.restitution = WALL_RESTITUTION;
-            b2Body.CreateFixture(level.obstruction, *fixture_def);
+        fixture_def : b2FixtureDef;
+        b2FixtureDef.Constructor(*fixture_def);
+        fixture_def.shape = *shape;
+        fixture_def.density = 0.;
+        fixture_def.friction = WALL_FRICTION;
+        fixture_def.restitution = WALL_RESTITUTION;
+        b2Body.CreateFixture(level.obstruction, *fixture_def);
 
-            joint_def : b2PrismaticJointDef;
-            b2PrismaticJointDef.Constructor(*joint_def);
-            b2PrismaticJointDef.Initialize(*joint_def, level.edges, level.obstruction, .{}, .{1., 0.});
-            if cast(Level_Id)current_level == .Spinning_Box {
-                b2Body.SetAngularVelocity(level.obstruction, .25);
-            }
+        joint_def : b2PrismaticJointDef;
+        b2PrismaticJointDef.Constructor(*joint_def);
+        b2PrismaticJointDef.Initialize(*joint_def, level.edges, level.obstruction, .{}, .{1., 0.});
+        if cast(Level_Id)current_level == .Spinning_Box {
+            b2Body.SetAngularVelocity(level.obstruction, .25);
+        }
     }
 }
 
@@ -1003,8 +1004,8 @@ init_player :: (using player : *Player, player_index : Player_Index) {
 
     polygon_shape : b2PolygonShape;
     if #complete cast(Paddle_Shape)current_paddle_shape == {
-        case .Box;   polygon_shape = rectangle_paddle(PADDLE_EXTENTS, 1./3., index);
-        case .Prism; polygon_shape = trapezoid_paddle(PADDLE_EXTENTS, 1./3., index);
+    case .Box;   polygon_shape = rectangle_paddle(PADDLE_EXTENTS, 1./3., index);
+    case .Prism; polygon_shape = trapezoid_paddle(PADDLE_EXTENTS, 1./3., index);
     }
 
     fixture_def : b2FixtureDef;
