@@ -324,7 +324,7 @@ main :: () {
             // nocommit Remove these booleans
             is_network_game_client := host_type == .CLIENT;
             is_network_game_server := host_type == .SERVER;
-            is_local_game :=          host_type == .LOCAL;;
+            is_local_game :=          host_type == .LOCAL;
 
             defer game_frame_index += 1;
 
