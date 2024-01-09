@@ -350,8 +350,10 @@ main :: () {
                         case #char "D";
                             input1.right_down = xx event.key_pressed;
 
+                        case .ARROW_LEFT; #through;
                         case #char "J";
                             input2.left_down =  xx event.key_pressed;
+                        case .ARROW_RIGHT; #through;
                         case #char "L";
                             input2.right_down = xx event.key_pressed;
 
@@ -372,8 +374,8 @@ main :: () {
 
                 if is_network_game_server {
                     input2=, received := receive_input_from_client();
-                    player2.left = xx input2.left_down;
-                    player2.right = xx input2.right_down;
+                    player2.left = xx input1.left_down;
+                    player2.right = xx input1.right_down;
                 }
             }
 
@@ -959,8 +961,8 @@ init_player :: (using player : *Player, player_index : Player_Index) {
         else Vector4.{.1, .1, 1., 1.};
 
     center_y := ifx index == .P1
-        then -GAME_EXTENTS.y + PADDLE_EXTENTS.y
-        else  GAME_EXTENTS.y - PADDLE_EXTENTS.y;
+        then  GAME_EXTENTS.y - PADDLE_EXTENTS.y
+        else -GAME_EXTENTS.y + PADDLE_EXTENTS.y;
 
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
@@ -976,17 +978,17 @@ init_player :: (using player : *Player, player_index : Player_Index) {
         vertices : [4]b2Vec2 = ---;
         if player_index == .P1 {
             vertices = .[
-                .{-extents.x, -extents.y},
-                .{ extents.x, -extents.y},
-                .{ extents.x - short_over_long * extents.x, extents.y},
-                .{-extents.x + short_over_long * extents.x, extents.y}
-            ];
-        } else {
-            vertices = .[
                 .{-extents.x + short_over_long * extents.x, -extents.y},
                 .{ extents.x - short_over_long * extents.x, -extents.y},
                 .{ extents.x, extents.y},
                 .{-extents.x, extents.y}
+            ];
+        } else {
+            vertices = .[
+                .{-extents.x, -extents.y},
+                .{ extents.x, -extents.y},
+                .{ extents.x - short_over_long * extents.x, extents.y},
+                .{-extents.x + short_over_long * extents.x, extents.y}
             ];
         }
         b2PolygonShape.Set(*shape, vertices.data, vertices.count);
