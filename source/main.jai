@@ -64,12 +64,6 @@ game_quitting : bool;
 game_menu : Game_Menu;
 game_mode : Game_Mode;
 
-// nocommit Remove these
-connection_retry_count : int = INITIAL_CONNECTION_RETRY_COUNT;
-connection_retry_countdown : float = INITIAL_CONNECTION_RETRY_COUNTDOWN;
-INITIAL_CONNECTION_RETRY_COUNT :: 500;
-INITIAL_CONNECTION_RETRY_COUNTDOWN : float : .1; // Seconds
-
 current_dt: float = 1. / 60.; // Seconds
 current_time: float64; // Seconds
 last_time:  float64; // Seconds
@@ -306,8 +300,6 @@ main :: () {
 
     init_world(*contact_listener);
 
-    // @TODOOO Figure out the order of things in this loop e.g., read input, simulate then render (to use the latest input).
-    // @TODOOO Split the game loop into a server loop and a client loop, currently they are interleaved which makes it confusing
     // Don't update things that don't need updating e.g., sound stuff if we are a server but not a client
     while !game_quitting {
         reset_temporary_storage();
@@ -349,7 +341,7 @@ main :: () {
 
             hide_cursor();
 
-            // Always read all input
+            // Read all input
             {
                 input1.player_index = .P1;
                 input2.player_index = .P2;
@@ -376,39 +368,47 @@ main :: () {
                         case #char "D";
                             input2.right_down = xx event.key_pressed;
 
-
                         }
                     }
                 }
-            }
 
-            player1.left = xx input1.left_down;
-            player1.right = xx input1.right_down;
-            if host_type == .LOCAL {
-                player2.left = xx input2.left_down;
-                player2.right = xx input2.right_down;
-            } else {
-                if host_type == .CLIENT {
-                    // Note: Sending input1 here since we would rather use those controls on the client computer
-                    send_input(input1);
-                }
+                if host_type == {
+                case .LOCAL;
 
-                if host_type == .SERVER {
+                    player1.left = xx input1.left_down;
+                    player1.right = xx input1.right_down;
+                    player2.left = xx input2.left_down;
+                    player2.right = xx input2.right_down;
+
+                case .SERVER;
+
+                    player1.left = xx input1.left_down;
+                    player1.right = xx input1.right_down;
+
                     input, received := receive_input();
                     player2.left = xx input.left_down;
                     player2.right = xx input.right_down;
+
+                case .CLIENT;
+
+                    // Note: Send input1 here since we would rather use those controls on the client computer
+                    send_input(input1);
                 }
             }
 
-            if host_type != .CLIENT {
-                simulate();
-            }
-             
-            if host_type == .SERVER {
-                send_state(player2, get_game_state());
-            }
+            // Update the game state
+            if host_type == {
+            case .LOCAL;
 
-            if host_type == .CLIENT {
+                simulate();
+
+            case .SERVER;
+
+                simulate();
+                send_state(player2, get_game_state());
+
+            case .CLIENT;
+
                 game_state, received := receive_state();
                 if received {
                     set_game_state(game_state);
@@ -433,13 +433,15 @@ main :: () {
                 for :LiveBalls balls {
                     draw_mesh(it.mesh, it.transform, it.color);
                 }
+
+                draw_score();
+
+                // draw_cursor();
+
+                // Draws the physics/collision geometry
+                //b2World.DebugDraw(world);
             }
 
-            draw_score();
-            // draw_cursor();
-
-            // Draws the physics/collision geometry
-            //b2World.DebugDraw(world);
         } else {
             menu();
         }
@@ -726,7 +728,6 @@ simulate :: () {
     // Important: Do this after SetTransform above (see the comment on b2Body::SetTransform)
     b2World.Step(world, current_dt, 6, 2);
 
-    // nocommit Do we really need to do this?
     // Update the transforms used for rendering
     player1.transform = b2Body.GetTransform(player1.body);
     player2.transform = b2Body.GetTransform(player2.body);
@@ -839,10 +840,6 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
     case .Circle; init_circle_mesh(mesh, radius);
     case .Square; init_prism_mesh(mesh, .{radius, radius}, 0.);
     }
-
-    // nocommit cleanup
-    // set_tranform(ball, )
-    b2Transform.Set(*ball.transform, .{0, 0}, 0);
 
     if host_type != .CLIENT {
         init_ball_physics(ball);

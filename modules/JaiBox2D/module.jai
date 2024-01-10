@@ -27,7 +27,7 @@ b2_timeToSleep :: 0.5;
 
 b2_nullNode :: -1;
 
-// nocommit Remove these typedefs, or prefix them?
+// @Cleanup Remove these typedefs, or prefix them?
 #scope_file
 
 int8 :: s8;

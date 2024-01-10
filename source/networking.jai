@@ -43,15 +43,6 @@ Game_State_Delta :: struct {
 }
 
 
-// nocommit
-Packet :: struct {
-    // A number representing the game protocol hashed with the protocol version number
-    // all UDP packages have the first 4 bytes inspected, packets with numbers not matching
-    // this protocol_id are discarded, otherwise we parse the rest of the payload
-    protocol_id : u32 = 4269;
-    type : Type; // [Server_State, Client_Input...] Cast the specific packets to this type
-}
-
 Client_Input :: struct {
     player_index : Player_Index;
     left_down : bool;
@@ -59,7 +50,6 @@ Client_Input :: struct {
     esc_down : bool;
 }
 
-// @TODOOO Send the transform (position/orientation)
 get_ball_state :: (using ball : Ball) -> Ball_State {
     result : Ball_State;
     result.live = live;
