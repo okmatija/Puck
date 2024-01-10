@@ -149,17 +149,14 @@ Obstruction :: struct {
     live : bool;
 
     mesh : Mesh;
-    color : Vector4;
+    color : Vector4 = .{1., 1., 1., 1.};
     transform : b2Transform;
 
     body : *b2Body; // Physics. This is not initialized or used by clients!
 }
 
 Boundary :: struct {
-    mesh : Mesh;
-    color : Vector4;
-    transform : b2Transform;
-
+    color : Vector4 = .{1., 1., 1., 1.};
     body : *b2Body; // Physics. This is not initialized or used by clients!
 }
 
@@ -425,8 +422,10 @@ main :: () {
 
                 Simp.set_shader_for_color(true);
 
-                draw_body(level.boundary.body, Vector4.{1., 1., 1., 1.,});
-                draw_body(level.obstructions.body, Vector4.{1., 1., 1., 1.,});
+                draw_mesh(level.obstructions.mesh, level.obstructions.transform, level.obstructions.color);
+
+                draw_segment(-GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, level.boundary.color);
+                draw_segment(.{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS, level.boundary.color);
 
                 draw_mesh(player1.mesh, player1.transform, player1.color);
                 draw_mesh(player2.mesh, player2.transform, player2.color);
@@ -586,6 +585,21 @@ draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
     }
 }
 
+draw_segment :: (start : Vector2, end : Vector2, color : Vector4) {
+    SEGMENT_THICKNESS :: 1.; // Simp units aka pixels
+
+    n := unit_vector(end - start);
+    n.x, n.y = n.y, -n.x; // Rotate the unit direction by 90 degrees
+
+    s := world_to_screen(start);
+    e := world_to_screen(end);
+    q0 := s + n * .5 * SEGMENT_THICKNESS;
+    q3 := s - n * .5 * SEGMENT_THICKNESS;
+    q2 := e - n * .5 * SEGMENT_THICKNESS;
+    q1 := e + n * .5 * SEGMENT_THICKNESS;
+    Simp.immediate_quad(q0, q1, q2, q3, color, color, color, color);
+}
+
 draw_score :: () {
     text := sprint("%:%", player1.score, player2.score);
     defer free(text);
@@ -719,6 +733,7 @@ simulate :: () {
     for * balls {
         it.transform = b2Body.GetTransform(it.body);
     }
+    level.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
 
     // for live_emitters update_emitter(it, current_dt);
 }
@@ -836,6 +851,15 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
     // play_sound(sound_start_game); // @todo find a nicer sound for this!
 }
 
+init_boundary :: () {
+    // Only need to init the physics for the boundary
+    // Boundaries are rendered directly without cached meshes and they only depend on the player count
+
+    if host_type != .CLIENT {
+        init_boundary_physics();
+    }
+}
+
 init_boundary_physics :: () {
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
@@ -861,25 +885,12 @@ init_boundary_physics :: () {
     b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
     b2Body.CreateFixture(level.boundary.body, *fixture_def);
 
-    // // Top edge
+    // // Top edge // nocommit Make this a single player mode
     //b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
     //b2Body.CreateFixture(level.boundary.body, *fixture_def);
 }
 
-// Create edges bounding the play area
-init_boundary :: () {
-
-
-    if host_type != .CLIENT {
-        init_boundary_physics();
-    }
-}
-
-// nocommit init_level_physics();
-init_level :: () {
-
-    init_boundary();
-
+init_obstructions_physics :: () {
     if #complete cast(Level_Id)current_level == {
     case .Empty;
         // Do nothing
@@ -912,6 +923,29 @@ init_level :: () {
             b2Body.SetAngularVelocity(body, .25);
         }
     }
+}
+
+init_obstructions :: () {
+    if #complete cast(Level_Id)current_level == {
+    case .Empty;
+        // Do nothing
+    case .Fixed_Box; #through;
+    case .Spinning_Box;
+        extents := .25 * GAME_EXTENTS;
+
+        init_prism_mesh(level.obstructions.mesh, extents, 0.);
+    }
+
+    if host_type != .CLIENT {
+        init_obstructions_physics();
+    }
+}
+
+init_level :: () {
+
+    init_boundary();
+    init_obstructions();
+
 }
 
 init_player_physics :: (using player : *Player) {

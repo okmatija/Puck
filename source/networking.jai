@@ -98,7 +98,10 @@ get_game_state :: () -> Game_State {
 
 set_game_state :: (using state : Game_State) {
     player1.transform = player1_state.transform;
+    player1.score = player1_state.score;
+
     player2.transform = player2_state.transform;
+    player2.score = player2_state.score;
 
     current_level = xx level_state.level_id;
     if cast(Level_Id)current_level != .Empty {

@@ -9,4 +9,4 @@ if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 start /B "" "pong.exe" 1100 400
 if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 
-echo "Success"
+echo "Pong/test.bat script succeeded!"
