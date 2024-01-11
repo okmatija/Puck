@@ -40,25 +40,6 @@ window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
 font : *Simp.Dynamic_Font;
 
-// @Cleanup Menus should be a state machine using this enum
-Game_Menu :: enum u8 {
-    MAIN_MENU :: 0;
-    PLAY_LOCAL_GAME_MENU;
-    JOIN_NETWORK_GAME_MENU;
-    HOST_NETWORK_GAME_MENU;
-    WAITING_FOR_PLAYERS_MENU;
-    CONNECTING_TO_SERVER_MENU;
-    SETTINGS_MENU;
-    PAUSE_MENU;
-}
-
-Game_Mode :: enum u8 {
-    NOT_STARTED :: 0;
-    //INITIALIZING;
-    PLAYING;
-    PAUSED;
-}
-
 game_frame_index : u32; // nocommti Remove this Used as a sequence number for network packets
 game_quitting : bool;
 game_menu : Game_Menu;
@@ -76,7 +57,26 @@ balls : [BALL_COUNT_MAX]Ball;
 ball_spawn_countdown := 0.;
 
 world : *b2World;
+contact_listener : b2ContactListener;
 world_debug_draw : *b2Draw;
+
+host_type : Host_Type = .UNKNOWN;
+server : Server;
+client : Client;
+network_events_this_frame : [..]Enet.Event;
+
+// Important these are global and persist across frames to preserve previous key down state
+input1 : Client_Input;
+input2 : Client_Input;
+
+data_folder: string;
+sky_map : Texture;
+menu_map : Texture;
+sound_start_game : *Mixer_Sound_Data;
+sound_collision1 : *Mixer_Sound_Data;
+sound_collision2 : *Mixer_Sound_Data;
+
+sound_player : *Sound_Player;
 
 DeadBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags) #expand {
     for *=cast(bool)(flags & .POINTER) ball, ball_index : ball_array.* {
@@ -98,14 +98,24 @@ LiveBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags
     }
 }
 
-data_folder: string;
-sky_map : Texture;
-menu_map : Texture;
-sound_start_game : *Mixer_Sound_Data;
-sound_collision1 : *Mixer_Sound_Data;
-sound_collision2 : *Mixer_Sound_Data;
+// @Cleanup Menus should be a state machine using this enum
+Game_Menu :: enum u8 {
+    MAIN_MENU :: 0;
+    PLAY_LOCAL_GAME_MENU;
+    JOIN_NETWORK_GAME_MENU;
+    HOST_NETWORK_GAME_MENU;
+    WAITING_FOR_PLAYERS_MENU;
+    CONNECTING_TO_SERVER_MENU;
+    SETTINGS_MENU;
+    PAUSE_MENU;
+}
 
-sound_player : *Sound_Player;
+Game_Mode :: enum u8 {
+    NOT_STARTED :: 0;
+    //INITIALIZING;
+    PLAYING;
+    PAUSED;
+}
 
 Ball_Shape :: enum {
     Circle;
@@ -196,30 +206,6 @@ initial_ball_velocity :: () -> Vector2 {
     return .{.0, -GAME_EXTENTS.y / 1.};
 }
 
-Host_Type :: enum {
-    UNKNOWN;
-    LOCAL;
-    CLIENT;
-    SERVER;
-}
-
-host_type : Host_Type = .UNKNOWN;
-
-GetHost :: () -> *Enet.Host #expand {
-    if `host_type == .SERVER return server.host;
-    if `host_type == .CLIENT return client.host;
-    return null;
-}
-
-server : Server;
-client : Client;
-network_events_this_frame : [..]Enet.Event;
-
-
-// Important these are global and persist across frames to preserve previous key down state
-input1 : Client_Input;
-input2 : Client_Input;
-
 main :: () {
     args : []string = get_command_line_arguments();
     defer array_free(args);
@@ -280,26 +266,6 @@ main :: () {
     server_address = ipv4_to_string(host_info.ipv4);
     server_port_string = copy_string(tprint("%", DEFAULT_PORT));
 
-    contact_listener : b2ContactListener;
-    begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
-        new_context : Context;
-        push_context new_context {
-            play_sound(sound_collision2, true);
-        }
-    }
-    end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
-    pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {}
-    post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
-    destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
-    contact_listener.vtable = New(b2ContactListener_VTable); // @Leak
-    contact_listener.vtable.BeginContact = begin_contact;
-    contact_listener.vtable.EndContact = end_contact;
-    contact_listener.vtable.PreSolve = pre_solve;
-    contact_listener.vtable.PostSolve = post_solve;
-    contact_listener.vtable.Destructor = destructor;
-
-    init_world(*contact_listener);
-
     // Don't update things that don't need updating e.g., sound stuff if we are a server but not a client
     while !game_quitting {
         reset_temporary_storage();
@@ -328,12 +294,7 @@ main :: () {
 
         is_network_game := host_type == .CLIENT || host_type == .SERVER;
         if is_network_game {
-            array_reset_keeping_memory(*network_events_this_frame);
-            event : Enet.Event;
-            timeout_milliseconds := 0; // http://enet.bespin.org/Tutorial.html says we should use 0 here to returns immediately
-            while Enet.host_service(GetHost(), *event, timeout_milliseconds) == .SUCCESS {
-                array_add(*network_events_this_frame, event);
-            }
+            read_network_events_this_frame();
         }
 
         if game_mode == .PLAYING {
@@ -436,7 +397,8 @@ main :: () {
 
                 draw_score();
 
-                // draw_cursor();
+                // @TODOOO Only draw if the mouse recently moved?
+                draw_cursor();
 
                 // Draws the physics/collision geometry
                 //b2World.DebugDraw(world);
@@ -450,8 +412,6 @@ main :: () {
 
         // memory_visualizer_per_frame_update();
     }
-
-    free(world_debug_draw);
 }
 
 
@@ -734,13 +694,32 @@ simulate :: () {
     for * balls {
         it.transform = b2Body.GetTransform(it.body);
     }
-    level.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
+    if level.obstructions.body {
+        level.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
+    }
 
     // for live_emitters update_emitter(it, current_dt);
 }
 
-init_world :: (contact_listener : *b2ContactListener) {
-    world = New(b2World);
+init_world :: () {
+    begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
+        new_context : Context;
+        push_context new_context {
+            play_sound(sound_collision2, true);
+        }
+    }
+    end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
+    pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {}
+    post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
+    destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
+    contact_listener.vtable = New(b2ContactListener_VTable); // @Leak
+    contact_listener.vtable.BeginContact = begin_contact;
+    contact_listener.vtable.EndContact = end_contact;
+    contact_listener.vtable.PreSolve = pre_solve;
+    contact_listener.vtable.PostSolve = post_solve;
+    contact_listener.vtable.Destructor = destructor;
+
+    world = New(b2World); // @Leak
     b2World.Constructor(world, Vector2.{0., 0.});
 
     world_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
@@ -752,7 +731,7 @@ init_world :: (contact_listener : *b2ContactListener) {
     //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.centerOfMassBit);
     b2World.SetDebugDraw(world, world_debug_draw);
 
-    b2World.SetContactListener(world, contact_listener);
+    b2World.SetContactListener(world, *contact_listener);
 }
 
 deinit_player :: (player : *Player) {
@@ -767,9 +746,17 @@ deinit_game :: () {
     deinit_player(*player2);
     deinit_player(*player1);
     deinit_level();
+
+    free(world_debug_draw);
+
+    host_type = .UNKNOWN;
 }
 
 init_game :: () {
+
+    if host_type != .CLIENT {
+        init_world();
+    }
 
     init_level(); // Must come before players since they are constrained relative to the level boundary
     init_player(*player1, .P1);

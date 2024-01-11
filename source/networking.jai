@@ -1,3 +1,16 @@
+Host_Type :: enum {
+    UNKNOWN;
+    LOCAL;
+    CLIENT;
+    SERVER;
+}
+
+GetHost :: () -> *Enet.Host #expand {
+    if `host_type == .SERVER return server.host;
+    if `host_type == .CLIENT return client.host;
+    return null;
+}
+
 Host_Info :: struct {
     hostname : string;
     ipv4 : u32;
@@ -161,6 +174,15 @@ get_host_info :: (hostname : string) -> bool, u32 {
     return true, ipv4;
 }
 
+read_network_events_this_frame :: () {
+    array_reset_keeping_memory(*network_events_this_frame);
+    event : Enet.Event;
+    timeout_milliseconds := 0; // http://enet.bespin.org/Tutorial.html says we should use 0 here to returns immediately
+    while Enet.host_service(GetHost(), *event, timeout_milliseconds) == .SUCCESS {
+        array_add(*network_events_this_frame, event);
+    }
+}
+
 // Send input from client to server
 send_input :: (input : Client_Input, loc := #caller_location) {
     // @TODO Ensure the client is connected
@@ -255,7 +277,6 @@ init_server :: (server_port : u16) {
 }
 
 deinit_server :: () {
-    host_type = .UNKNOWN;
     Enet.host_destroy(server.host);
 }
 
@@ -290,7 +311,6 @@ init_client :: (server_address : string, server_port : u16) {
 }
 
 deinit_client ::() {
-    host_type = .UNKNOWN;
     Enet.host_destroy(client.host);
 }
 
