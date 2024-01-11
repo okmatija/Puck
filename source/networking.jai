@@ -1,8 +1,23 @@
+Server :: struct {
+    using host : *Enet.Host;
+}
+
+Client :: struct {
+    using host : *Enet.Host;
+    peer : *Enet.Peer;
+}
+
 Host_Type :: enum {
     UNKNOWN;
     LOCAL;
     CLIENT;
     SERVER;
+}
+
+Host_Info :: struct {
+    hostname : string;
+    ipv4 : u32;
+    port : u16 = DEFAULT_PORT; // This is configurable
 }
 
 GetHost :: () -> *Enet.Host #expand {
@@ -11,11 +26,58 @@ GetHost :: () -> *Enet.Host #expand {
     return null;
 }
 
-Host_Info :: struct {
-    hostname : string;
-    ipv4 : u32;
-    port : u16 = DEFAULT_PORT; // This is configurable
+init_server :: (server_port : u16) {
+    host_type = .SERVER;
+
+    success : bool;
+
+    // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
+    bandwidth_bytes_per_second := 0;
+
+    address : Enet.Address;
+    address.host = Enet.HOST_ANY;
+    address.port = server_port;
+    server.host, success = Enet.host_create(
+        address=*address,
+        peer_count=1, // player_count-1, currently only 2 players are supported
+        channel_limit=1,
+        incoming_bandwidth=bandwidth_bytes_per_second,
+        outgoing_bandwidth=bandwidth_bytes_per_second);
+
+    assert(success, "Failed to create server!\n");
 }
+
+deinit_server :: () {
+    Enet.host_destroy(server.host);
+}
+
+init_client :: (server_address : string, server_port : u16) {
+    host_type = .CLIENT;
+
+    success : bool;
+
+    // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
+    bandwidth_bytes_per_second := 0;
+
+    client.host, success = Enet.host_create(
+        address=null,
+        peer_count=1, // Can only connect to one server
+        channel_limit=1,
+        incoming_bandwidth=bandwidth_bytes_per_second,
+        outgoing_bandwidth=bandwidth_bytes_per_second);
+    assert(success, "Failed to create server!\n");
+
+    address := Enet.get_host_ip_address(server_address);
+    address.port = server_port;
+
+    print("Connecting to server %:%\n", server_address, server_port);
+    client.peer = Enet.host_connect(host=client.host, address=*address, channel_count=1, data=0); 
+}
+
+deinit_client ::() {
+    Enet.host_destroy(client.host);
+}
+
 
 Player_State :: struct {
     shape : Paddle_Shape;
@@ -251,68 +313,6 @@ receive_state :: (loc := #caller_location) -> Game_State, bool {
 
 
 
-Server :: struct {
-    using host : *Enet.Host;
-}
-
-init_server :: (server_port : u16) {
-    host_type = .SERVER;
-
-    success : bool;
-
-    // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
-    bandwidth_bytes_per_second := 0;
-
-    address : Enet.Address;
-    address.host = Enet.HOST_ANY;
-    address.port = server_port;
-    server.host, success = Enet.host_create(
-        address=*address,
-        peer_count=1, // player_count-1, currently only 2 players are supported
-        channel_limit=1,
-        incoming_bandwidth=bandwidth_bytes_per_second,
-        outgoing_bandwidth=bandwidth_bytes_per_second);
-
-    assert(success, "Failed to create server!\n");
-}
-
-deinit_server :: () {
-    Enet.host_destroy(server.host);
-}
-
-
-
-Client :: struct {
-    using host : *Enet.Host;
-    peer : *Enet.Peer;
-}
-
-init_client :: (server_address : string, server_port : u16) {
-    host_type = .CLIENT;
-
-    success : bool;
-
-    // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
-    bandwidth_bytes_per_second := 0;
-
-    client.host, success = Enet.host_create(
-        address=null,
-        peer_count=1, // Can only connect to one server
-        channel_limit=1,
-        incoming_bandwidth=bandwidth_bytes_per_second,
-        outgoing_bandwidth=bandwidth_bytes_per_second);
-    assert(success, "Failed to create server!\n");
-
-    address := Enet.get_host_ip_address(server_address);
-    address.port = server_port;
-
-    print("Connecting to server %:%\n", server_address, server_port);
-    client.peer = Enet.host_connect(host=client.host, address=*address, channel_count=1, data=0); 
-}
-
-deinit_client ::() {
-    Enet.host_destroy(client.host);
-}
 
 
 // @Cleanup rename to ipv4_as_string
