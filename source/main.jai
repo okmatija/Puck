@@ -72,11 +72,9 @@ input2 : Client_Input;
 data_folder: string;
 sky_map : Texture;
 menu_map : Texture;
-sound_start_game : *Mixer_Sound_Data;
-sound_collision1 : *Mixer_Sound_Data;
-sound_collision2 : *Mixer_Sound_Data;
-
-sound_player : *Sound_Player;
+sound_start_game : Sound.Sound_Data;
+sound_collision1 : Sound.Sound_Data;
+sound_collision2 : Sound.Sound_Data;
 
 DeadBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags) #expand {
     for *=cast(bool)(flags & .POINTER) ball, ball_index : ball_array.* {
@@ -290,7 +288,7 @@ main :: () {
             }
         }
 
-        update_sound_player(current_dt);
+        Sound.update(current_dt);
 
         is_network_game := host_type == .CLIENT || host_type == .SERVER;
         if is_network_game {
@@ -444,42 +442,18 @@ init_textures :: () {
 }
 
 init_sounds :: (window : *Window_Type) {
-    sound_player = New(Sound_Player);
-    sound_player.update_history = true;
-
-    //
-    // Load sound effects
-    //
-    load_sound :: (basename: string) -> *Mixer_Sound_Data {
-        name := tprint("%/%.wav", data_folder, basename);
-        data := load_audio_file(name);
-
-        if !data {
-            print("Error: Could not load wav file: %\n", name);
-            exit(1); // Hard-exit for now.
-            return null;
-        }
-
-        return data;
-    }
-
-    // You might think, "hey, we can auto-generate this kind of
-    // thing from a list of strings with metaprogramming." We could,
-    // but this wouldn't allow us the freedom to change filenames,
-    // or renaming a variable would break the game in an unintuitive
-    // way because there would be no corresponding sound file.
-    // So we do it the simple / dumb way. A shipping game would have
-    // some kind of asset catalog where you would use handles (or
-    // maybe just the string name) when you play sound effects.
+    // A shipping game would have some kind of asset catalog where you would
+    // use handles (or maybe just the string name) when you play sound effects.
 
     // @Cleanup Rename the sounds
-    // sound_start_game = load_sound("start_game");
-    sound_start_game = load_sound("collision1");
-    sound_collision1 = load_sound("collision1");
-    sound_collision2 = load_sound("collision2");
+    //sound_start_game = Sound.load_audio_file(tprint("%/start_game.wav", data_folder));
+    sound_start_game = Sound.load_audio_file(tprint("%/collision1.wav", data_folder));
+    sound_collision1 = Sound.load_audio_file(tprint("%/collision1.wav", data_folder));
+    sound_collision2 = Sound.load_audio_file(tprint("%/collision2.wav", data_folder));
 
-    success := init(sound_player, xx window, true, true);
-    // assert(success); // @Incomplete We need an audio pass. Low priority (for now).
+    success := Sound.sound_player_init(.{});
+    assert(success);
+
 }
 
 // @Cleanup This is b2Mul in Box2D, it is not output by JaiBox2D/generate.jai, maybe because older versions of Bindings_Generator didn't do that
@@ -705,7 +679,9 @@ init_world :: () {
     begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
         new_context : Context;
         push_context new_context {
-            play_sound(sound_collision2, true);
+            stream := Sound.make_stream(*sound_collision2, .GENERAL_SFX);
+            stream.rate_scale = random_get_within_range(0.7, 1.22);
+            Sound.start_playing(stream);
         }
     }
     end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
@@ -993,7 +969,6 @@ Texture :: Simp.Texture;
 #import "Basic";
 #import "String";
 #import "Input";
-#import "Sound_Player";
 #import "Wav_File";
 #import "stb_vorbis";
 #import "Thread";
@@ -1001,6 +976,7 @@ Texture :: Simp.Texture;
 #import "Math";
 #import "Random";
 #import "File";
+Sound :: #import "Sound_Player";
 Socket :: #import "Socket";
 UI :: #import "GetRect_LeftHanded";
 System :: #import "System";
@@ -1014,7 +990,6 @@ Enet :: #import "enet";
 // These are in ./source/
 #load "Box2D_DebugDraw_Simp.jai";
 #load "networking.jai";
-#load "sound.jai";
 #load "menu.jai";
 #load "mesh.jai";
 #load "carpet.jai";
