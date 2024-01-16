@@ -22,9 +22,6 @@ PADDLE_DENSITY :: 1000;
 PADDLE_FRICTION :: 1.;
 PADDLE_RESTITUTION :: 1.2;
 
-friction := PADDLE_FRICTION;
-restitution := PADDLE_RESTITUTION;
-
 DEFAULT_PORT : u16 : 42698;
 
 // player_name: string; // @Cleanup move to Player struct
@@ -924,17 +921,40 @@ init_player_physics :: (using player : *Player) {
 
     b2Body.SetSleepingAllowed(body, false);
 
-    polygon_shape : b2PolygonShape;
-    b2PolygonShape.Constructor(*polygon_shape);
-    b2PolygonShape.Set(*polygon_shape, mesh.vertices.data, cast(s32)mesh.vertices.count);
+    // :VariablePaddleRestitution
 
-    fixture_def : b2FixtureDef;
-    b2FixtureDef.Constructor(*fixture_def);
-    fixture_def.shape = *polygon_shape;
-    fixture_def.density = PADDLE_DENSITY;
-    fixture_def.friction = friction;
-    fixture_def.restitution = restitution;
-    b2Body.CreateFixture(body, *fixture_def);
+    {
+        // Flat part
+        polygon_shape : b2PolygonShape;
+        b2PolygonShape.Constructor(*polygon_shape);
+        t := mesh.triangles[0];
+        points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
+        b2PolygonShape.Set(*polygon_shape, points.data, 3);
+
+        fixture_def : b2FixtureDef;
+        b2FixtureDef.Constructor(*fixture_def);
+        fixture_def.shape = *polygon_shape;
+        fixture_def.density = PADDLE_DENSITY;
+        fixture_def.friction = PADDLE_FRICTION;
+        fixture_def.restitution = PADDLE_RESTITUTION;
+        b2Body.CreateFixture(body, *fixture_def);
+    }
+
+    for 1..2 {
+        polygon_shape : b2PolygonShape;
+        b2PolygonShape.Constructor(*polygon_shape);
+        t := mesh.triangles[it];
+        points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
+        b2PolygonShape.Set(*polygon_shape, points.data, 3);
+
+        fixture_def : b2FixtureDef;
+        b2FixtureDef.Constructor(*fixture_def);
+        fixture_def.shape = *polygon_shape;
+        fixture_def.density = PADDLE_DENSITY;
+        fixture_def.friction = PADDLE_FRICTION;
+        fixture_def.restitution = .5 * PADDLE_RESTITUTION;
+        b2Body.CreateFixture(body, *fixture_def);
+    }
 
     // Constrain player movement to within the GAME_EXTENTS
     joint_def : b2PrismaticJointDef;

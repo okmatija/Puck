@@ -11,12 +11,15 @@ deinit_mesh :: (mesh : Mesh) {
 // Centered around the origin, short edge is above long edge
 init_prism_mesh :: (mesh : Mesh, extents : Vector2, alpha : float) {
 
+    array_add(*mesh.vertices, .{        0., -extents.y});
     array_add(*mesh.vertices, .{-extents.x, -extents.y});
     array_add(*mesh.vertices, .{ extents.x, -extents.y});
     array_add(*mesh.vertices, .{ extents.x - alpha * extents.x, extents.y});
     array_add(*mesh.vertices, .{-extents.x + alpha * extents.x, extents.y});
 
-    array_add(*mesh.triangles, .{0, 1, 2});
+    // @Volatile :VariablePaddleRestitution Use three triangles here so we can have different restitutions on each
+    array_add(*mesh.triangles, .{0, 3, 4});
+    array_add(*mesh.triangles, .{0, 4, 1});
     array_add(*mesh.triangles, .{0, 2, 3});
 }
 
