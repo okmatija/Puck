@@ -4,7 +4,7 @@ Server :: struct {
 
 Client :: struct {
     using host : *Enet.Host;
-    peer : *Enet.Peer;
+    server : *Enet.Peer;
 }
 
 Host_Type :: enum {
@@ -20,9 +20,9 @@ Host_Info :: struct {
     port : u16 = DEFAULT_PORT; // This is configurable
 }
 
-GetHost :: () -> *Enet.Host #expand {
-    if `host_type == .SERVER return server.host;
-    if `host_type == .CLIENT return client.host;
+get_host :: () -> *Enet.Host {
+    if host_type == .SERVER return server.host;
+    if host_type == .CLIENT return client.host;
     return null;
 }
 
@@ -65,13 +65,13 @@ init_client :: (server_address : string, server_port : u16) {
         channel_limit=1,
         incoming_bandwidth=bandwidth_bytes_per_second,
         outgoing_bandwidth=bandwidth_bytes_per_second);
-    assert(success, "Failed to create server!\n");
+    assert(success, "Failed to create client!\n");
 
     address := Enet.get_host_ip_address(server_address);
     address.port = server_port;
 
     print("Connecting to server %:%\n", server_address, server_port);
-    client.peer = Enet.host_connect(host=client.host, address=*address, channel_count=1, data=0); 
+    client.server = Enet.host_connect(host=client.host, address=*address, channel_count=1, data=0); 
 }
 
 deinit_client ::() {
@@ -240,7 +240,7 @@ read_network_events_this_frame :: () {
     array_reset_keeping_memory(*network_events_this_frame);
     event : Enet.Event;
     timeout_milliseconds := 0; // http://enet.bespin.org/Tutorial.html says we should use 0 here to returns immediately
-    while Enet.host_service(GetHost(), *event, timeout_milliseconds) == .SUCCESS {
+    while Enet.host_service(get_host(), *event, timeout_milliseconds) == .SUCCESS {
         array_add(*network_events_this_frame, event);
     }
 }
@@ -251,7 +251,7 @@ send_input :: (input : Client_Input, loc := #caller_location) {
     
     // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
     packet := Enet.packet_create(*input, .RELIABLE); // nocommit Try UNRELIABLE here  @Leak also cleanup the packet!
-    Enet.peer_send(peer=client.peer, channel_id=0, packet=packet);
+    Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
     
     // Sleep(16); // @@nocommit??
 }
@@ -271,41 +271,43 @@ send_state :: (player : Player, state : Game_State, loc := #caller_location) {
 // Receive input sent from client to server
 receive_input :: (loc := #caller_location) -> Client_Input, bool {
 
+    input : Client_Input;
+    found : bool;
+
     for event : network_events_this_frame {
         if event.type == .RECEIVE {
             defer Enet.packet_destroy(event.packet);
             if event.packet.data_length == size_of(Client_Input) {
 
-                input : Client_Input = (cast(*Client_Input)event.packet.data).*;
-                remove;
-
-                // nocommit Maybe we should keep processing to get the most recent input??
-                return input, true;
+                // Keep the most recent?
+                input = (cast(*Client_Input)event.packet.data).*;
+                found = true;
             }
         }
     }
 
-    return .{}, false;
+    return input, found;
 }
 
 // Receive game state sent from server to client
 receive_state :: (loc := #caller_location) -> Game_State, bool {
+
+    state : Game_State;
+    found : bool;
 
     for event : network_events_this_frame {
         if event.type == .RECEIVE {
             defer Enet.packet_destroy(event.packet);
             if event.packet.data_length == size_of(Game_State) {
 
-                state := (cast(*Game_State)event.packet.data).*;
-                remove;
-
-                // nocommit Maybe we should keep processing to get the most recent input??
-                return state, true;
+                // Keep the most recent?
+                state = (cast(*Game_State)event.packet.data).*;
+                found = true;
             }
         }
     }
 
-    return .{}, false;
+    return state, found;
 }
 
 
