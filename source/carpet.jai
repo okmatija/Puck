@@ -196,6 +196,100 @@ draw_body :: (body : *b2Body, color : Vector4) #deprecated "Render using mesh/tr
     }
 }
 
+indent :: (level : int, c : u8 = #char " ", level_count := 2) {
+    for 0..(level * level_count)-1 {
+        c_str : string;
+        c_str.count = 1;
+        c_str.data = *c;
+        print("%", c_str);
+    }
+}
+
+print_event :: (event : Enet.Event, event_index : int) {
+    indent(1);
+    print("[%] % %\n",
+        event_index,
+        event.type,
+        event.channel_id,
+        );
+
+    if event.type == .RECEIVE {
+
+        indent(2);
+        type : Type = void;
+        if event.packet.data_length == {
+        case size_of(Client_Input);
+            type = Client_Input;
+        case size_of(Game_State);
+            type = Game_State;
+        }
+        print("packet (%): flags=% data_length=% user_data.*=%\n",
+            type,
+            event.packet.flags,
+            event.packet.data_length,
+            ifx event.packet.user_data then event.packet.user_data.* else Any.{},
+            );
+
+        if event.peer {
+
+            // indent(2);
+            // print("peer: % or=%\n",
+            //     event.peer.state,
+            //     event.peer.outgoing_reliable_seq_number,
+            //     );
+
+            // channel
+            indent(3);
+            channel := *event.peer.channels[event.channel_id];
+            print("channels[%]: or=% ou=% ir=% iu=%\n",
+                event.channel_id,
+                channel.outgoing_reliable_seq_number,
+                channel.outgoing_unreliable_seq_number,
+                channel.incoming_reliable_seq_number,
+                channel.incoming_unreliable_seq_number,
+                );
+
+            print_list :: (name : string, list : *Enet.List, max_length := 10) {
+                Iter :: (list: *Enet.List, body: Code, flags: For_Flags) #expand {
+                    `it := Enet.list_begin(list);
+                    `it_index := 0;
+                    while it != Enet.list_end(list) {
+                        defer it = Enet.list_next(it);
+                        defer it_index += 1;
+
+                        #insert body;
+                    }
+                }
+
+                length := 0;
+                for :Iter list {
+                    length+=1;
+                }
+
+                indent(3);
+                print("%: [%].(", name, length);
+                for :Iter list {
+                    outgoing_cmd := cast(*Enet.Outgoing_Command)it;
+                    print("{%, %}, ", outgoing_cmd.sent_time, outgoing_cmd.send_attempts);
+                    if it_index > max_length {
+                        print("...");
+                        break;
+                    }
+                }
+                print(")\n");
+            }
+
+            print_list("outgoing_reliable_commands  ", *event.peer.outgoing_reliable_commands);
+            print_list("outgoing_unreliable_commands", *event.peer.outgoing_unreliable_commands);
+            print_list("acknowledgements            ", *event.peer.acknowledgements);
+            print_list("sent_reliable_commands      ", *event.peer.sent_reliable_commands);
+            print_list("sent_unreliable_commands    ", *event.peer.sent_unreliable_commands); // @EnetBug This grows unbounded???
+            print_list("dispatched_commands         ", *event.peer.dispatched_commands);
+
+        }
+    }
+}
+
 
 
 #import "Math";

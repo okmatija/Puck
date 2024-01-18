@@ -42,6 +42,7 @@ game_quitting : bool;
 game_menu : Game_Menu;
 game_mode : Game_Mode;
 
+current_frame : u64;
 current_dt: float = 1. / 60.; // Seconds
 current_time: float64; // Seconds
 last_time:  float64; // Seconds
@@ -265,6 +266,7 @@ main :: () {
     while !game_quitting {
         reset_temporary_storage();
 
+        current_frame += 1;
         current_time = seconds_since_init();
         current_dt = cast(float) (current_time - last_time);
         if current_dt > DT_MAX current_dt = DT_MAX;

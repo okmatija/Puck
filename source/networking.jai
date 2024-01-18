@@ -236,12 +236,35 @@ get_host_info :: (hostname : string) -> bool, u32 {
     return true, ipv4;
 }
 
-read_network_events_this_frame :: () {
+read_network_events_this_frame_debug_count := 5;
+read_network_events_this_frame :: ($debug : bool = false) {
+    host_service_start_time := to_microseconds(current_time_monotonic());
+
     array_reset_keeping_memory(*network_events_this_frame);
     event : Enet.Event;
-    timeout_milliseconds := 0; // http://enet.bespin.org/Tutorial.html says we should use 0 here to returns immediately
+
+    // http://enet.bespin.org/Tutorial.html says we should use 0 here to returns immediately
+    // but https://github.com/zpl-c/enet/issues/46 suggests using 2 is better
+    timeout_milliseconds := 0;
     while Enet.host_service(get_host(), *event, timeout_milliseconds) == .SUCCESS {
         array_add(*network_events_this_frame, event);
+    }
+
+    #if debug {
+        if host_type == .CLIENT printv(host_service_start_time);
+        if network_events_this_frame {
+            if host_type == .SERVER printv(host_service_start_time);
+
+            read_network_events_this_frame_debug_count -= 1;
+            if read_network_events_this_frame_debug_count < 0 exit(0);
+
+            print("************************************\n");
+            print("% got % events:\n", host_type, network_events_this_frame.count);
+            for event : network_events_this_frame {
+                if it_index > 10 { print("...\n"); break; }
+                print_event(event, it_index);
+            }
+        }
     }
 }
 
@@ -251,9 +274,10 @@ send_input :: (input : Client_Input, loc := #caller_location) {
     
     // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
     packet := Enet.packet_create(*input, .RELIABLE); // nocommit Try UNRELIABLE here  @Leak also cleanup the packet!
+    // packet.user_data.* = current_frame; // @Volatile Previously when I experimented with setting this everything broke, not just because this is clearly the wrong way to set an *Any
     Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
     
-    // Sleep(16); // @@nocommit??
+    // Sleep(16); // @@?
 }
 
 // Send game state from server to client
@@ -282,6 +306,7 @@ receive_input :: (loc := #caller_location) -> Client_Input, bool {
                 // Keep the most recent?
                 input = (cast(*Client_Input)event.packet.data).*;
                 found = true;
+                // remove; // @Think Adding just this one line causes a crash in the default allocator, why???
             }
         }
     }
@@ -303,6 +328,7 @@ receive_state :: (loc := #caller_location) -> Game_State, bool {
                 // Keep the most recent?
                 state = (cast(*Game_State)event.packet.data).*;
                 found = true;
+                // remove; // @Think Adding just this one line causes a crash in the default allocator, why???
             }
         }
     }
