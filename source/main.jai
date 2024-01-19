@@ -63,6 +63,16 @@ server : Server;
 client : Client;
 network_events_this_frame : [..]Enet.Event;
 
+current_level : s32 = xx Level_Id.Spinning_Box;
+current_ball_shape : s32 = xx Ball_Shape.Circle;
+current_paddle_shape : s32 = xx Paddle_Shape.Prism;
+
+// @Cleanup Remove this, its not very useful. We actually want something to simulate lag
+client_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
+server_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
+CLIENT_PACKET_COUNTDOWN_MS :: #run 0. / 1000;
+SERVER_PACKET_COUNTDOWN_MS :: #run 0. / 1000;
+
 // Important these are global and persist across frames to preserve previous key down state
 input1 : Client_Input;
 input2 : Client_Input;
@@ -344,8 +354,10 @@ main :: () {
                     player1.right = xx input1.right_down;
 
                     input, received := receive_input();
-                    player2.left = xx input.left_down;
-                    player2.right = xx input.right_down;
+                    if received {
+                        player2.left = xx input.left_down;
+                        player2.right = xx input.right_down;
+                    }
 
                 case .CLIENT;
 
@@ -727,7 +739,11 @@ deinit_game :: () {
     host_type = .UNKNOWN;
 }
 
-init_game :: () {
+init_game :: (using init_game_state : Init_Game_State) {
+
+    current_paddle_shape = xx paddle_shape;
+    current_ball_shape = xx ball_shape;
+    current_level = xx level_id;
 
     if host_type != .CLIENT {
         init_world();

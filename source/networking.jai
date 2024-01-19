@@ -4,7 +4,7 @@ Server :: struct {
 
 Client :: struct {
     using host : *Enet.Host;
-    server : *Enet.Peer;
+    server : *Enet.Peer; // @Cleanup Rather that storing this, can we access client.host.peers?
 }
 
 Host_Type :: enum {
@@ -100,9 +100,20 @@ Obstruction_State :: struct {
 }
 
 Level_State :: struct {
-    level_id : Level_Id;
+    level_id : Level_Id; // @Cleanup Do we need this? We send it in Init_Game_State
     obstructions : Obstruction_State;
 }
+
+Init_Game_State :: struct {
+    paddle_shape : Paddle_Shape;
+    ball_shape : Ball_Shape;
+    level_id : Level_Id;
+} 
+
+// @TODO Better way of distinguishing packets...!
+#assert(size_of(Game_State) != size_of(Init_Game_State));
+#assert(size_of(Game_State) != size_of(Client_Input));
+#assert(size_of(Client_Input) != size_of(Init_Game_State));
 
 // This data is sent by the server to all connected clients
 // @TODO Generate the members using notes
@@ -270,6 +281,11 @@ read_network_events_this_frame :: ($debug : bool = false) {
 
 // Send input from client to server
 send_input :: (input : Client_Input, loc := #caller_location) {
+    countdown(*client_packet_countdown_ms);
+    if client_packet_countdown_ms > 0  return;
+    client_packet_countdown_ms = CLIENT_PACKET_COUNTDOWN_MS;
+
+
     // @TODO Ensure the client is connected
     
     // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
@@ -282,6 +298,10 @@ send_input :: (input : Client_Input, loc := #caller_location) {
 
 // Send game state from server to client
 send_state :: (player : Player, state : Game_State, loc := #caller_location) {
+    countdown(*server_packet_countdown_ms);
+    if server_packet_countdown_ms > 0  return;
+    server_packet_countdown_ms = SERVER_PACKET_COUNTDOWN_MS;
+
     assert(server.host.peers.count == 1);
     // @Cleanup use Enet.host_broadcast here
     for * peer: server.host.peers {

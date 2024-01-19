@@ -124,7 +124,12 @@ menu :: () {
         _, _, released = UI.button(r, "Play", *button_theme);
         if released {
             host_type = .LOCAL;
-            init_game();
+
+            init_game_state : Init_Game_State;
+            init_game_state.paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+            init_game_state.ball_shape = cast(Ball_Shape)current_ball_shape;
+            init_game_state.level_id = cast(Level_Id)current_level;
+            init_game(init_game_state);
         }
 
     case .PAUSE_MENU;
@@ -252,11 +257,18 @@ menu :: () {
         for event : network_events_this_frame {
             if event.type == {
             case .CONNECT;
-                init_game();
+                // Do nothing
             case .DISCONNECT; #through;
             case .DISCONNECT_TIMEOUT;
                 disconnect = true;
                 // @Think Can this happen?
+            case .RECEIVE;
+                defer Enet.packet_destroy(event.packet);
+                assert(client.server.state == .CONNECTED);
+                if event.packet.data_length == size_of(Init_Game_State) {
+                    init_game_state := cast(*Init_Game_State)event.packet.data;
+                    init_game(init_game_state.*);
+                }
             }
         }
 
@@ -277,11 +289,23 @@ menu :: () {
         label_theme.alignment = .Center;
         UI.label(r, "Waiting for players...", *label_theme);
 
+        init_game_state : Init_Game_State;
+        init_game_state.paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+        init_game_state.ball_shape = cast(Ball_Shape)current_ball_shape;
+        init_game_state.level_id = cast(Level_Id)current_level;
+
+        for * peer: server.host.peers {
+            if peer.state == .CONNECTED {
+                packet := Enet.packet_create(*init_game_state, .RELIABLE); // @Leak?
+                Enet.peer_send(peer=peer, channel_id=0, packet=packet);
+            }
+        }
+
         disconnect := false;
         for event : network_events_this_frame {
             if event.type == {
             case .CONNECT;
-                init_game();
+                init_game(init_game_state);
             case .DISCONNECT; #through;
             case .DISCONNECT_TIMEOUT;
                 disconnect = true;
@@ -319,9 +343,6 @@ menu :: () {
 }
 
 
-current_level : s32 = xx Level_Id.Spinning_Box;
-current_ball_shape : s32 = xx Ball_Shape.Circle;
-current_paddle_shape : s32 = xx Paddle_Shape.Prism;
 
 modify_string :: (ps: *string, new_value: string) {
     free(ps.*);
