@@ -274,7 +274,7 @@ menu :: () {
 
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Cancel", *button_theme);
-        if disconnect || released {
+        if disconnect || released || esc_pressed {
             game_menu = .JOIN_NETWORK_GAME_MENU;
             deinit_client();
         }
@@ -317,7 +317,7 @@ menu :: () {
 
         r = NextRect(1.25*k.x, .75*k.y);
         _, _, released := UI.button(r, "Cancel", *button_theme);
-        if disconnect || released {
+        if disconnect || released || esc_pressed {
             game_menu = .HOST_NETWORK_GAME_MENU;
             deinit_server();
         }
