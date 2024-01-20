@@ -1,3 +1,43 @@
+my_logger :: (message: string, data: *void, info: Log_Info) {
+    if context.log_level == {
+    case .NORMAL;
+        if info.common_flags & (Log_Flags.VERBOSE_ONLY | Log_Flags.VERY_VERBOSE_ONLY) {
+            return;
+        }
+    case .VERBOSE;
+        if info.common_flags & (Log_Flags.VERY_VERBOSE_ONLY) {
+            return;
+        }
+    case .VERY_VERBOSE;
+        // No filter
+    }
+
+    us := to_microseconds(current_time_monotonic());
+
+    // @Cleanup Think about how to do allocation properly here
+    if info.common_flags & .ERROR {
+        write_string(tprint("[error] %:% %\n", us, current_frame, message));
+    } else if info.common_flags & .WARNING {
+        write_string(tprint("[warning] %:% %\n", us, current_frame, message));
+    } else {
+        write_string(tprint("%:% %\n", us, current_frame, message));
+    }
+}
+
+log_error :: (format_string: string, args: .. Any, loc := #caller_location, flags := Log_Flags.NONE, user_flags : u32 = 0) {
+    new_flags := flags | .ERROR;
+    log(format_string, ..args, loc, new_flags, user_flags);
+} @PrintLike
+
+log_warning :: (format_string: string, args: .. Any, loc := #caller_location, flags := Log_Flags.NONE, user_flags : u32 = 0) {
+    new_flags := flags | .WARNING;
+    log(format_string, ..args, loc, new_flags, user_flags);
+} @PrintLike
+
+log_verbose :: (format_string: string, args: .. Any, loc := #caller_location, flags := Log_Flags.NONE, user_flags : u32 = 0) {
+    new_flags := flags | .VERBOSE_ONLY;
+    log(format_string, ..args, loc, new_flags, user_flags);
+} @PrintLike
 
 to_radians :: (degrees : float) -> float {
     scale :: PI / 180;
@@ -127,7 +167,7 @@ NextRect2 :: (w: float, h: float) -> UI.Rect, UI.Rect #expand {
 
 draw_body :: (body : *b2Body, color : Vector4) #deprecated "Render using mesh/transform data instead, this function only works on the server" {
     if body == null {
-        log_error("draw_body only works on the servers, called from %\n", host_type);
+        log_error("draw_body only works on the servers, called from %", host_type);
         return;
     }
 

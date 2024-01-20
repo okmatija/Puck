@@ -22,7 +22,7 @@ PADDLE_DENSITY :: 1000;
 PADDLE_FRICTION :: 1.;
 PADDLE_RESTITUTION :: 1.2;
 
-DEFAULT_PORT : u16 : 42698;
+DEFAULT_PORT : u16 : 42069;
 
 // player_name: string; // @Cleanup move to Player struct
 // server_address: string;
@@ -37,7 +37,6 @@ window_height : s32 = WINDOW_HEIGHT_INITIAL;
 window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
 font : *Simp.Dynamic_Font;
 
-game_frame_index : u32; // nocommti Remove this Used as a sequence number for network packets
 game_quitting : bool;
 game_menu : Game_Menu;
 game_mode : Game_Mode;
@@ -213,26 +212,30 @@ initial_ball_velocity :: () -> Vector2 {
 }
 
 main :: () {
+    context.logger = my_logger;
+    context.logger_data = null;
+    context.log_level = .VERBOSE;
+
     args : []string = get_command_line_arguments();
     defer array_free(args);
 
     if args.count != 1 && args.count != 3 {
-        print("Expected zero arguments or two arguments, the (x,y) window offset.");
+        log_error("Expected zero arguments or two arguments, the (x,y) window offset.");
         return;
     }
 
-    window_x, window_y := 200, 50; 
+    window_x, window_y := 50, 50;
     if args.count == 3 {
         success := false;
         window_x, success, _ = to_integer(args[1]);
-        if !success { print("Unexpected window_x argument, got %\n", window_x); return; }
+        if !success { log_error("Unexpected window_x argument, got %", window_x); return; }
         window_y, success, _ = to_integer(args[2]);
-        if !success { print("Unexpected window_y argument, got %\n", window_y); return; }
+        if !success { log_error("Unexpected window_y argument, got %", window_y); return; }
     }
 
     path := path_strip_filename(System.get_path_of_running_executable());
     data_folder = join(path, "data");
-    //print("data_folder is '%'\n", data_folder);
+    log_verbose("data_folder is '%'", data_folder);
 
     last_time = seconds_since_init();
 
@@ -252,7 +255,7 @@ main :: () {
     hide_cursor();
 
     if !Enet.initialize() {
-        print("Failed to initialize enet\n");
+        log_error("Failed to initialize enet");
         return;
     }
     defer Enet.deinitialize();
@@ -305,7 +308,6 @@ main :: () {
         }
 
         if game_mode == .PLAYING {
-            defer game_frame_index += 1;
 
             hide_cursor();
 
@@ -756,7 +758,6 @@ init_game :: (using init_game_state : Init_Game_State) {
         init_ball(ball, cast(Ball_Shape)current_ball_shape);
     }
 
-    game_frame_index = 0;
     game_mode = .PLAYING;
 }
 

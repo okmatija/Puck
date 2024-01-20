@@ -27,6 +27,7 @@ get_host :: () -> *Enet.Host {
 }
 
 init_server :: (server_port : u16) {
+    log_verbose("init_server, server_port=%", server_port);
     host_type = .SERVER;
 
     success : bool;
@@ -48,10 +49,13 @@ init_server :: (server_port : u16) {
 }
 
 deinit_server :: () {
+    log_verbose("deinit_server");
     Enet.host_destroy(server.host);
 }
 
 init_client :: (server_address : string, server_port : u16) {
+    log_verbose("init_client, server_address:server_port=%:%", server_address, server_port);
+
     host_type = .CLIENT;
 
     success : bool;
@@ -70,11 +74,12 @@ init_client :: (server_address : string, server_port : u16) {
     address := Enet.get_host_ip_address(server_address);
     address.port = server_port;
 
-    print("Connecting to server %:%\n", server_address, server_port);
+    log("Connecting to server %:%\n", server_address, server_port);
     client.server = Enet.host_connect(host=client.host, address=*address, channel_count=1, data=0); 
 }
 
 deinit_client ::() {
+    log_verbose("deinit_client");
     Enet.host_destroy(client.host);
 }
 
