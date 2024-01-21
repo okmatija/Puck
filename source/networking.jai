@@ -306,7 +306,7 @@ send_input :: (input : Client_Input, loc := #caller_location) {
     // @TODO Ensure the client is connected
     
     // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
-    packet := Enet.packet_create(*input, .RELIABLE); // nocommit Try UNRELIABLE here  @Leak also cleanup the packet!
+    packet := Enet.packet_create(*input, .RELIABLE); // @Leak?
     // packet.user_data.* = current_frame; // @Volatile Previously when I experimented with setting this everything broke, not just because this is clearly the wrong way to set an *Any
     Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
     
@@ -323,7 +323,7 @@ send_state :: (player : Player, state : Game_State, loc := #caller_location) {
     // @Cleanup use Enet.host_broadcast here
     for * peer: server.host.peers {
         if peer.state == .CONNECTED {
-            packet := Enet.packet_create(*state, .RELIABLE); // nocommit Try UNRELIABLE here  @Leak also cleanup the packet!
+            packet := Enet.packet_create(*state, .RELIABLE); // @Leak?
             Enet.peer_send(peer=peer, channel_id=0, packet=packet);
         }
     }
