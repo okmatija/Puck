@@ -12,15 +12,30 @@ my_logger :: (message: string, data: *void, info: Log_Info) {
         // No filter
     }
 
-    us := to_microseconds(current_time_monotonic());
+    // "QPC is typically the best method to use to time-stamp events and measure small time intervals that
+    // occur on the same system or virtual machine. Consider using GetSystemTimePreciseAsFileTime when you
+    // want to time-stamp events across multiple machines, provided that each machine is participating in a
+    // time synchronization scheme such as Network Time Protocol (NTP). QPC helps you avoid difficulties that
+    // can be encountered with other time measurement approaches, such as reading the processor’s time stamp
+    // counter (TSC) directly."
+    // Source: https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
+    //
+    // By reading QPC at the time of compilation we can write more reasonably sized microsecond timestamps for readability
+    COMPILATION_TIME :: #run current_time_monotonic();
+
+    // Number of decimal digits needed to write 1 hour of microseconds with 2 added to ensure a leading group of 3 digits
+    DIGITS :: #run tprint("%", 60*60*1000*1000).count + 2;
+
+    timestamp_us := to_microseconds(current_time_monotonic() - COMPILATION_TIME);
+    timestamp := formatInt(timestamp_us, digits_per_comma=3, comma_string=",", minimum_digits=DIGITS);
 
     // @Cleanup Think about how to do allocation properly here
     if info.common_flags & .ERROR {
-        write_string(tprint("[error] %:% %\n", us, current_frame, message));
+        write_string(tprint("[error] %:% %\n", timestamp, current_frame, message));
     } else if info.common_flags & .WARNING {
-        write_string(tprint("[warning] %:% %\n", us, current_frame, message));
+        write_string(tprint("[warning] %:% %\n", timestamp, current_frame, message));
     } else {
-        write_string(tprint("%:% %\n", us, current_frame, message));
+        write_string(tprint("%:% %\n", timestamp, current_frame, message));
     }
 }
 

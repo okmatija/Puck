@@ -74,7 +74,7 @@ init_client :: (server_address : string, server_port : u16) {
     address := Enet.get_host_ip_address(server_address);
     address.port = server_port;
 
-    log("Connecting to server %:%\n", server_address, server_port);
+    log("Connecting to server %:%", server_address, server_port);
     client.server = Enet.host_connect(host=client.host, address=*address, channel_count=1, data=0); 
 }
 
