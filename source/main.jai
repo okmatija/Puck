@@ -305,6 +305,16 @@ main :: () {
         is_network_game := host_type == .CLIENT || host_type == .SERVER;
         if is_network_game {
             read_network_events_this_frame();
+
+            // Handle network player disconnects, do this last so we don't try send/recieve from released peers
+            for event : network_events_this_frame {
+                if event.type == {
+                case .DISCONNECT_TIMEOUT; #through;
+                case .DISCONNECT;
+                    deinit_game();
+                    break; // @Think Is it ok to not handle anything else?
+                }
+            }
         }
 
         if game_mode == .PLAYING {
@@ -735,10 +745,21 @@ deinit_game :: () {
     deinit_player(*player2);
     deinit_player(*player1);
     deinit_level();
-
     free(world_debug_draw);
 
-    host_type = .UNKNOWN;
+    // Make sure to deinit the client/server after deinitting the game above, to do that properly we need to know the host_type which is set to UNKNOWN below
+    if host_type == {
+    case .CLIENT;
+        game_menu = .JOIN_NETWORK_GAME_MENU;
+        deinit_client();
+    case .SERVER;
+        game_menu = .HOST_NETWORK_GAME_MENU;
+        deinit_server();
+    case .LOCAL;
+        game_menu = .PLAY_LOCAL_GAME_MENU;
+    }
+
+    game_mode = .NOT_STARTED;
 }
 
 init_game :: (using init_game_state : Init_Game_State) {

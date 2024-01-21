@@ -143,18 +143,6 @@ menu :: () {
         }
         _, _, released = UI.button(l, "Leave", *button_theme);
         if released {
-
-            if host_type == .CLIENT {
-                game_menu = .JOIN_NETWORK_GAME_MENU;
-                deinit_client();
-            } else if host_type == .SERVER {
-                game_menu = .HOST_NETWORK_GAME_MENU;
-                deinit_server();
-            } else {
-                game_menu = .PLAY_LOCAL_GAME_MENU;
-            }
-
-            game_mode = .NOT_STARTED;
             deinit_game();
         }
 

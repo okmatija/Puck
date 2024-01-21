@@ -50,7 +50,14 @@ init_server :: (server_port : u16) {
 
 deinit_server :: () {
     log_verbose("deinit_server");
+
+    for * peer: server.host.peers {
+        Enet.peer_disconnect(peer, 0);
+    }
+    Enet.host_flush(server.host); // Flush since we're about destroy the host
     Enet.host_destroy(server.host);
+
+    host_type = .UNKNOWN;
 }
 
 init_client :: (server_address : string, server_port : u16) {
@@ -80,7 +87,12 @@ init_client :: (server_address : string, server_port : u16) {
 
 deinit_client ::() {
     log_verbose("deinit_client");
+
+    Enet.peer_disconnect(client.server, 0);
+    Enet.host_flush(client.host);
     Enet.host_destroy(client.host);
+
+    host_type = .UNKNOWN;
 }
 
 
