@@ -49,9 +49,12 @@ log_warning :: (format_string: string, args: .. Any, loc := #caller_location, fl
     log(format_string, ..args, loc, new_flags, user_flags);
 } @PrintLike
 
+// This function is suitable for verbose logs which do not compute any additional data
 log_verbose :: (format_string: string, args: .. Any, loc := #caller_location, flags := Log_Flags.NONE, user_flags : u32 = 0) {
-    new_flags := flags | .VERBOSE_ONLY;
-    log(format_string, ..args, loc, new_flags, user_flags);
+    if context.log_level == .VERBOSE {
+        new_flags := flags | .VERBOSE_ONLY;
+        log(format_string, ..args, loc, new_flags, user_flags);
+    }
 } @PrintLike
 
 to_radians :: (degrees : float) -> float {
