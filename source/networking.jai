@@ -1,5 +1,11 @@
 Server :: struct {
     using host : *Enet.Host;
+
+    // Data used to init the game, filled in with data from clients and only then
+    // broadcast to all clients.  Clients start their games, when they recieve
+    // this data
+    init_game_state : Init_Game_State;
+    init_game_state_ready : bool;
 }
 
 Client :: struct {
@@ -122,7 +128,8 @@ Level_State :: struct {
 }
 
 Init_Game_State :: struct {
-    paddle_shape : Paddle_Shape;
+    p1_paddle_shape : Paddle_Shape;
+    p2_paddle_shape : Paddle_Shape;
     ball_shape : Ball_Shape;
     level_id : Level_Id;
 } 
@@ -130,7 +137,10 @@ Init_Game_State :: struct {
 // @TODO Better way of distinguishing packets...!
 #assert(size_of(Game_State) != size_of(Init_Game_State));
 #assert(size_of(Game_State) != size_of(Client_Input));
+#assert(size_of(Game_State) != size_of(Paddle_Shape));
 #assert(size_of(Client_Input) != size_of(Init_Game_State));
+#assert(size_of(Client_Input) != size_of(Paddle_Shape));
+#assert(size_of(Paddle_Shape) != size_of(Init_Game_State));
 
 // This data is sent by the server to all connected clients
 // @TODO Generate the members using notes

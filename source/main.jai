@@ -62,9 +62,10 @@ server : Server;
 client : Client;
 network_events_this_frame : [..]Enet.Event;
 
+// @TODOOO Rename these to have a ui_ prefix and make them only for ui, game logic will use other variables (which are typed to the enums)
+// nocommitttt Use the actual types here and cast just before use. Many errors were made sending the enum u8 rather than s32!!!
 current_level : s32 = xx Level_Id.Spinning_Box;
 current_ball_shape : s32 = xx Ball_Shape.Circle;
-current_paddle_shape : s32 = xx Paddle_Shape.Prism;
 
 // @Cleanup Remove this, its not very useful. We actually want something to simulate lag
 client_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
@@ -764,7 +765,6 @@ deinit_game :: () {
 
 init_game :: (using init_game_state : Init_Game_State) {
 
-    current_paddle_shape = xx paddle_shape;
     current_ball_shape = xx ball_shape;
     current_level = xx level_id;
 
@@ -773,8 +773,8 @@ init_game :: (using init_game_state : Init_Game_State) {
     }
 
     init_level(); // Must come before players since they are constrained relative to the level boundary
-    init_player(*player1, .P1);
-    init_player(*player2, .P2);
+    init_player(*player1, .P1, p1_paddle_shape);
+    init_player(*player2, .P2, p2_paddle_shape);
     for * ball : balls {
         init_ball(ball, cast(Ball_Shape)current_ball_shape);
     }
@@ -1006,12 +1006,12 @@ init_player_physics :: (using player : *Player) {
     b2World.CreateJoint(world, *joint_def);
 }
 
-init_player :: (using player : *Player, player_index : Player_Index) {
+init_player :: (using player : *Player, player_index : Player_Index, paddle_shape : Paddle_Shape) {
 
     index = player_index;
     color = ifx index == .P1 then Vector4.{1., .1, .1, 1.} else Vector4.{.1, .1, 1., 1.};
 
-    if #complete cast(Paddle_Shape)current_paddle_shape == {
+    if #complete paddle_shape == {
     case .Box;
         init_prism_mesh(mesh, PADDLE_EXTENTS, 0.);
     case .Prism;

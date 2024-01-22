@@ -110,9 +110,16 @@ menu :: () {
             UI.label(l, "Ball Shape", *label_theme);
             UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
 
+            // @TODOO Player 1 and 2 paddle shapes
             l, r = NextRect2(2.2*k.x, .5*k.y);
             UI.label(l, "Paddle Shape", *label_theme);
+            current_paddle_shape := cast(s32)paddle_shape;
             UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+            paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+
+            // l, r = NextRect2(2.2*k.x, .5*k.y);
+            // UI.label(l, "P2 Paddle Shape", *label_theme);
+            // UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
 
             l, r = NextRect2(2.2*k.x, .5*k.y);
             UI.label(l, "Play Area", *label_theme);
@@ -135,7 +142,9 @@ menu :: () {
             host_type = .LOCAL;
 
             init_game_state : Init_Game_State;
-            init_game_state.paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+            // @TODOO local play option to choose paddle shape
+            init_game_state.p1_paddle_shape = cast(Paddle_Shape)paddle_shape;
+            init_game_state.p2_paddle_shape = cast(Paddle_Shape)paddle_shape;
             init_game_state.ball_shape = cast(Ball_Shape)current_ball_shape;
             init_game_state.level_id = cast(Level_Id)current_level;
             init_game(init_game_state);
@@ -158,8 +167,9 @@ menu :: () {
     case .JOIN_NETWORK_GAME_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
+        l, r : UI.Rect;
 
-        r := NextRect(4*k.x, .75*k.y);
+        r = NextRect(4*k.x, .75*k.y);
         text_theme.alignment = .Center;
         action, new_server_address := UI.text_input(r, server_address, *text_theme);
         if action & .ENTERED {
@@ -182,7 +192,18 @@ menu :: () {
             }
         }
 
-        l:, r = NextRect2(1.25*k.x, .75*k.y);
+        label_theme := button_theme.label_theme;
+        label_theme.alignment = .Left;
+
+        {
+            l, r = NextRect2(2.2*k.x, .5*k.y);
+            UI.label(l, "Paddle Shape", *label_theme);
+            current_paddle_shape : s32 = cast(s32)paddle_shape;
+            UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+            paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+        }
+
+        l, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
             game_menu = .MAIN_MENU;
@@ -220,15 +241,6 @@ menu :: () {
             }
         }
 
-        // r = NextRect(2.*k.x, .5*k.y);
-        // UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
-
-        // r = NextRect(2.*k.x, .5*k.y);
-        // UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
-
-        // r = NextRect(2.*k.x, .5*k.y);
-        // UI.dropdown(r, level_choices, *current_level, dropdown_theme);
-
         {
             label_theme := button_theme.label_theme;
             label_theme.alignment = .Left;
@@ -239,7 +251,9 @@ menu :: () {
 
             l, r = NextRect2(2.2*k.x, .5*k.y);
             UI.label(l, "Paddle Shape", *label_theme);
+            current_paddle_shape : s32 = cast(s32)paddle_shape;
             UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+            paddle_shape = cast(Paddle_Shape)current_paddle_shape;
 
             l, r = NextRect2(2.2*k.x, .5*k.y);
             UI.label(l, "Play Area", *label_theme);
@@ -267,6 +281,12 @@ menu :: () {
         label_theme.alignment = .Left;
         // UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
         UI.label(r, "Connecting to Server...", *label_theme);
+
+        if client.server.state == .CONNECTED {
+            log_verbose("Sending player paddle shape to server", flags=.VERBOSE_ONLY);
+            packet := Enet.packet_create(*paddle_shape, .RELIABLE); // @Leak?
+            Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
+        }
 
         disconnect := false;
         for event : network_events_this_frame {
@@ -304,23 +324,22 @@ menu :: () {
         label_theme.alignment = .Center;
         UI.label(r, "Waiting for players...", *label_theme);
 
-        init_game_state : Init_Game_State;
-        init_game_state.paddle_shape = cast(Paddle_Shape)current_paddle_shape;
-        init_game_state.ball_shape = cast(Ball_Shape)current_ball_shape;
-        init_game_state.level_id = cast(Level_Id)current_level;
-
-        for * peer: server.host.peers {
-            if peer.state == .CONNECTED {
-                packet := Enet.packet_create(*init_game_state, .RELIABLE); // @Leak?
-                Enet.peer_send(peer=peer, channel_id=0, packet=packet);
-            }
-        }
+        server.init_game_state.p1_paddle_shape = paddle_shape;
+        server.init_game_state.ball_shape = cast(Ball_Shape)current_ball_shape;
+        server.init_game_state.level_id = cast(Level_Id)current_level;
 
         disconnect := false;
         for event : network_events_this_frame {
             if event.type == {
+            case .RECEIVE;
+                defer Enet.packet_destroy(event.packet);
+                if event.packet.data_length == size_of(Paddle_Shape) {
+                    server.init_game_state.p2_paddle_shape = (cast(*Paddle_Shape)event.packet.data).*;
+                    server.init_game_state_ready = true;
+                }
+
             case .CONNECT;
-                init_game(init_game_state);
+                // Do nothing
             case .DISCONNECT; #through;
             case .DISCONNECT_TIMEOUT;
                 disconnect = true;
@@ -335,6 +354,19 @@ menu :: () {
         if disconnect || released || esc_pressed {
             game_menu = .HOST_NETWORK_GAME_MENU;
             deinit_server();
+        }
+
+        if server.init_game_state_ready {
+            server.init_game_state_ready = false; // Reset for the next time
+
+            for * peer: server.host.peers {
+                if peer.state == .CONNECTED {
+                    packet := Enet.packet_create(*server.init_game_state, .RELIABLE); // @Leak?
+                    Enet.peer_send(peer=peer, channel_id=0, packet=packet);
+                }
+            }
+
+            init_game(server.init_game_state);
         }
 
 
@@ -363,3 +395,6 @@ modify_string :: (ps: *string, new_value: string) {
     free(ps.*);
     ps.* = copy_string(new_value);
 }
+
+#scope_file
+paddle_shape : Paddle_Shape = .Prism;
