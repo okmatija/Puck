@@ -117,7 +117,7 @@ Game_Menu :: enum u8 {
 }
 
 Game_Mode :: enum u8 {
-    NOT_STARTED :: 0;
+    NOT_STARTED :: 0; // Here the game is not initted
     //INITIALIZING;
     PLAYING;
     PAUSED;
@@ -743,10 +743,13 @@ deinit_player :: (player : *Player) {
 }
 
 deinit_game :: () {
-    deinit_player(*player2);
-    deinit_player(*player1);
-    deinit_level();
-    free(world_debug_draw);
+    // We can call deinit_game before game was initted if the client connects but disconnects before 
+    if game_mode != .NOT_STARTED {
+        deinit_player(*player2);
+        deinit_player(*player1);
+        deinit_level();
+        free(world_debug_draw);
+    }
 
     // Make sure to deinit the client/server after deinitting the game above, to do that properly we need to know the host_type which is set to UNKNOWN below
     if host_type == {
@@ -764,6 +767,7 @@ deinit_game :: () {
 }
 
 init_game :: (using init_game_state : Init_Game_State) {
+    assert(game_mode == .NOT_STARTED);
 
     current_ball_shape = xx ball_shape;
     current_level = xx level_id;
