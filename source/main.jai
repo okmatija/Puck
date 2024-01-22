@@ -673,10 +673,10 @@ simulate :: () {
 
     for * :LiveBalls ball : balls {
         center := b2Body.GetPosition(ball.body);
-        if center.y > GAME_EXTENTS.y {
+        if center.y - ball.radius > GAME_EXTENTS.y {
             ball.live = false; 
             player1.score += 1;
-        } else if center.y < -GAME_EXTENTS.y {
+        } else if center.y + ball.radius < -GAME_EXTENTS.y {
             ball.live = false; 
             player2.score += 1;
         }
