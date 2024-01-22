@@ -100,15 +100,24 @@ menu :: () {
     case .PLAY_LOCAL_GAME_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
+        l, r : UI.Rect;
 
-        r := NextRect(2.*k.x, .5*k.y);
-        UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
+        label_theme := button_theme.label_theme;
+        label_theme.alignment = .Left;
 
-        r = NextRect(2.*k.x, .5*k.y);
-        UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+        {
+            l, r = NextRect2(2.2*k.x, .5*k.y);
+            UI.label(l, "Ball Shape", *label_theme);
+            UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
 
-        r = NextRect(2.*k.x, .5*k.y);
-        UI.dropdown(r, level_choices, *current_level, dropdown_theme);
+            l, r = NextRect2(2.2*k.x, .5*k.y);
+            UI.label(l, "Paddle Shape", *label_theme);
+            UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+
+            l, r = NextRect2(2.2*k.x, .5*k.y);
+            UI.label(l, "Play Area", *label_theme);
+            UI.dropdown(r, level_choices, *current_level, dropdown_theme);
+        }
 
         // r = NextRect(2.*k.x, .5*k.y);
         // UI.slider(r, *friction, 0., 1., .01, *ui_theme.slider_theme, prefix="F ");
@@ -116,7 +125,7 @@ menu :: () {
         // r = NextRect(2.*k.x, .5*k.y);
         // UI.slider(r, *restitution, 0., 1.5, .01, *ui_theme.slider_theme, prefix="R ");
 
-        l:, r = NextRect2(1.25*k.x, .75*k.y);
+        l, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
             game_menu = .MAIN_MENU;
@@ -187,10 +196,11 @@ menu :: () {
     case .HOST_NETWORK_GAME_MENU;
 
         cursor := CenteredCursor(5.2*k.y);
+        l, r : UI.Rect;
 
         // @Cleanup This should not be editable
         // @CompilerBug When the program first starts this can be edited, but after going to the Join menu and back here it can't be
-        r := NextRect(4*k.x, .75*k.y);
+        r = NextRect(4*k.x, .75*k.y);
         text_theme.alignment = .Center;
         UI.text_input(r, ipv4_to_string(host_info.ipv4,,temp), *text_theme);
 
@@ -210,16 +220,33 @@ menu :: () {
             }
         }
 
-        r = NextRect(2.*k.x, .5*k.y);
-        UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
+        // r = NextRect(2.*k.x, .5*k.y);
+        // UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
 
-        r = NextRect(2.*k.x, .5*k.y);
-        UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+        // r = NextRect(2.*k.x, .5*k.y);
+        // UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
 
-        r = NextRect(2.*k.x, .5*k.y);
-        UI.dropdown(r, level_choices, *current_level, dropdown_theme);
+        // r = NextRect(2.*k.x, .5*k.y);
+        // UI.dropdown(r, level_choices, *current_level, dropdown_theme);
 
-        l:, r = NextRect2(1.25*k.x, .75*k.y);
+        {
+            label_theme := button_theme.label_theme;
+            label_theme.alignment = .Left;
+
+            l, r = NextRect2(2.2*k.x, .5*k.y);
+            UI.label(l, "Ball Shape", *label_theme);
+            UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
+
+            l, r = NextRect2(2.2*k.x, .5*k.y);
+            UI.label(l, "Paddle Shape", *label_theme);
+            UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
+
+            l, r = NextRect2(2.2*k.x, .5*k.y);
+            UI.label(l, "Play Area", *label_theme);
+            UI.dropdown(r, level_choices, *current_level, dropdown_theme);
+        }
+
+        l, r = NextRect2(1.25*k.x, .75*k.y);
         _, _, released := UI.button(l, "Back", *button_theme);
         if released || esc_pressed {
             game_menu = .MAIN_MENU;

@@ -6,13 +6,13 @@ A pong game to play at work in breaks
 
 [ ] Add winning conditions
 [ ] Add an option for game mode e.g., best of/first to/rally (high scores)
-[ ] Add text to all the game settings
 [ ] Add color and player name customization
 [ ] Make pausing a quitting the game work better
 [ ] Add a restart button
 [ ] Options to have the window always on top
 [ ] Add Credits
 
+[x] Add text to all the game settings
 [x] Add a basic menu
 [x] Add an option to toggle the ball type
 [x] Add an option to toggle the paddle type
