@@ -6,6 +6,8 @@ Server :: struct {
     // this data
     init_game_state : Init_Game_State;
     init_game_state_ready : bool;
+
+    level_id : Level_Id;
 }
 
 Client :: struct {
@@ -102,31 +104,6 @@ deinit_client ::() {
 }
 
 
-Player_State :: struct {
-    shape : Paddle_Shape;
-
-    transform : b2Transform;
-
-    score : int;
-};
-
-Ball_State :: struct {
-    shape : Ball_Shape;
-
-    transform : b2Transform;
-
-    live : bool;
-};
-
-Obstruction_State :: struct {
-    transform : b2Transform;
-}
-
-Level_State :: struct {
-    level_id : Level_Id; // @Cleanup Do we need this? We send it in Init_Game_State
-    obstructions : Obstruction_State;
-}
-
 Init_Game_State :: struct {
     p1_paddle_shape : Paddle_Shape;
     p2_paddle_shape : Paddle_Shape;
@@ -145,6 +122,30 @@ Init_Game_State :: struct {
 // This data is sent by the server to all connected clients
 // @TODO Generate the members using notes
 Game_State :: struct {
+    Player_State :: struct {
+        shape : Paddle_Shape;
+
+        transform : b2Transform;
+
+        score : int;
+    };
+
+    Ball_State :: struct {
+        shape : Ball_Shape;
+
+        transform : b2Transform;
+
+        live : bool;
+    };
+
+    Level_State :: struct {
+        Obstruction_State :: struct {
+            transform : b2Transform;
+        }
+
+        obstructions : Obstruction_State;
+    }
+
     player1_state : Player_State;
     player2_state : Player_State;
     level_state : Level_State;
@@ -163,25 +164,30 @@ Client_Input :: struct {
     esc_down : bool;
 }
 
-get_ball_state :: (using ball : Ball) -> Ball_State {
-    result : Ball_State;
+get_ball_state :: (using ball : Ball) -> Game_State.Ball_State {
+    assert(host_type == .SERVER);
+
+    result : Game_State.Ball_State;
     result.live = live;
     result.transform = b2Body.GetTransform(body);
     return result;
 }
 
-get_player_state :: (using player : Player) -> Player_State {
-    result : Player_State;
+get_player_state :: (using player : Player) -> Game_State.Player_State {
+    assert(host_type == .SERVER);
+
+    result : Game_State.Player_State;
     result.transform = b2Body.GetTransform(body);
     result.score = score;
+
     return result;
 }
 
-get_level_state :: () -> Level_State {
-    result : Level_State;
+get_level_state :: () -> Game_State.Level_State {
+    assert(host_type == .SERVER);
 
-    result.level_id = cast(Level_Id)current_level;
-    if result.level_id != .Empty {
+    result : Game_State.Level_State;
+    if level.level_id != .Empty {
         result.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
     }
 
@@ -189,6 +195,8 @@ get_level_state :: () -> Level_State {
 }
 
 get_game_state :: () -> Game_State {
+    assert(host_type == .SERVER);
+
     result : Game_State;
     result.player1_state = get_player_state(player1);
     result.player2_state = get_player_state(player2);
@@ -200,14 +208,15 @@ get_game_state :: () -> Game_State {
 }
 
 set_game_state :: (using state : Game_State) {
+    assert(host_type == .CLIENT);
+
     player1.transform = player1_state.transform;
     player1.score = player1_state.score;
 
     player2.transform = player2_state.transform;
     player2.score = player2_state.score;
 
-    current_level = xx level_state.level_id;
-    if cast(Level_Id)current_level != .Empty {
+    if level.level_id != .Empty {
         level.obstructions.transform = level_state.obstructions.transform;
     }
 

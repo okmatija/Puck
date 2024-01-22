@@ -7,7 +7,7 @@ GAME_PADDING :: 3.0; // Applied to both sides of game
 WINDOW_HEIGHT_INITIAL :: 900; //1440;
 DT_MAX : float : 0.15;
 
-BALL_RADIUS_INITIAL :: 0.2;
+BALL_RADIUS_INITIAL :: 0.4;
 BALL_DENSITY :: 1.0;
 BALL_FRICTION :: 0.3;
 BALL_RESTITUTION :: 1.0;
@@ -64,8 +64,6 @@ network_events_this_frame : [..]Enet.Event;
 
 // @TODOOO Rename these to have a ui_ prefix and make them only for ui, game logic will use other variables (which are typed to the enums)
 // nocommitttt Use the actual types here and cast just before use. Many errors were made sending the enum u8 rather than s32!!!
-current_level : s32 = xx Level_Id.Spinning_Box;
-current_ball_shape : s32 = xx Ball_Shape.Circle;
 
 // @Cleanup Remove this, its not very useful. We actually want something to simulate lag
 client_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
@@ -132,6 +130,7 @@ Ball_Shape :: enum {
     // Pentagon;
     // Hexagon;
 }
+#insert #run generate_dropdown_choices("ball_shape_choices", Ball_Shape);
 
 Paddle_Shape :: enum {
     Box;     // aka rectangle
@@ -139,8 +138,14 @@ Paddle_Shape :: enum {
     // Dome;    // aka circular segment
     // Capsule; // aka a half capsule cut along the line connecting circle centers
 };
+#insert #run generate_dropdown_choices("paddle_shape_choices", Paddle_Shape);
 
-Level_Id :: enum { Empty; Fixed_Box; Spinning_Box; };
+Level_Id :: enum {
+    Empty;
+    Fixed_Box;
+    Spinning_Box;
+};
+#insert #run generate_dropdown_choices("level_choices", Level_Id);
 
 
 Player_Index :: enum u8 #specified {
@@ -171,6 +176,7 @@ Boundary :: struct {
 }
 
 Level :: struct {
+    level_id : Level_Id;
     obstructions : Obstruction;
     boundary : Boundary;
 }
@@ -405,7 +411,9 @@ main :: () {
 
                 Simp.set_shader_for_color(true);
 
-                draw_mesh(level.obstructions.mesh, level.obstructions.transform, level.obstructions.color);
+                if level.level_id != .Empty {
+                    draw_mesh(level.obstructions.mesh, level.obstructions.transform, level.obstructions.color);
+                }
 
                 draw_segment(-GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, level.boundary.color);
                 draw_segment(.{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS, level.boundary.color);
@@ -769,18 +777,15 @@ deinit_game :: () {
 init_game :: (using init_game_state : Init_Game_State) {
     assert(game_mode == .NOT_STARTED);
 
-    current_ball_shape = xx ball_shape;
-    current_level = xx level_id;
-
     if host_type != .CLIENT {
         init_world();
     }
 
-    init_level(); // Must come before players since they are constrained relative to the level boundary
+    init_level(level_id); // Must come before players since they are constrained relative to the level boundary
     init_player(*player1, .P1, p1_paddle_shape);
     init_player(*player2, .P2, p2_paddle_shape);
     for * ball : balls {
-        init_ball(ball, cast(Ball_Shape)current_ball_shape);
+        init_ball(ball, ball_shape);
     }
 
     game_mode = .PLAYING;
@@ -806,6 +811,8 @@ deinit_ball :: (ball : *Ball) {
 }
 
 init_ball_physics :: (ball : *Ball) {
+    assert(host_type == .SERVER || host_type == .LOCAL);
+
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     body_def.type = .b2_dynamicBody;
@@ -862,6 +869,8 @@ init_boundary :: () {
 }
 
 init_boundary_physics :: () {
+    assert(host_type == .SERVER || host_type == .LOCAL);
+
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     level.boundary.body = b2World.CreateBody(world, *body_def);
@@ -892,7 +901,9 @@ init_boundary_physics :: () {
 }
 
 init_obstructions_physics :: () {
-    if #complete cast(Level_Id)current_level == {
+    assert(host_type == .SERVER || host_type == .LOCAL);
+
+    if #complete level.level_id == {
     case .Empty;
         // Do nothing
     case .Fixed_Box; #through;
@@ -920,14 +931,14 @@ init_obstructions_physics :: () {
         joint_def : b2PrismaticJointDef;
         b2PrismaticJointDef.Constructor(*joint_def);
         b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, .{}, .{1., 0.});
-        if cast(Level_Id)current_level == .Spinning_Box {
+        if level.level_id == .Spinning_Box {
             b2Body.SetAngularVelocity(body, .25);
         }
     }
 }
 
 init_obstructions :: () {
-    if #complete cast(Level_Id)current_level == {
+    if #complete level.level_id == {
     case .Empty;
         // Do nothing
     case .Fixed_Box; #through;
@@ -942,14 +953,16 @@ init_obstructions :: () {
     }
 }
 
-init_level :: () {
+init_level :: (level_id : Level_Id) {
+    level.level_id = level_id;
 
     init_boundary();
     init_obstructions();
-
 }
 
 init_player_physics :: (using player : *Player) {
+    assert(host_type == .SERVER || host_type == .LOCAL);
+
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     body_def.type = .b2_dynamicBody;

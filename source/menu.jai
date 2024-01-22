@@ -1,6 +1,6 @@
 menu :: () {
 
-    esc_pressed : bool;
+    esc_pressed = false;
     for event : events_this_frame {
         if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
             esc_pressed = true;
@@ -16,373 +16,41 @@ menu :: () {
     x, y, width, height := get_dimensions(window, true);
     UI.ui_per_frame_update(window, window_width, window_height, current_time);
 
-    using ui_state := make_ui_state();
-
-    button_theme := ui_theme.button_theme;
-    button_theme.font = font;
-    button_theme.enable_variable_frame_thickness = true;
-    button_theme.label_theme.alignment = .Center;
-
-    text_theme := ui_theme.text_input_theme;
-    text_theme.font = font;
-
-    dropdown_theme := *ui_theme.dropdown_theme;
-
-    // The 'dropdown' function causes a popup to be created, which
-    // gets rendered at the end of the frame when we call draw_popups().
-    // The theme and choices array must remain valid until after that time!
-    // The 'current_theme' pointer also needs to remain pointing at valid memory
-    // until after that time, as that is when it will be changed.
-
-    ball_shape_choices : [#run get_enum_count(Ball_Shape)]string;
-    for 0..get_enum_count(Ball_Shape)-1 {
-        text := tprint("%", cast(Ball_Shape)it);
-        for 0..text.count-1 {
-            if text[it] == #char "_"  text[it] = #char " ";  // Convert underscores to spaces!
-        }
-        ball_shape_choices[it] = text;
-    }
-
-    paddle_shape_choices : [#run get_enum_count(Paddle_Shape)]string;
-    for 0..get_enum_count(Paddle_Shape)-1 {
-        text := tprint("%", cast(Paddle_Shape)it);
-        for 0..text.count-1 {
-            if text[it] == #char "_"  text[it] = #char " ";  // Convert underscores to spaces!
-        }
-        paddle_shape_choices[it] = text;
-    }
-
-    level_choices : [#run get_enum_count(Level_Id)]string;
-    for 0..get_enum_count(Level_Id)-1 {
-        text := tprint("%", cast(Level_Id)it);
-        for 0..text.count-1 {
-            if text[it] == #char "_"  text[it] = #char " ";  // Convert underscores to spaces!
-        }
-        level_choices[it] = text;
-    }
 
 
     if #complete game_menu == {
     case .MAIN_MENU;
 
-        cursor := CenteredCursor(5.2*k.y);
-
-        r := NextRect(3.25*k.x, .75*k.y);
-        _, _, released := UI.button(r, "Play Local Game", *button_theme);
-        if released {
-            game_menu = .PLAY_LOCAL_GAME_MENU;
-        }
-
-        r = NextRect(3.25*k.x, .75*k.y);
-        _, _, released = UI.button(r, "Join Network Game", *button_theme);
-        if released {
-            game_menu = .JOIN_NETWORK_GAME_MENU;
-        }
-
-        r = NextRect(3.25*k.x, .75*k.y);
-        _, _, released = UI.button(r, "Host Network Game", *button_theme);
-        if released {
-            game_menu = .HOST_NETWORK_GAME_MENU;
-        }
-
-        r = NextRect(1.75*k.x, .75*k.y);
-        _, _, released = UI.button(r, "Settings", *button_theme);
-        if released {
-            game_menu = .SETTINGS_MENU;
-        }
-
-        r = NextRect(1.25*k.x, .75*k.y);
-        _, _, released = UI.button(r, "Quit", *button_theme);
-        if released {
-            game_quitting = true;
-        }
-
-    case .PLAY_LOCAL_GAME_MENU;
-
-        cursor := CenteredCursor(5.2*k.y);
-        l, r : UI.Rect;
-
-        label_theme := button_theme.label_theme;
-        label_theme.alignment = .Left;
-
-        {
-            l, r = NextRect2(2.2*k.x, .5*k.y);
-            UI.label(l, "Ball Shape", *label_theme);
-            UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
-
-            // @TODOO Player 1 and 2 paddle shapes
-            l, r = NextRect2(2.2*k.x, .5*k.y);
-            UI.label(l, "Paddle Shape", *label_theme);
-            current_paddle_shape := cast(s32)paddle_shape;
-            UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
-            paddle_shape = cast(Paddle_Shape)current_paddle_shape;
-
-            // l, r = NextRect2(2.2*k.x, .5*k.y);
-            // UI.label(l, "P2 Paddle Shape", *label_theme);
-            // UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
-
-            l, r = NextRect2(2.2*k.x, .5*k.y);
-            UI.label(l, "Play Area", *label_theme);
-            UI.dropdown(r, level_choices, *current_level, dropdown_theme);
-        }
-
-        // r = NextRect(2.*k.x, .5*k.y);
-        // UI.slider(r, *friction, 0., 1., .01, *ui_theme.slider_theme, prefix="F ");
-
-        // r = NextRect(2.*k.x, .5*k.y);
-        // UI.slider(r, *restitution, 0., 1.5, .01, *ui_theme.slider_theme, prefix="R ");
-
-        l, r = NextRect2(1.25*k.x, .75*k.y);
-        _, _, released := UI.button(l, "Back", *button_theme);
-        if released || esc_pressed {
-            game_menu = .MAIN_MENU;
-        }
-        _, _, released = UI.button(r, "Play", *button_theme);
-        if released {
-            host_type = .LOCAL;
-
-            init_game_state : Init_Game_State;
-            // @TODOO local play option to choose paddle shape
-            init_game_state.p1_paddle_shape = cast(Paddle_Shape)paddle_shape;
-            init_game_state.p2_paddle_shape = cast(Paddle_Shape)paddle_shape;
-            init_game_state.ball_shape = cast(Ball_Shape)current_ball_shape;
-            init_game_state.level_id = cast(Level_Id)current_level;
-            init_game(init_game_state);
-        }
+        main_menu();
 
     case .PAUSE_MENU;
 
-        cursor := CenteredCursor(5.2*k.y);
-
-        l, r := NextRect2(1.25*k.x, .75*k.y);
-        _, _, released := UI.button(r, "Resume", *button_theme);
-        if released {
-            game_mode = .PLAYING;
-        }
-        _, _, released = UI.button(l, "Leave", *button_theme);
-        if released {
-            deinit_game();
-        }
-
-    case .JOIN_NETWORK_GAME_MENU;
-
-        cursor := CenteredCursor(5.2*k.y);
-        l, r : UI.Rect;
-
-        r = NextRect(4*k.x, .75*k.y);
-        text_theme.alignment = .Center;
-        action, new_server_address := UI.text_input(r, server_address, *text_theme);
-        if action & .ENTERED {
-            modify_string(*server_address, new_server_address);
-        }
-
-        r = NextRect(4*k.x, .75*k.y);
-        text_theme.alignment = .Center;
-        action=, new_server_port_string := UI.text_input(r, server_port_string, *text_theme);
-        if action & .ENTERED {
-            port, success, _ := to_integer(new_server_port_string);
-            if success && (port >= 1024 && port <= 49151) {
-                modify_string(*server_port_string, new_server_port_string);
-                server_port = cast(u16)port;
-            } else {
-                // From: https://www.ibm.com/docs/en/ztpf/2023?topic=overview-port-numbers
-                // Port numbers [1024,  49151] are reserved for user server applications.
-                // Port numbers [49152, 65535] are reserved for clients.
-                log_error("Enter a valid port integer in the range [1024, 49151], got %", server_port);
-            }
-        }
-
-        label_theme := button_theme.label_theme;
-        label_theme.alignment = .Left;
-
-        {
-            l, r = NextRect2(2.2*k.x, .5*k.y);
-            UI.label(l, "Paddle Shape", *label_theme);
-            current_paddle_shape : s32 = cast(s32)paddle_shape;
-            UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
-            paddle_shape = cast(Paddle_Shape)current_paddle_shape;
-        }
-
-        l, r = NextRect2(1.25*k.x, .75*k.y);
-        _, _, released := UI.button(l, "Back", *button_theme);
-        if released || esc_pressed {
-            game_menu = .MAIN_MENU;
-        }
-        _, _, released = UI.button(r, "Join", *button_theme);
-        if released {
-            game_menu = .CONNECTING_TO_SERVER_MENU;
-            init_client(server_address, server_port);
-        }
-
-    case .HOST_NETWORK_GAME_MENU;
-
-        cursor := CenteredCursor(5.2*k.y);
-        l, r : UI.Rect;
-
-        // @Cleanup This should not be editable
-        // @CompilerBug When the program first starts this can be edited, but after going to the Join menu and back here it can't be
-        r = NextRect(4*k.x, .75*k.y);
-        text_theme.alignment = .Center;
-        UI.text_input(r, ipv4_to_string(host_info.ipv4,,temp), *text_theme);
-
-        r = NextRect(4*k.x, .75*k.y);
-        text_theme.alignment = .Center;
-        action, new_server_port_string := UI.text_input(r, server_port_string, *text_theme);
-        if action & .ENTERED {
-            port, success, _ := to_integer(new_server_port_string);
-            if success && (port >= 1024 && port <= 49151) {
-                modify_string(*server_port_string, new_server_port_string);
-                server_port = cast(u16)port;
-            } else {
-                // From: https://www.ibm.com/docs/en/ztpf/2023?topic=overview-port-numbers
-                // Port numbers [1024,  49151] are reserved for user server applications.
-                // Port numbers [49152, 65535] are reserved for clients.
-                log_error("Enter a valid port integer in the range [1024, 49151], got %", server_port);
-            }
-        }
-
-        {
-            label_theme := button_theme.label_theme;
-            label_theme.alignment = .Left;
-
-            l, r = NextRect2(2.2*k.x, .5*k.y);
-            UI.label(l, "Ball Shape", *label_theme);
-            UI.dropdown(r, ball_shape_choices, *current_ball_shape, dropdown_theme);
-
-            l, r = NextRect2(2.2*k.x, .5*k.y);
-            UI.label(l, "Paddle Shape", *label_theme);
-            current_paddle_shape : s32 = cast(s32)paddle_shape;
-            UI.dropdown(r, paddle_shape_choices, *current_paddle_shape, dropdown_theme);
-            paddle_shape = cast(Paddle_Shape)current_paddle_shape;
-
-            l, r = NextRect2(2.2*k.x, .5*k.y);
-            UI.label(l, "Play Area", *label_theme);
-            UI.dropdown(r, level_choices, *current_level, dropdown_theme);
-        }
-
-        l, r = NextRect2(1.25*k.x, .75*k.y);
-        _, _, released := UI.button(l, "Back", *button_theme);
-        if released || esc_pressed {
-            game_menu = .MAIN_MENU;
-        }
-        _, _, released = UI.button(r, "Host", *button_theme);
-        if released {
-            game_menu = .WAITING_FOR_PLAYERS_MENU;
-            init_server(server_port);
-        }
-
-    case .CONNECTING_TO_SERVER_MENU;
-
-        label_theme := ui_theme.label_theme;
-        label_theme.text_color = .{0, 0, 0, 1};
-
-        cursor := CenteredCursor(5*k.y);
-        r := NextRect(5*k.x, .75*k.y);
-        label_theme.alignment = .Left;
-        // UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
-        UI.label(r, "Connecting to Server...", *label_theme);
-
-        if client.server.state == .CONNECTED {
-            log_verbose("Sending player paddle shape to server", flags=.VERBOSE_ONLY);
-            packet := Enet.packet_create(*paddle_shape, .RELIABLE); // @Leak?
-            Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
-        }
-
-        disconnect := false;
-        for event : network_events_this_frame {
-            if event.type == {
-            case .CONNECT;
-                // Do nothing
-            case .DISCONNECT; #through;
-            case .DISCONNECT_TIMEOUT;
-                disconnect = true;
-                // @Think Can this happen?
-            case .RECEIVE;
-                defer Enet.packet_destroy(event.packet);
-                assert(client.server.state == .CONNECTED);
-                if event.packet.data_length == size_of(Init_Game_State) {
-                    init_game_state := cast(*Init_Game_State)event.packet.data;
-                    init_game(init_game_state.*);
-                }
-            }
-        }
-
-        r = NextRect(1.25*k.x, .75*k.y);
-        _, _, released := UI.button(r, "Cancel", *button_theme);
-        if disconnect || released || esc_pressed {
-            game_menu = .JOIN_NETWORK_GAME_MENU;
-            deinit_client();
-        }
-
-    case .WAITING_FOR_PLAYERS_MENU;
-
-        label_theme := ui_theme.label_theme;
-        label_theme.text_color = .{0, 0, 0, 1};
-
-        cursor := CenteredCursor(5*k.y);
-        r := NextRect(5*k.x, .75*k.y);
-        label_theme.alignment = .Center;
-        UI.label(r, "Waiting for players...", *label_theme);
-
-        server.init_game_state.p1_paddle_shape = paddle_shape;
-        server.init_game_state.ball_shape = cast(Ball_Shape)current_ball_shape;
-        server.init_game_state.level_id = cast(Level_Id)current_level;
-
-        disconnect := false;
-        for event : network_events_this_frame {
-            if event.type == {
-            case .RECEIVE;
-                defer Enet.packet_destroy(event.packet);
-                if event.packet.data_length == size_of(Paddle_Shape) {
-                    server.init_game_state.p2_paddle_shape = (cast(*Paddle_Shape)event.packet.data).*;
-                    server.init_game_state_ready = true;
-                }
-
-            case .CONNECT;
-                // Do nothing
-            case .DISCONNECT; #through;
-            case .DISCONNECT_TIMEOUT;
-                disconnect = true;
-                // This could happen a previously connected player disconnects before the game started?
-                log("Disconnected peer %", event.peer.data);
-                //event.peer.data = null; // @Cleanup http://enet.bespin.org/Tutorial.html says we should do this?
-            }
-        }
-
-        r = NextRect(1.25*k.x, .75*k.y);
-        _, _, released := UI.button(r, "Cancel", *button_theme);
-        if disconnect || released || esc_pressed {
-            game_menu = .HOST_NETWORK_GAME_MENU;
-            deinit_server();
-        }
-
-        if server.init_game_state_ready {
-            server.init_game_state_ready = false; // Reset for the next time
-
-            for * peer: server.host.peers {
-                if peer.state == .CONNECTED {
-                    packet := Enet.packet_create(*server.init_game_state, .RELIABLE); // @Leak?
-                    Enet.peer_send(peer=peer, channel_id=0, packet=packet);
-                }
-            }
-
-            init_game(server.init_game_state);
-        }
-
+        pause_menu();
 
     case .SETTINGS_MENU;
 
-        cursor := CenteredCursor(5.2*k.y);
-        r := NextRect(1.25*k.x, .75*k.y);
-        _, _, released := UI.button(r, "Back", *button_theme);
-        if released || esc_pressed {
-            game_menu = .MAIN_MENU;
-        }
+        settings_menu();
+
+    case .PLAY_LOCAL_GAME_MENU;
+
+        play_local_game_menu();
+
+    case .JOIN_NETWORK_GAME_MENU;
+
+        join_network_game_menu();
+
+    case .HOST_NETWORK_GAME_MENU;
+
+        host_network_game_menu();
+
+    case .CONNECTING_TO_SERVER_MENU;
+
+        connecting_to_server_menu();
+
+    case .WAITING_FOR_PLAYERS_MENU;
+
+        waiting_for_players_menu();
     }
-
-
-
-    UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
 
     draw_cursor();
 
@@ -397,4 +65,422 @@ modify_string :: (ps: *string, new_value: string) {
 }
 
 #scope_file
+
+main_menu :: () {
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    cursor := CenteredCursor(5.2*k.y);
+
+    r := NextRect(3.25*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Play Local Game", *button_theme);
+    if released {
+        game_menu = .PLAY_LOCAL_GAME_MENU;
+    }
+
+    r = NextRect(3.25*k.x, .75*k.y);
+    _, _, released = UI.button(r, "Join Network Game", *button_theme);
+    if released {
+        game_menu = .JOIN_NETWORK_GAME_MENU;
+    }
+
+    r = NextRect(3.25*k.x, .75*k.y);
+    _, _, released = UI.button(r, "Host Network Game", *button_theme);
+    if released {
+        game_menu = .HOST_NETWORK_GAME_MENU;
+    }
+
+    r = NextRect(1.75*k.x, .75*k.y);
+    _, _, released = UI.button(r, "Settings", *button_theme);
+    if released {
+        game_menu = .SETTINGS_MENU;
+    }
+
+    r = NextRect(1.25*k.x, .75*k.y);
+    _, _, released = UI.button(r, "Quit", *button_theme);
+    if released {
+        game_quitting = true;
+    }
+}
+
+settings_menu :: () {
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    cursor := CenteredCursor(5.2*k.y);
+    r := NextRect(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Back", *button_theme);
+    if released || esc_pressed {
+        game_menu = .MAIN_MENU;
+    }
+}
+
+pause_menu :: () {
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    cursor := CenteredCursor(5.2*k.y);
+
+    l, r := NextRect2(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Resume", *button_theme);
+    if released {
+        game_mode = .PLAYING;
+    }
+    _, _, released = UI.button(l, "Leave", *button_theme);
+    if released {
+        deinit_game();
+    }
+}
+
+play_local_game_menu :: () {
+
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    label_theme := button_theme.label_theme;
+    label_theme.alignment = .Left;
+
+    dropdown_theme := *ui_theme.dropdown_theme;
+
+    // nocommit rename current_paddle_shape to paddle_shape_s32;
+    current_paddle_shape : s32 = cast(s32)paddle_shape;
+    current_ball_shape : s32 = cast(s32)ball_shape;
+    current_level : s32 = cast(s32)level_id;
+
+    cursor := CenteredCursor(5.2*k.y);
+    l, r : UI.Rect;
+
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    BallShapeDropdown(l, r);
+
+    // @TODOO Player 1 and 2 paddle shapes
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    PaddleShapeDropdown(l, r);
+
+    // l, r = NextRect2(2.2*k.x, .5*k.y);
+    // PaddleShapeDropdown(l, r, "P2 Paddle Shape");
+
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    LevelDropdown(l, r);
+
+    // r = NextRect(2.*k.x, .5*k.y);
+    // UI.slider(r, *friction, 0., 1., .01, *ui_theme.slider_theme, prefix="F ");
+
+    // r = NextRect(2.*k.x, .5*k.y);
+    // UI.slider(r, *restitution, 0., 1.5, .01, *ui_theme.slider_theme, prefix="R ");
+
+    l, r = NextRect2(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(l, "Back", *button_theme);
+    if released || esc_pressed {
+        game_menu = .MAIN_MENU;
+    }
+    _, _, released = UI.button(r, "Play", *button_theme);
+    if released {
+        host_type = .LOCAL;
+
+        init_game_state : Init_Game_State;
+        // @TODOO local play option to choose paddle shape
+        init_game_state.p1_paddle_shape = paddle_shape;
+        init_game_state.p2_paddle_shape = paddle_shape;
+        init_game_state.ball_shape = ball_shape;
+        init_game_state.level_id = level_id;
+        init_game(init_game_state);
+    }
+
+    UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
+    paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+    ball_shape = cast(Ball_Shape)current_ball_shape;
+    level_id = cast(Level_Id)current_level;
+}
+
+join_network_game_menu :: () {
+
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    text_theme := ui_theme.text_input_theme;
+    text_theme.font = font;
+
+    label_theme := button_theme.label_theme;
+    label_theme.alignment = .Left;
+
+    dropdown_theme := *ui_theme.dropdown_theme;
+
+    current_paddle_shape : s32 = cast(s32)paddle_shape;
+
+    cursor := CenteredCursor(5.2*k.y);
+    l, r : UI.Rect;
+
+    r = NextRect(4*k.x, .75*k.y);
+    text_theme.alignment = .Center;
+    action, new_server_address := UI.text_input(r, server_address, *text_theme);
+    if action & .ENTERED {
+        modify_string(*server_address, new_server_address);
+    }
+
+    r = NextRect(4*k.x, .75*k.y);
+    text_theme.alignment = .Center;
+    action=, new_server_port_string := UI.text_input(r, server_port_string, *text_theme);
+    if action & .ENTERED {
+        port, success, _ := to_integer(new_server_port_string);
+        if success && (port >= 1024 && port <= 49151) {
+            modify_string(*server_port_string, new_server_port_string);
+            server_port = cast(u16)port;
+        } else {
+            // From: https://www.ibm.com/docs/en/ztpf/2023?topic=overview-port-numbers
+            // Port numbers [1024,  49151] are reserved for user server applications.
+            // Port numbers [49152, 65535] are reserved for clients.
+            log_error("Enter a valid port integer in the range [1024, 49151], got %", server_port);
+        }
+    }
+
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    PaddleShapeDropdown(l, r);
+
+    l, r = NextRect2(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(l, "Back", *button_theme);
+    if released || esc_pressed {
+        game_menu = .MAIN_MENU;
+    }
+    _, _, released = UI.button(r, "Join", *button_theme);
+    if released {
+        game_menu = .CONNECTING_TO_SERVER_MENU;
+        init_client(server_address, server_port);
+    }
+
+    UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
+    paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+}
+
+host_network_game_menu :: () {
+
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    text_theme := ui_theme.text_input_theme;
+    text_theme.font = font;
+
+    label_theme := button_theme.label_theme;
+    label_theme.alignment = .Left;
+
+    dropdown_theme := *ui_theme.dropdown_theme;
+
+    // nocommit rename current_paddle_shape to paddle_shape_s32;
+    current_paddle_shape : s32 = cast(s32)paddle_shape;
+    current_ball_shape : s32 = cast(s32)ball_shape;
+    current_level : s32 = cast(s32)level_id;
+
+
+    cursor := CenteredCursor(5.2*k.y);
+    l, r : UI.Rect;
+
+    // @Cleanup This should not be editable
+    // @CompilerBug When the program first starts this can be edited, but after going to the Join menu and back here it can't be
+    r = NextRect(4*k.x, .75*k.y);
+    text_theme.alignment = .Center;
+    UI.text_input(r, ipv4_to_string(host_info.ipv4,,temp), *text_theme);
+
+    r = NextRect(4*k.x, .75*k.y);
+    text_theme.alignment = .Center;
+    action, new_server_port_string := UI.text_input(r, server_port_string, *text_theme);
+    if action & .ENTERED {
+        port, success, _ := to_integer(new_server_port_string);
+        if success && (port >= 1024 && port <= 49151) {
+            modify_string(*server_port_string, new_server_port_string);
+            server_port = cast(u16)port;
+        } else {
+            // From: https://www.ibm.com/docs/en/ztpf/2023?topic=overview-port-numbers
+            // Port numbers [1024,  49151] are reserved for user server applications.
+            // Port numbers [49152, 65535] are reserved for clients.
+            log_error("Enter a valid port integer in the range [1024, 49151], got %", server_port);
+        }
+    }
+
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    BallShapeDropdown(l, r);
+
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    PaddleShapeDropdown(l, r);
+
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    LevelDropdown(l, r);
+
+    l, r = NextRect2(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(l, "Back", *button_theme);
+    if released || esc_pressed {
+        game_menu = .MAIN_MENU;
+    }
+    _, _, released = UI.button(r, "Host", *button_theme);
+    if released {
+        game_menu = .WAITING_FOR_PLAYERS_MENU;
+        init_server(server_port);
+    }
+
+    UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
+    paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+    ball_shape = cast(Ball_Shape)current_ball_shape;
+    level_id = cast(Level_Id)current_level;
+}
+
+
+connecting_to_server_menu :: () {
+
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    label_theme := ui_theme.label_theme;
+    label_theme.text_color = .{0, 0, 0, 1};
+
+    cursor := CenteredCursor(5*k.y);
+    r := NextRect(5*k.x, .75*k.y);
+    label_theme.alignment = .Left;
+    // UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
+    UI.label(r, "Connecting to Server...", *label_theme);
+
+    if client.server.state == .CONNECTED {
+        log_verbose("Sending player paddle shape to server", flags=.VERBOSE_ONLY);
+        packet := Enet.packet_create(*paddle_shape, .RELIABLE); // @Leak?
+        Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
+    }
+
+    disconnect := false;
+    for event : network_events_this_frame {
+        if event.type == {
+        case .CONNECT;
+            // Do nothing
+        case .DISCONNECT; #through;
+        case .DISCONNECT_TIMEOUT;
+            disconnect = true;
+            // @Think Can this happen?
+        case .RECEIVE;
+            defer Enet.packet_destroy(event.packet);
+            assert(client.server.state == .CONNECTED);
+            if event.packet.data_length == size_of(Init_Game_State) {
+                init_game_state := cast(*Init_Game_State)event.packet.data;
+                init_game(init_game_state.*);
+            }
+        }
+    }
+
+    r = NextRect(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Cancel", *button_theme);
+    if disconnect || released || esc_pressed {
+        game_menu = .JOIN_NETWORK_GAME_MENU;
+        deinit_client();
+    }
+}
+
+waiting_for_players_menu :: () {
+
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    label_theme := ui_theme.label_theme;
+    label_theme.text_color = .{0, 0, 0, 1};
+
+    cursor := CenteredCursor(5*k.y);
+    r := NextRect(5*k.x, .75*k.y);
+    label_theme.alignment = .Center;
+    UI.label(r, "Waiting for players...", *label_theme);
+
+    server.init_game_state.p1_paddle_shape = paddle_shape;
+    server.init_game_state.ball_shape = ball_shape;
+    server.init_game_state.level_id = level_id;
+
+    disconnect := false;
+    for event : network_events_this_frame {
+        if event.type == {
+        case .RECEIVE;
+            defer Enet.packet_destroy(event.packet);
+            if event.packet.data_length == size_of(Paddle_Shape) {
+                server.init_game_state.p2_paddle_shape = (cast(*Paddle_Shape)event.packet.data).*;
+                server.init_game_state_ready = true;
+            }
+
+        case .CONNECT;
+            // Do nothing
+        case .DISCONNECT; #through;
+        case .DISCONNECT_TIMEOUT;
+            disconnect = true;
+            // This could happen a previously connected player disconnects before the game started?
+            log("Disconnected peer %", event.peer.data);
+            //event.peer.data = null; // @Cleanup http://enet.bespin.org/Tutorial.html says we should do this?
+        }
+    }
+
+    r = NextRect(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Cancel", *button_theme);
+    if disconnect || released || esc_pressed {
+        game_menu = .HOST_NETWORK_GAME_MENU;
+        deinit_server();
+    }
+
+    if server.init_game_state_ready {
+        server.init_game_state_ready = false; // Reset for the next time
+
+        for * peer: server.host.peers {
+            if peer.state == .CONNECTED {
+                packet := Enet.packet_create(*server.init_game_state, .RELIABLE); // @Leak?
+                Enet.peer_send(peer=peer, channel_id=0, packet=packet);
+            }
+        }
+
+        init_game(server.init_game_state);
+    }
+}
+
+// The 'dropdown' function causes a popup to be created, which
+// gets rendered at the end of the frame when we call draw_popups().
+// The theme and choices array must remain valid until after that time!
+// The 'current_theme' pointer also needs to remain pointing at valid memory
+// until after that time, as that is when it will be changed. The value is
+// also changed in the draw_popups call!!
+PaddleShapeDropdown :: (l : UI.Rect, r : UI.Rect, label := "Paddle Shape") #expand {
+    UI.label(l, label, *`label_theme);
+    UI.dropdown(r, paddle_shape_choices, *`current_paddle_shape, `dropdown_theme);
+}
+BallShapeDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
+    UI.label(l, "Ball Shape", *`label_theme);
+    UI.dropdown(r, ball_shape_choices, *`current_ball_shape, `dropdown_theme);
+}
+LevelDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
+    UI.label(l, "Play Area", *`label_theme);
+    UI.dropdown(r, level_choices, *`current_level, `dropdown_theme);
+}
+
+ball_shape : Ball_Shape = .Circle;
 paddle_shape : Paddle_Shape = .Prism;
+level_id : Level_Id = .Spinning_Box;
+esc_pressed : bool;
