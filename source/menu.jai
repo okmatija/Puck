@@ -1,22 +1,11 @@
 menu :: () {
 
-    esc_pressed = false;
-    for event : events_this_frame {
-        if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
-            esc_pressed = true;
-        }
-
-        UI.getrect_handle_event(event);
-    }
-
     Simp.clear_render_target(1, 0, 0, 1);
 
     draw_menu_background();
 
-    x, y, width, height := get_dimensions(window, true);
-    UI.ui_per_frame_update(window, window_width, window_height, current_time);
-
-
+    _, _, width, height := get_dimensions(window, true);
+    UI.ui_per_frame_update(window, width, height, current_time);
 
     if #complete game_menu == {
     case .MAIN_MENU;
@@ -53,8 +42,6 @@ menu :: () {
     }
 
     draw_cursor();
-
-    // Draw cursor
 }
 
 
@@ -365,17 +352,14 @@ connecting_to_server_menu :: () {
     // UI.label(r, tprint("Connecting to Server... (%s)", time_format(remaining_time)), *label_theme);
     UI.label(r, "Connecting to Server...", *label_theme);
 
-    if client.server.state == .CONNECTED {
-        log_verbose("Sending player paddle shape to server", flags=.VERBOSE_ONLY);
-        packet := Enet.packet_create(*paddle_shape, .RELIABLE); // @Leak?
-        Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
-    }
-
     disconnect := false;
     for event : network_events_this_frame {
         if event.type == {
         case .CONNECT;
-            // Do nothing
+            log_verbose("Sending player paddle shape to server", flags=.VERBOSE_ONLY);
+            packet := Enet.packet_create(*paddle_shape, .RELIABLE); // @Leak?
+            Enet.peer_send(peer=client.server, channel_id=0, packet=packet);
+
         case .DISCONNECT; #through;
         case .DISCONNECT_TIMEOUT;
             disconnect = true;
@@ -483,4 +467,3 @@ LevelDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
 ball_shape : Ball_Shape = .Circle;
 paddle_shape : Paddle_Shape = .Prism;
 level_id : Level_Id = .Spinning_Box;
-esc_pressed : bool;

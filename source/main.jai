@@ -74,6 +74,7 @@ SERVER_PACKET_COUNTDOWN_MS :: #run 0. / 1000;
 // Important these are global and persist across frames to preserve previous key down state
 input1 : Client_Input;
 input2 : Client_Input;
+esc_pressed : bool;
 
 data_folder: string;
 sky_map : Texture;
@@ -324,79 +325,45 @@ main :: () {
             }
         }
 
+        handle_inputs();
+
         if game_mode == .PLAYING {
 
-            hide_cursor();
-
-            // Read all input
-            {
-                input1.player_index = .P1;
-                input2.player_index = .P2;
-                for event : events_this_frame {
-                    if event.type == .QUIT || (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
-                        // @Cleanup Is this correct? What even is the QUIT event?
-                        game_menu = .PAUSE_MENU;
-                        game_mode = .PAUSED;
-                        break;
-                    }
-
-                    if event.type == .KEYBOARD {
-                        if event.key_code == {
-
-                        case .ARROW_LEFT; #through;
-                        case #char "J";
-                            input1.left_down =  xx event.key_pressed;
-                        case .ARROW_RIGHT; #through;
-                        case #char "L";
-                            input1.right_down = xx event.key_pressed;
-
-                        case #char "A";
-                            input2.left_down = xx event.key_pressed;
-                        case #char "D";
-                            input2.right_down = xx event.key_pressed;
-
-                        }
-                    }
-                }
-
-                if host_type == {
-                case .LOCAL;
-
-                    player1.left = xx input1.left_down;
-                    player1.right = xx input1.right_down;
-                    player2.left = xx input2.left_down;
-                    player2.right = xx input2.right_down;
-
-                case .SERVER;
-
-                    player1.left = xx input1.left_down;
-                    player1.right = xx input1.right_down;
-
-                    input, received := receive_input();
-                    if received {
-                        player2.left = xx input.left_down;
-                        player2.right = xx input.right_down;
-                    }
-
-                case .CLIENT;
-
-                    // Note: Send input1 here since we would rather use those controls on the client computer
-                    send_input(input1);
-                }
+            if esc_pressed {
+                // @Cleanup Is this correct? What even is the QUIT event?
+                game_menu = .PAUSE_MENU;
+                game_mode = .PAUSED;
             }
 
             // Update the game state
             if host_type == {
             case .LOCAL;
 
+                player1.left = xx input1.left_down;
+                player1.right = xx input1.right_down;
+                player2.left = xx input2.left_down;
+                player2.right = xx input2.right_down;
+
                 simulate();
 
             case .SERVER;
+
+                player1.left = xx input1.left_down;
+                player1.right = xx input1.right_down;
+
+                input, received := receive_input();
+                if received {
+                    player2.left = xx input.left_down;
+                    player2.right = xx input.right_down;
+                }
 
                 simulate();
                 send_state(player2, get_game_state());
 
             case .CLIENT;
+
+                // Note: Send input1 here since we would rather use those controls on the client computer
+                send_input(input1);
 
                 game_state, received := receive_state();
                 if received {
@@ -406,6 +373,8 @@ main :: () {
 
             // Draw game state
             {
+                hide_cursor();
+
                 Simp.clear_render_target(1, 0, 0, 1);
                 draw_game_background();
 
@@ -441,6 +410,49 @@ main :: () {
         Simp.swap_buffers(window);
 
         // memory_visualizer_per_frame_update();
+    }
+
+    // Notify peers to cleanly disconnect if we quit the game
+    if host_type == .CLIENT {
+        deinit_client();
+    }
+    if host_type == .SERVER {
+        deinit_server();
+    }
+}
+
+handle_inputs :: () {
+    esc_pressed = false;
+    input1.player_index = .P1;
+    input2.player_index = .P2;
+    for event : events_this_frame {
+        if (event.type == .KEYBOARD && event.key_code == .ESCAPE && event.key_pressed) {
+            esc_pressed = true;
+        }
+
+        if event.type == .QUIT {
+            game_quitting = true;
+        }
+
+        if event.type == .KEYBOARD {
+            if event.key_code == {
+
+            case .ARROW_LEFT; #through;
+            case #char "J";
+                input1.left_down =  xx event.key_pressed;
+            case .ARROW_RIGHT; #through;
+            case #char "L";
+                input1.right_down = xx event.key_pressed;
+
+            case #char "A";
+                input2.left_down = xx event.key_pressed;
+            case #char "D";
+                input2.right_down = xx event.key_pressed;
+
+            }
+        }
+
+        UI.getrect_handle_event(event);
     }
 }
 
@@ -683,10 +695,10 @@ simulate :: () {
     for * :LiveBalls ball : balls {
         center := b2Body.GetPosition(ball.body);
         if center.y - ball.radius > GAME_EXTENTS.y {
-            ball.live = false; 
+            ball.live = false;
             player1.score += 1;
         } else if center.y + ball.radius < -GAME_EXTENTS.y {
-            ball.live = false; 
+            ball.live = false;
             player2.score += 1;
         }
     }
@@ -751,7 +763,7 @@ deinit_player :: (player : *Player) {
 }
 
 deinit_game :: () {
-    // We can call deinit_game before game was initted if the client connects but disconnects before 
+    // We can call deinit_game before game was initted if the client connects but disconnects before
     if game_mode != .NOT_STARTED {
         deinit_player(*player2);
         deinit_player(*player1);
@@ -1037,7 +1049,7 @@ init_player :: (using player : *Player, player_index : Player_Index, paddle_shap
 
     if host_type != .CLIENT {
         init_player_physics(player);
-    }    
+    }
 }
 
 Texture :: Simp.Texture;
