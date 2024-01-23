@@ -136,7 +136,7 @@ Ball_Shape :: enum {
 Paddle_Shape :: enum {
     Box;     // aka rectangle
     Prism;   // aka isosceles trapezoid
-    // Dome;    // aka circular segment
+    Dome;    // aka circular segment
     // Capsule; // aka a half capsule cut along the line connecting circle centers
 };
 #insert #run generate_dropdown_choices("paddle_shape_choices", Paddle_Shape);
@@ -202,6 +202,7 @@ Ball :: struct {
 Player :: struct {
     index : Player_Index;
 
+    paddle_shape : Paddle_Shape;
     mesh : Mesh;
     color : Vector4;
     transform : b2Transform;
@@ -992,38 +993,59 @@ init_player_physics :: (using player : *Player) {
 
     // :VariablePaddleRestitution
 
-    {
-        // Flat part
-        polygon_shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*polygon_shape);
-        t := mesh.triangles[0];
-        points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
-        b2PolygonShape.Set(*polygon_shape, points.data, 3);
+    if #complete paddle_shape == {
+        case .Box; #through;
+        case .Prism;
+            {
+                // Flat part
+                polygon_shape : b2PolygonShape;
+                b2PolygonShape.Constructor(*polygon_shape);
+                t := mesh.triangles[0];
+                points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
+                b2PolygonShape.Set(*polygon_shape, points.data, 3);
 
-        fixture_def : b2FixtureDef;
-        b2FixtureDef.Constructor(*fixture_def);
-        fixture_def.shape = *polygon_shape;
-        fixture_def.density = PADDLE_DENSITY;
-        fixture_def.friction = PADDLE_FRICTION;
-        fixture_def.restitution = PADDLE_RESTITUTION;
-        b2Body.CreateFixture(body, *fixture_def);
+                fixture_def : b2FixtureDef;
+                b2FixtureDef.Constructor(*fixture_def);
+                fixture_def.shape = *polygon_shape;
+                fixture_def.density = PADDLE_DENSITY;
+                fixture_def.friction = PADDLE_FRICTION;
+                fixture_def.restitution = PADDLE_RESTITUTION;
+                b2Body.CreateFixture(body, *fixture_def);
+            }
+
+            for 1..2 {
+                polygon_shape : b2PolygonShape;
+                b2PolygonShape.Constructor(*polygon_shape);
+                t := mesh.triangles[it];
+                points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
+                b2PolygonShape.Set(*polygon_shape, points.data, 3);
+
+                fixture_def : b2FixtureDef;
+                b2FixtureDef.Constructor(*fixture_def);
+                fixture_def.shape = *polygon_shape;
+                fixture_def.density = PADDLE_DENSITY;
+                fixture_def.friction = PADDLE_FRICTION;
+                fixture_def.restitution = .5 * PADDLE_RESTITUTION;
+                b2Body.CreateFixture(body, *fixture_def);
+            }
+
+        case .Dome;
+            for t : mesh.triangles {
+                polygon_shape : b2PolygonShape;
+                b2PolygonShape.Constructor(*polygon_shape);
+                points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
+                b2PolygonShape.Set(*polygon_shape, points.data, 3);
+
+                fixture_def : b2FixtureDef;
+                b2FixtureDef.Constructor(*fixture_def);
+                fixture_def.shape = *polygon_shape;
+                fixture_def.density = PADDLE_DENSITY;
+                fixture_def.friction = PADDLE_FRICTION;
+                fixture_def.restitution = .5 * PADDLE_RESTITUTION;
+                b2Body.CreateFixture(body, *fixture_def);
+            }
     }
 
-    for 1..2 {
-        polygon_shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*polygon_shape);
-        t := mesh.triangles[it];
-        points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
-        b2PolygonShape.Set(*polygon_shape, points.data, 3);
-
-        fixture_def : b2FixtureDef;
-        b2FixtureDef.Constructor(*fixture_def);
-        fixture_def.shape = *polygon_shape;
-        fixture_def.density = PADDLE_DENSITY;
-        fixture_def.friction = PADDLE_FRICTION;
-        fixture_def.restitution = .5 * PADDLE_RESTITUTION;
-        b2Body.CreateFixture(body, *fixture_def);
-    }
 
     // Constrain player movement to within the GAME_EXTENTS
     joint_def : b2PrismaticJointDef;
@@ -1035,16 +1057,19 @@ init_player_physics :: (using player : *Player) {
     b2World.CreateJoint(world, *joint_def);
 }
 
-init_player :: (using player : *Player, player_index : Player_Index, paddle_shape : Paddle_Shape) {
+init_player :: (using player : *Player, player_index : Player_Index, player_paddle_shape : Paddle_Shape) {
 
     index = player_index;
     color = ifx index == .P1 then Vector4.{1., .1, .1, 1.} else Vector4.{.1, .1, 1., 1.};
+    paddle_shape = player_paddle_shape;
 
     if #complete paddle_shape == {
     case .Box;
         init_prism_mesh(mesh, PADDLE_EXTENTS, 0.);
     case .Prism;
         init_prism_mesh(mesh, PADDLE_EXTENTS, 1./3.);
+    case .Dome;
+        init_dome_mesh(mesh, PADDLE_EXTENTS, 2. * PADDLE_EXTENTS.x, 11);
     }
 
     if host_type != .CLIENT {

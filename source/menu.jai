@@ -465,5 +465,5 @@ LevelDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
 }
 
 ball_shape : Ball_Shape = .Circle;
-paddle_shape : Paddle_Shape = .Prism;
+paddle_shape : Paddle_Shape = .Dome;
 level_id : Level_Id = .Spinning_Box;
