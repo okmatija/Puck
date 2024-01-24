@@ -709,6 +709,11 @@ init_game :: (using init_game_state : Init_Game_State) {
     init_player(*player2, .P2, p2_paddle_shape);
     for * ball : balls {
         init_ball(ball, ball_shape);
+        if it_index == {
+            case 0; ball.color = .{1., 0., 1., 1.};
+            case 1; ball.color = .{1., 1., 0., 1.};
+            case 2; ball.color = .{0., 1., 1., 1.};
+        }
     }
 
     game_mode = .PLAYING;
