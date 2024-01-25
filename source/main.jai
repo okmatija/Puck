@@ -209,6 +209,12 @@ Player :: struct {
 
     left : u32;
     right : u32;
+    down : u32;
+    up : u32;
+
+    warp_active := false;
+    warp_countdown := WARP_COUNTDOWN;
+
     score : int;
 
     // Some powerups will change the size of the player
@@ -219,6 +225,11 @@ Player :: struct {
 initial_ball_velocity :: () -> Vector2 {
     return .{.0, -GAME_EXTENTS.y / 1.};
 }
+
+time_factor := 1.;
+TIME_FACTOR :: .3;
+WARP_SPEEDUP :: #run 1. / TIME_FACTOR;
+WARP_COUNTDOWN :: .4;;
 
 main :: () {
     context.logger = my_logger;
@@ -291,6 +302,9 @@ main :: () {
         current_frame += 1;
         current_time = seconds_since_init();
         current_dt = cast(float) (current_time - last_time);
+
+        current_dt *= time_factor;
+
         if current_dt > DT_MAX current_dt = DT_MAX;
         last_time = current_time;
 
@@ -342,8 +356,13 @@ main :: () {
 
                 player1.left = xx input1.left_down;
                 player1.right = xx input1.right_down;
+                player1.down = xx input1.down_down;
+                player1.up = xx input1.up_down;
+
                 player2.left = xx input2.left_down;
                 player2.right = xx input2.right_down;
+                player2.down = xx input2.down_down;
+                player2.up = xx input2.up_down;
 
                 simulate();
 
@@ -351,11 +370,15 @@ main :: () {
 
                 player1.left = xx input1.left_down;
                 player1.right = xx input1.right_down;
+                player1.down = xx input1.down_down;
+                player1.up = xx input1.up_down;
 
                 input, received := receive_input();
                 if received {
                     player2.left = xx input.left_down;
                     player2.right = xx input.right_down;
+                    player2.down = xx input2.down_down;
+                    player2.up = xx input2.up_down;
                 }
 
                 simulate();
@@ -409,15 +432,21 @@ handle_inputs :: () {
         if event.type == .KEYBOARD {
             if event.key_code == {
 
-            case .ARROW_LEFT; #through;
-            case #char "J";
-                input1.left_down =  xx event.key_pressed;
-            case .ARROW_RIGHT; #through;
-            case #char "L";
+            case #char "I"; #through; case .ARROW_UP;
+                input1.up_down = xx event.key_pressed;
+            case #char "J"; #through; case .ARROW_LEFT;
+                input1.left_down = xx event.key_pressed;
+            case #char "K"; #through; case .ARROW_DOWN;
+                input1.down_down = xx event.key_pressed;
+            case #char "L"; #through; case .ARROW_RIGHT;
                 input1.right_down = xx event.key_pressed;
 
+            case #char "W";
+                input2.up_down = xx event.key_pressed;
             case #char "A";
                 input2.left_down = xx event.key_pressed;
+            case #char "S";
+                input2.down_down = xx event.key_pressed;
             case #char "D";
                 input2.right_down = xx event.key_pressed;
 
@@ -517,7 +546,7 @@ kinetic_energy :: (body : *b2Body) -> float {
 
 simulate :: () {
 
-    apply_impulse_to_move_player :: (using player : Player) {
+    apply_impulse_to_move_player :: (using player : *Player) {
 
         Control_Mode :: enum {
             KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
@@ -546,13 +575,33 @@ simulate :: () {
 
         case .KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
 
-            accel := (PADDLE_SPEED / (3 * current_dt));
-            decel := (PADDLE_SPEED / (1 * current_dt));
+            paddle_speed := PADDLE_SPEED;
+
+            {
+                if down && warp_countdown == WARP_COUNTDOWN {
+                    warp_active = true;
+                    time_factor = TIME_FACTOR;
+                }
+
+                if warp_active {
+                    countdown(*warp_countdown);
+                    paddle_speed *= WARP_SPEEDUP;
+                }
+
+                if warp_countdown <= 0  {
+                    warp_active = false;
+                    time_factor = 1.;
+                    warp_countdown = WARP_COUNTDOWN;
+                }
+            }
+
+            accel := (paddle_speed / (3 * current_dt));
+            decel := (paddle_speed / (1 * current_dt));
 
             current_velocity := b2Body.GetLinearVelocity(body);
             desired_velocity := 0.;
-            if left       desired_velocity = max(-PADDLE_SPEED, current_velocity.x - current_dt * accel);
-            else if right desired_velocity = min( PADDLE_SPEED, current_velocity.x + current_dt * accel);
+            if left       desired_velocity = max(-paddle_speed, current_velocity.x - current_dt * accel);
+            else if right desired_velocity = min( paddle_speed, current_velocity.x + current_dt * accel);
             else {
                 if current_velocity.x < 0      desired_velocity = min(0., current_velocity.x + current_dt * decel);
                 else if current_velocity.x > 0 desired_velocity = max(0., current_velocity.x - current_dt * decel);
@@ -584,8 +633,8 @@ simulate :: () {
         }
     }
 
-    apply_impulse_to_move_player(player1);
-    apply_impulse_to_move_player(player2);
+    apply_impulse_to_move_player(*player1);
+    apply_impulse_to_move_player(*player2);
 
     // If there are any dead balls revive one after the spawn countdown
     for * :DeadBalls ball : balls {
@@ -596,6 +645,7 @@ simulate :: () {
             b2Body.SetTransform(ball.body, .{0, 0}, 0);
             b2Body.SetLinearVelocity(ball.body, initial_ball_velocity());
             b2Body.SetAngularVelocity(ball.body, 0.);
+            b2Body.SetEnabled(ball.body, true);
             ball_spawn_countdown = 2.;
         }
 
@@ -607,9 +657,11 @@ simulate :: () {
         center := b2Body.GetPosition(ball.body);
         if center.y - ball.radius > GAME_EXTENTS.y {
             ball.live = false;
+            b2Body.SetEnabled(ball.body, false);
             player1.score += 1;
         } else if center.y + ball.radius < -GAME_EXTENTS.y {
             ball.live = false;
+            b2Body.SetEnabled(ball.body, false);
             player2.score += 1;
         }
     }
@@ -769,6 +821,8 @@ init_ball_physics :: (ball : *Ball) {
     fixture_def.friction = BALL_FRICTION;
     fixture_def.restitution = BALL_RESTITUTION;
     b2Body.CreateFixture(ball.body, *fixture_def);
+
+    b2Body.SetEnabled(ball.body, false);
 }
 
 init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
@@ -776,8 +830,10 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
     ball.shape = initial_shape;
 
     if #complete shape == {
-    case .Circle; init_circle_mesh(mesh, radius);
-    case .Square; init_prism_mesh(mesh, .{radius, radius}, 0.);
+    case .Circle;
+        init_circle_mesh(mesh, radius);
+    case .Square;
+        init_prism_mesh(mesh, .{radius, radius}, 0.);
     }
 
     if host_type != .CLIENT {

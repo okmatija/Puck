@@ -22,6 +22,8 @@ render_one_frame :: () {
 
     draw_score();
 
+    draw_powerups();
+
     // @TODOOO Only draw if the mouse recently moved?
     draw_cursor();
 
@@ -84,6 +86,24 @@ draw_segment :: (start : Vector2, end : Vector2, color : Vector4) {
     q2 := e - n * .5 * SEGMENT_THICKNESS;
     q1 := e + n * .5 * SEGMENT_THICKNESS;
     Simp.immediate_quad(q0, q1, q2, q3, color, color, color, color);
+}
+
+draw_powerups :: () {
+    text_w := Simp.prepare_text(font, "Warp");
+    scale := 0.5;
+
+    warp_ready_color :: Vector4.{.8, .2, .0, 1.};
+    warp_active_color :: Vector4.{.6, .6, .6, 1.};
+
+    Simp.draw_prepared_text(font,
+        window_width - 3 * window_width/30,
+        font.character_height/2,
+        ifx player1.warp_active then warp_active_color else warp_ready_color);
+
+    Simp.draw_prepared_text(font,
+        window_width - 3 * window_width/30,
+        window_height - font.character_height,
+        ifx player2.warp_active then warp_active_color else warp_ready_color);
 }
 
 draw_score :: () {

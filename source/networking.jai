@@ -134,6 +134,7 @@ Game_State :: struct {
         shape : Ball_Shape;
 
         transform : b2Transform;
+        color : Vector4;
 
         live : bool;
     };
@@ -161,6 +162,9 @@ Client_Input :: struct {
     player_index : Player_Index;
     left_down : bool;
     right_down : bool;
+    down_down : bool;
+    up_down : bool;
+
     esc_down : bool;
 }
 
@@ -170,6 +174,7 @@ get_ball_state :: (using ball : Ball) -> Game_State.Ball_State {
     result : Game_State.Ball_State;
     result.live = live;
     result.transform = b2Body.GetTransform(body);
+    result.color = ball.color;
     return result;
 }
 
@@ -207,24 +212,25 @@ get_game_state :: () -> Game_State {
     return result;
 }
 
-set_game_state :: (using state : Game_State) {
+set_game_state :: (state : Game_State) {
     assert(host_type == .CLIENT);
 
-    player1.transform = player1_state.transform;
-    player1.score = player1_state.score;
+    player1.transform = state.player1_state.transform;
+    player1.score = state.player1_state.score;
 
-    player2.transform = player2_state.transform;
-    player2.score = player2_state.score;
+    player2.transform = state.player2_state.transform;
+    player2.score = state.player2_state.score;
 
     if level.level_id != .Empty {
-        level.obstructions.transform = level_state.obstructions.transform;
+        level.obstructions.transform = state.level_state.obstructions.transform;
     }
 
-    for ball_state {
+    for state.ball_state {
         ball := *balls[it_index];
         ball.live = it.live;
         ball.shape = it.shape;
         ball.transform = it.transform;
+        ball.color = it.color;
     }
 }
 
