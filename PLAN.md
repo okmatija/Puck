@@ -4,13 +4,23 @@ A pong game to play at work in breaks
 
 # General
 
+[ ] Review the networking/serialization code, make it support a scaled up phyics world better better e.g., with more simulated bodies?
+
+[ ] gravity amongst balls
+[ ] Planets for ball?
+[ ] Improve graphics
+[ ] Flip the view for all players
+[ ] Add 3P and 4P options
+[ ] Add some powerups
+  - Add buttons that can be pressed with the ball to turn on/off some effect
+[ ] Add color and player name customization
 [ ] Add winning conditions
 [ ] Add an option for game mode e.g., best of/first to/rally (high scores)
-[ ] Add color and player name customization
 [ ] Make pausing a quitting the game work better
 [ ] Add a restart button
 [ ] Options to have the window always on top
 [ ] Add Credits
+[ ] Track game stats e.g., rally length, near miss count...
 
 [x] Add text to all the game settings
 [x] Add a basic menu
@@ -76,9 +86,22 @@ A pong game to play at work in breaks
 [ ] Add serving the ball?
 [ ] Add tilt/rotate button
 
+# Physics
+
+iforce2d tutorials suggest I should collect all begin contact events and issue sounds afterwards:
+
+"Collisions between entities in the world will be detected during the b2World::Step() function that we call every time step. As we saw in the topic on worlds, the b2World::Step function advances the simulation, moving all the bodies around and so on. As soon as a collision is detected, the program flow will be given to your callback function to do something, and then goes back to b2World::Step to continue with more processing. It's important to note that since your callback is being called right in the middle of the stepping process, you shouldn't do anything to change the scene right away - there may be more collisions occuring in the same time step." -- https://www.iforce2d.net/b2dtut/collision-callbacks
+
+Use the userdata pointer on the body to point to the game entity so that you can access it in the collision callbacks.  Use an enum in a base class to implement figuring out which entity to cast to
+
+Implement an exploding ball using ray casting in a circle to apply forces to nearby fixtures
+
+Use sensors 
+
 # Gameplay
 
 [x] Kinematic obstructions in the play area
+[x] Add dome paddle shape
 [ ] Portals?
 [ ] Ball can have gravitational attraction to the powerups? And the powerups only attach to that specific ball? 
 [ ] Get 3 boosts which gradually replenish, its useful to reach for ball when its going really fast
@@ -107,6 +130,9 @@ A pong game to play at work in breaks
 
 [ ] Add imgui for debug UI to the project, consider using https://github.com/kevinw/jai-imgui as a starting point for the backend implementation using Window_Creation and Input modules. Then use this to implement debugging for enet in Pong
 
+# Dreams
+
+[ ] Galaga style gameplay but your bullets are simulated balls and need to bounce around amongst the enemies
 
 # Notes
 - To hit the ball really fast you can hit it with the side of the paddle, but to do that you need to risk missing the ball entirely which is neat
