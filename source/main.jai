@@ -234,7 +234,7 @@ WARP_COUNTDOWN :: .4;;
 main :: () {
     context.logger = my_logger;
     context.logger_data = null;
-    context.log_level = .VERBOSE;
+    //context.log_level = .VERBOSE;
 
     args : []string = get_command_line_arguments();
     defer array_free(args);
@@ -491,8 +491,7 @@ init_sounds :: (window : *Window_Type) {
     // use handles (or maybe just the string name) when you play sound effects.
 
     // @Cleanup Rename the sounds
-    //sound_start_game = Sound.load_audio_file(tprint("%/start_game.wav", data_folder));
-    sound_start_game = Sound.load_audio_file(tprint("%/collision1.wav", data_folder));
+    sound_start_game = Sound.load_audio_file(tprint("%/start_game.wav", data_folder));
     sound_collision1 = Sound.load_audio_file(tprint("%/collision1.wav", data_folder));
     sound_collision2 = Sound.load_audio_file(tprint("%/collision2.wav", data_folder));
 
@@ -579,6 +578,10 @@ simulate :: () {
 
             {
                 if down && warp_countdown == WARP_COUNTDOWN {
+                    stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+                    stream.rate_scale = .5;
+                    Sound.start_playing(stream);
+
                     warp_active = true;
                     time_factor = TIME_FACTOR;
                 }
@@ -589,6 +592,10 @@ simulate :: () {
                 }
 
                 if warp_countdown <= 0  {
+                    stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+                    stream.rate_scale = -.8;
+                    Sound.start_playing(stream);
+
                     warp_active = false;
                     time_factor = 1.;
                     warp_countdown = WARP_COUNTDOWN;
@@ -728,9 +735,12 @@ deinit_player :: (player : *Player) {
 deinit_game :: () {
     // We can call deinit_game before game was initted if the client connects but disconnects before
     if game_mode != .NOT_STARTED {
-        deinit_player(*player2);
-        deinit_player(*player1);
         deinit_level();
+        deinit_player(*player1);
+        deinit_player(*player2);
+        for * ball : balls {
+            deinit_ball(ball);
+        }
         free(world_debug_draw);
     }
 
@@ -781,6 +791,8 @@ deinit_level :: () {
 }
 
 deinit_ball :: (ball : *Ball) {
+    log_verbose("deinit_ball");
+
     ball.live = false;
 
     deinit_mesh(ball.mesh);
