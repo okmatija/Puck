@@ -151,3 +151,28 @@ Use sensors
 [x] Use b2EdgeShape for play edges
 
 
+
+# Journal
+
+## 2024/01/25
+
+I have a call with Jimme later, my agenda is roughly:
+- Ask him what he's working on
+- Ask him about streaming, and if he does that
+- Show him the game
+  - Mention setting up Azure for a dedicated server
+- Show him Prizm
+
+Added a sound effect for when the time warp engages/disengages
+Fixed bugs where ball was not deinitted
+
+
+
+Imd   dddddd dd
+
+
+
+
+Attenditon is the most important thing
+Leisure suit larry. Boss mode?
+Get certified for trusted installs
