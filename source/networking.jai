@@ -323,11 +323,6 @@ read_network_events_this_frame :: ($debug : bool = false) {
 
 // Send input from client to server
 send_input :: (input : Client_Input, loc := #caller_location) {
-    countdown(*client_packet_countdown_ms);
-    if client_packet_countdown_ms > 0  return;
-    client_packet_countdown_ms = CLIENT_PACKET_COUNTDOWN_MS;
-
-
     // @TODO Ensure the client is connected
     
     // @Cleanuppp Rather that storing client.peer, can this be done line the server function via client.host.peers?
@@ -340,10 +335,6 @@ send_input :: (input : Client_Input, loc := #caller_location) {
 
 // Send game state from server to client
 send_state :: (player : Player, state : Game_State, loc := #caller_location) {
-    countdown(*server_packet_countdown_ms);
-    if server_packet_countdown_ms > 0  return;
-    server_packet_countdown_ms = SERVER_PACKET_COUNTDOWN_MS;
-
     assert(server.host.peers.count == 1);
     // @Cleanup use Enet.host_broadcast here
     for * peer: server.host.peers {

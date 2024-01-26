@@ -62,12 +62,6 @@ server : Server;
 client : Client;
 network_events_this_frame : [..]Enet.Event;
 
-// @Cleanup Remove this, its not very useful. We actually want something to simulate lag
-client_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
-server_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
-CLIENT_PACKET_COUNTDOWN_MS :: #run 0. / 1000;
-SERVER_PACKET_COUNTDOWN_MS :: #run 0. / 1000;
-
 // Important these are global and persist across frames to preserve previous key down state
 input1 : Client_Input;
 input2 : Client_Input;
