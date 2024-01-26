@@ -371,8 +371,8 @@ main :: () {
                 if received {
                     player2.left = xx input.left_down;
                     player2.right = xx input.right_down;
-                    player2.down = xx input2.down_down;
-                    player2.up = xx input2.up_down;
+                    player2.down = xx input.down_down;
+                    player2.up = xx input.up_down;
                 }
 
                 simulate();
