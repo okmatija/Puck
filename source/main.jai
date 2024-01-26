@@ -62,9 +62,6 @@ server : Server;
 client : Client;
 network_events_this_frame : [..]Enet.Event;
 
-// @TODOOO Rename these to have a ui_ prefix and make them only for ui, game logic will use other variables (which are typed to the enums)
-// nocommitttt Use the actual types here and cast just before use. Many errors were made sending the enum u8 rather than s32!!!
-
 // @Cleanup Remove this, its not very useful. We actually want something to simulate lag
 client_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
 server_packet_countdown_ms := 0.; // Start at 0. so we send and update on the first frame
@@ -288,10 +285,7 @@ main :: () {
     // Get info about the host this program is running on
     init_host_info();
 
-    // So that we have consistent memory handling after these
-    // strings are user-modified, we heap-allocate them. You don't
-    // have to do this; you just need some consistent way of
-    // storing the strings.
+    // So that we have consistent memory handling after these strings are user-modified, we heap-allocate them
     server_address = ipv4_to_string(host_info.ipv4);
     server_port_string = copy_string(tprint("%", DEFAULT_PORT));
 

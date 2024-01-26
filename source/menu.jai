@@ -145,10 +145,9 @@ play_local_game_menu :: () {
 
     dropdown_theme := *ui_theme.dropdown_theme;
 
-    // nocommit rename current_paddle_shape to paddle_shape_s32;
-    current_paddle_shape : s32 = cast(s32)paddle_shape;
-    current_ball_shape : s32 = cast(s32)ball_shape;
-    current_level : s32 = cast(s32)level_id;
+    paddle_shape_s32 := cast(s32)paddle_shape;
+    ball_shape_s32 := cast(s32)ball_shape;
+    level_s32 := cast(s32)level_id;
 
     cursor := CenteredCursor(5.2*k.y);
     l, r : UI.Rect;
@@ -191,9 +190,9 @@ play_local_game_menu :: () {
     }
 
     UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
-    paddle_shape = cast(Paddle_Shape)current_paddle_shape;
-    ball_shape = cast(Ball_Shape)current_ball_shape;
-    level_id = cast(Level_Id)current_level;
+    paddle_shape = cast(Paddle_Shape)paddle_shape_s32;
+    ball_shape = cast(Ball_Shape)ball_shape_s32;
+    level_id = cast(Level_Id)level_s32;
 }
 
 join_network_game_menu :: () {
@@ -213,7 +212,7 @@ join_network_game_menu :: () {
 
     dropdown_theme := *ui_theme.dropdown_theme;
 
-    current_paddle_shape : s32 = cast(s32)paddle_shape;
+    paddle_shape_s32 : s32 = cast(s32)paddle_shape;
 
     cursor := CenteredCursor(5.2*k.y);
     l, r : UI.Rect;
@@ -256,7 +255,7 @@ join_network_game_menu :: () {
     }
 
     UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
-    paddle_shape = cast(Paddle_Shape)current_paddle_shape;
+    paddle_shape = cast(Paddle_Shape)paddle_shape_s32;
 }
 
 host_network_game_menu :: () {
@@ -276,10 +275,9 @@ host_network_game_menu :: () {
 
     dropdown_theme := *ui_theme.dropdown_theme;
 
-    // nocommit rename current_paddle_shape to paddle_shape_s32;
-    current_paddle_shape : s32 = cast(s32)paddle_shape;
-    current_ball_shape : s32 = cast(s32)ball_shape;
-    current_level : s32 = cast(s32)level_id;
+    paddle_shape_s32 := cast(s32)paddle_shape;
+    ball_shape_s32 := cast(s32)ball_shape;
+    level_s32 := cast(s32)level_id;
 
 
     cursor := CenteredCursor(5.2*k.y);
@@ -328,9 +326,9 @@ host_network_game_menu :: () {
     }
 
     UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
-    paddle_shape = cast(Paddle_Shape)current_paddle_shape;
-    ball_shape = cast(Ball_Shape)current_ball_shape;
-    level_id = cast(Level_Id)current_level;
+    paddle_shape = cast(Paddle_Shape)paddle_shape_s32;
+    ball_shape = cast(Ball_Shape)ball_shape_s32;
+    level_id = cast(Level_Id)level_s32;
 }
 
 
@@ -453,15 +451,15 @@ waiting_for_players_menu :: () {
 // also changed in the draw_popups call!!
 PaddleShapeDropdown :: (l : UI.Rect, r : UI.Rect, label := "Paddle Shape") #expand {
     UI.label(l, label, *`label_theme);
-    UI.dropdown(r, paddle_shape_choices, *`current_paddle_shape, `dropdown_theme);
+    UI.dropdown(r, paddle_shape_choices, *`paddle_shape_s32, `dropdown_theme);
 }
 BallShapeDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
     UI.label(l, "Ball Shape", *`label_theme);
-    UI.dropdown(r, ball_shape_choices, *`current_ball_shape, `dropdown_theme);
+    UI.dropdown(r, ball_shape_choices, *`ball_shape_s32, `dropdown_theme);
 }
 LevelDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
     UI.label(l, "Play Area", *`label_theme);
-    UI.dropdown(r, level_choices, *`current_level, `dropdown_theme);
+    UI.dropdown(r, level_choices, *`level_s32, `dropdown_theme);
 }
 
 ball_shape : Ball_Shape = .Circle;
