@@ -1,3 +1,42 @@
+Polyline :: struct {
+    points : [..]Vector2;
+}
+
+Polyline_Soup :: struct {
+    polylines : [..]Polyline;
+}
+
+Segment :: struct {
+    from, to : Vector2;
+}
+
+PolylineSegmentIterator :: (using soup : *Polyline_Soup, body : Code, flags : For_Flags) #expand {
+    #assert(flags == 0); // No options are supported.
+
+    `it_index := -1;
+    for polyline_index : 0..soup.polylines.count-1 {
+        segment_count := soup.polylines[polyline_index].points.count-1;
+        for segment_index : 0..segment_count-1 {
+            `it : Segment = ---;
+            it.from = *soup.polylines[polyline_index].points[segment_index];
+            it.to   = *soup.polylines[polyline_index].points[segment_index + 1];
+            it_index += 1;
+            #insert (remove=#assert(false)) body;
+        }
+    }
+}
+
+deinit_polyline :: (polyline : *Polyline) {
+    array_reset(*polyline.points);
+}
+
+deinit_polyline_soup :: (soup : *Polyline_Soup) {
+    for * polyline : soup.polylines {
+        deinit_polyline(polyline);
+    }
+    array_reset(*soup.polylines);
+}
+
 Mesh :: struct {
     vertices : [..]Vector2;
     triangles : [..]Tuple3;

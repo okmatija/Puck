@@ -2,9 +2,66 @@
 // - Game origin, (0,0) is at the center of the window
 // - Game occupies a central vertical strip of the window, P1 at the bottom, P2 at the top
 // - Game playable area is padded left and right by GAME_PADDING
-GAME_EXTENTS :: Vector2.{10.0, 10.0}; // half-width/height in meters
-GAME_PADDING :: 3.0; // Applied to both sides of game
-WINDOW_HEIGHT_INITIAL :: 900; //1440;
+// - Depends on level (shape of play area)
+
+// Tight bbox of the playable area. Half-width/height in meters
+get_game_extents :: () -> Vector2 {
+    return .{10., 10.};
+}
+
+// At least this much padding separates the game extents from the edge of the window, in game units
+get_game_padding :: () -> Vector2 {
+    return .{3., 0.};
+}
+
+// Result is in meters
+get_game_size :: () -> Vector2 {
+    return get_game_extents() + get_game_padding();
+}
+
+// Compute data to convert world data to screen data
+// * _screen is the postfix for screen coordinates
+// * _world  is the postfix for world  coordinates
+// * _pixels is the postfix for screen vectors
+// * _meters is the postfix for world  vectors
+get_world_to_screen_data :: () -> float, Vector2 {
+    game_size := get_game_size();
+    game_aspect := game_size.x / game_size.y;
+    window_aspect := cast(float)window_width / cast(float)window_height;
+
+    // Scale the game until it fits tightly in the window while keeping its aspect ratio
+    // letter/pillarboxing will be used to fill in the remaining space. We only need to
+    // consider aspect ratios (imagine of the game box scaling up from zero until it fits
+    // in the window box)
+
+    meters_to_pixels : float;
+    offset_pixels : Vector2;
+    if game_aspect < window_aspect {
+        meters_to_pixels = window_height / (2 * game_size.y);
+        offset_pixels.x = (window_width - 2 * game_size.x * meters_to_pixels) / 2;
+    } else {
+        meters_to_pixels = window_width / (2 * game_size.x);
+        offset_pixels.y = (window_height - 2 * game_size.y * meters_to_pixels) / 2;
+    }
+
+    return meters_to_pixels, offset_pixels;
+}
+
+world_to_screen :: (point_world : Vector2) -> Vector2 {
+    game_size := get_game_size();
+    meters_to_pixels, offset_pixels := get_world_to_screen_data();
+    return offset_pixels + (game_size + point_world) * meters_to_pixels;
+}
+
+screen_to_world :: (point_screen : Vector2) -> Vector2 {
+    game_size := get_game_size();
+    meters_to_pixels, offset_pixels := get_world_to_screen_data();
+    return (point_screen - offset_pixels) / meters_to_pixels - game_size;
+}
+
+// Default to 1080p
+WINDOW_WIDTH_INITIAL :: 1920;
+WINDOW_HEIGHT_INITIAL :: 1080;
 DT_MAX : float : 0.15;
 
 BALL_RADIUS_INITIAL :: 0.4;
@@ -16,8 +73,9 @@ BALL_COUNT_MAX :: 3;
 WALL_FRICTION :: 0.0; // Set to zero because otherwise we get into situations where the ball bounces back and forth horizontally... also it seems better to have the spin only affected by player movement
 WALL_RESTITUTION :: 0.0;
 
-PADDLE_EXTENTS :: Vector2.{2.00, 0.25};
-PADDLE_SPEED :: #run (GAME_EXTENTS.x / 0.35);
+// The paddle extents is the main scaling entity!
+PADDLE_EXTENTS :: Vector2.{2.0, 0.25};
+PADDLE_SPEED :: #run (5.0 * PADDLE_EXTENTS.x / 0.35); // move 5 paddle widths in 0.35 seconds
 PADDLE_DENSITY :: 1000;
 PADDLE_FRICTION :: 1.;
 PADDLE_RESTITUTION :: 1.2;
@@ -33,8 +91,9 @@ server_port : u16 = DEFAULT_PORT;
 server_port_string : string;
 
 window : Window_Type;
-window_height : s32 = WINDOW_HEIGHT_INITIAL;
-window_width  : s32 = #run cast(s32)(WINDOW_HEIGHT_INITIAL * (GAME_EXTENTS.x / GAME_EXTENTS.y) + meters_to_pixels() * 2 * GAME_PADDING);
+window_height : s32;
+window_width  : s32;
+
 font : *Simp.Dynamic_Font;
 
 game_quitting : bool;
@@ -164,6 +223,8 @@ Obstruction :: struct {
 
 Boundary :: struct {
     color : Vector4 = .{1., 1., 1., 1.};
+    shape : Polyline_Soup;
+
     body : *b2Body; // Physics. This is not initialized or used by clients!
 }
 
@@ -214,7 +275,7 @@ Player :: struct {
 }
 
 initial_ball_velocity :: () -> Vector2 {
-    return .{.0, -GAME_EXTENTS.y / 1.};
+    return .{.0, -5.0 * PADDLE_EXTENTS.x / 1.};
 }
 
 time_factor := 1.;
@@ -257,6 +318,9 @@ main :: () {
         // Windows is very bad at thread-switching by default unless you do this. Sad.
         Windows.timeBeginPeriod(1);
     }
+
+    window_height = WINDOW_HEIGHT_INITIAL;
+    window_width = WINDOW_WIDTH_INITIAL;
 
     window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=window_x, window_y=window_y);
     Simp.set_render_target(window);
@@ -496,23 +560,6 @@ apply_transform :: (transform: b2Transform, point: Vector2) -> Vector2 {
     return result;
 }
 
-meters_to_pixels :: () -> float {
-    return window_height / (2. * GAME_EXTENTS.y);
-}
-
-pixels_to_meters :: () -> float {
-    return 1. / meters_to_pixels();
-}
-
-// Converts game units (meters) to pixels for rendering
-world_to_screen :: (meters : Vector2) -> Vector2 {
-    return (GAME_EXTENTS + Vector2.{GAME_PADDING, 0.} + meters) * meters_to_pixels();
-}
-
-screen_to_world :: (pixels : Vector2) -> Vector2 {
-    return pixels * pixels_to_meters() - GAME_EXTENTS - Vector2.{GAME_PADDING, 0.};
-}
-
 countdown :: (value_pointer: *float) {
     value := value_pointer.*;
     value -= current_dt;
@@ -650,11 +697,12 @@ simulate :: () {
 
     for * :LiveBalls ball : balls {
         center := b2Body.GetPosition(ball.body);
-        if center.y - ball.radius > GAME_EXTENTS.y {
+        game_extents := get_game_extents();
+        if center.y - ball.radius > game_extents.y {
             ball.live = false;
             b2Body.SetEnabled(ball.body, false);
             player1.score += 1;
-        } else if center.y + ball.radius < -GAME_EXTENTS.y {
+        } else if center.y + ball.radius < -game_extents.y {
             ball.live = false;
             b2Body.SetEnabled(ball.body, false);
             player2.score += 1;
@@ -770,6 +818,8 @@ init_game :: (using init_game_state : Init_Game_State) {
 }
 
 deinit_level :: () {
+    deinit_polyline_soup(*level.boundary.shape);
+
     if host_type != .CLIENT {
         if level.obstructions.body {
             b2World.DestroyBody(world, level.obstructions.body);
@@ -844,8 +894,16 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
 }
 
 init_boundary :: () {
-    // Only need to init the physics for the boundary
-    // Boundaries are rendered directly without cached meshes and they only depend on the player count
+    game_extents := get_game_extents();
+
+    left : *Polyline = array_add(*level.boundary.shape.polylines);
+    array_add(*left.points, -game_extents, Vector2.{-game_extents.x, game_extents.y});
+
+    right : *Polyline = array_add(*level.boundary.shape.polylines);
+    array_add(*right.points, .{game_extents.x, -game_extents.y}, game_extents);
+
+    //top : *Polyline = array_add(*level.boundary.shape.polylines);
+    //array_add(*top.points, .{-game_extents.x, game_extents.y}, game_extents);
 
     if host_type != .CLIENT {
         init_boundary_physics();
@@ -871,17 +929,10 @@ init_boundary_physics :: () {
     fixture_def.friction = WALL_FRICTION;
     fixture_def.restitution = WALL_RESTITUTION;
 
-    // Left edge
-    b2EdgeShape.SetTwoSided(*edge_shape, -GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y});
-    b2Body.CreateFixture(level.boundary.body, *fixture_def);
-
-    // Right edge
-    b2EdgeShape.SetTwoSided(*edge_shape, .{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS);
-    b2Body.CreateFixture(level.boundary.body, *fixture_def);
-
-    // // Top edge // @TODO Make this a single player mode
-    //b2EdgeShape.SetTwoSided(*edge_shape, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, GAME_EXTENTS);
-    //b2Body.CreateFixture(level.boundary.body, *fixture_def);
+    for :PolylineSegmentIterator level.boundary.shape {
+        b2EdgeShape.SetTwoSided(*edge_shape, it.from, it.to);
+        b2Body.CreateFixture(level.boundary.body, *fixture_def);
+    }
 }
 
 init_obstructions_physics :: () {
@@ -892,7 +943,7 @@ init_obstructions_physics :: () {
         // Do nothing
     case .Fixed_Box; #through;
     case .Spinning_Box;
-        extents := .25 * GAME_EXTENTS;
+        extents := .25 * Vector2.{5 * PADDLE_EXTENTS.x, 5 * PADDLE_EXTENTS.x};
 
         body_def : b2BodyDef;
         b2BodyDef.Constructor(*body_def);
@@ -927,7 +978,7 @@ init_obstructions :: () {
         // Do nothing
     case .Fixed_Box; #through;
     case .Spinning_Box;
-        extents := .25 * GAME_EXTENTS;
+        extents := .25 * get_game_extents();
 
         init_prism_mesh(level.obstructions.mesh, extents, 0.);
     }
@@ -947,15 +998,17 @@ init_level :: (level_id : Level_Id) {
 init_player_physics :: (using player : *Player) {
     assert(host_type == .SERVER || host_type == .LOCAL);
 
+    game_extents := get_game_extents();
+
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     body_def.type = .b2_dynamicBody;
     if index == {
     case .P1;
-        body_def.position = Vector2.{0, -GAME_EXTENTS.y + PADDLE_EXTENTS.y};
+        body_def.position = Vector2.{0, -game_extents.y + PADDLE_EXTENTS.y};
         body_def.angle = 0.;
     case .P2;
-        body_def.position = Vector2.{0,  GAME_EXTENTS.y - PADDLE_EXTENTS.y};
+        body_def.position = Vector2.{0,  game_extents.y - PADDLE_EXTENTS.y};
         body_def.angle = PI;
     }
     body = b2World.CreateBody(world, *body_def);
@@ -1017,13 +1070,12 @@ init_player_physics :: (using player : *Player) {
             }
     }
 
-
-    // Constrain player movement to within the GAME_EXTENTS
+    // Constrain player movement
     joint_def : b2PrismaticJointDef;
     b2PrismaticJointDef.Constructor(*joint_def);
-    b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, -GAME_EXTENTS, .{1., 0.});
-    joint_def.lowerTranslation = -GAME_EXTENTS.x + PADDLE_EXTENTS.x;
-    joint_def.upperTranslation =  GAME_EXTENTS.x - PADDLE_EXTENTS.x;
+    b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, -game_extents, .{1., 0.});
+    joint_def.lowerTranslation = -game_extents.x + PADDLE_EXTENTS.x;
+    joint_def.upperTranslation =  game_extents.x - PADDLE_EXTENTS.x;
     joint_def.enableLimit = true;
     b2World.CreateJoint(world, *joint_def);
 }
@@ -1079,3 +1131,4 @@ Enet :: #import "enet";
 #load "rendering.jai";
 #load "mesh.jai";
 #load "carpet.jai";
+#load "numeric.jai";

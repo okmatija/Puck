@@ -10,8 +10,14 @@ render_one_frame :: () {
         draw_mesh(level.obstructions.mesh, level.obstructions.transform, level.obstructions.color);
     }
 
-    draw_segment(-GAME_EXTENTS, .{-GAME_EXTENTS.x, GAME_EXTENTS.y}, level.boundary.color);
-    draw_segment(.{GAME_EXTENTS.x, -GAME_EXTENTS.y}, GAME_EXTENTS, level.boundary.color);
+    // Debug the game size rect
+    //game_size := get_game_size();
+    //draw_segment(.{-game_size.x, -game_size.y}, .{ game_size.x,  game_size.y}, .{1, 0, 0, 1});
+    //draw_segment(.{-game_size.x,  game_size.y}, .{ game_size.x, -game_size.y}, .{0, 1, 0, 1});
+
+    for :PolylineSegmentIterator segment : level.boundary.shape {
+        draw_segment(segment.from, segment.to, level.boundary.color);
+    }
 
     draw_mesh(player1.mesh, player1.transform, player1.color);
     draw_mesh(player2.mesh, player2.transform, player2.color);
