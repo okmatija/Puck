@@ -31,11 +31,11 @@ my_logger :: (message: string, data: *void, info: Log_Info) {
 
     // @Cleanup Think about how to do allocation properly here
     if info.common_flags & .ERROR {
-        write_string(tprint("[error] %:% %\n", timestamp, current_frame, message));
+        write_string(tprint("[error] %:% %", timestamp, current_frame, message));
     } else if info.common_flags & .WARNING {
-        write_string(tprint("[warning] %:% %\n", timestamp, current_frame, message));
+        write_string(tprint("[warning] %:% %", timestamp, current_frame, message));
     } else {
-        write_string(tprint("%:% %\n", timestamp, current_frame, message));
+        write_string(tprint("%:% %", timestamp, current_frame, message));
     }
 }
 
