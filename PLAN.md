@@ -4,6 +4,12 @@ A pong game to play at work in breaks
 
 # General
 
+[ ] Make it a mobile android game, make it work on LAN if both phones are on the same wifi. Add left and right buttons which light up when the left/right key is pressed (to indicate what this might be like on a phone)
+
+[ ] Give balls a timer until they explode
+
+[ ] Implement a dedicated server
+[] Implement STUN/TURN/ICE. See https://www.twilio.com/docs/stun-turn/faq
 [ ] Review the networking/serialization code, make it support a scaled up phyics world better better e.g., with more simulated bodies?
 
 [ ] gravity amongst balls
@@ -166,13 +172,12 @@ I have a call with Jimme later, my agenda is roughly:
 Added a sound effect for when the time warp engages/disengages
 Fixed bugs where ball was not deinitted
 
+## 2024/01/26
 
+It was interesting to talk to Jimmy yesterday, he related an interesting anecdote about what he learned from running his own bussinesses: getting potential user attention is critical and difficult, he speculated that much of levelsio success comes from the fact that he managed to get fame from NomadList/early popular products and now finds it easy to find users for his new projects.
 
-Imd   dddddd dd
+He also mentioned the Leisure Suit Larry boss key which I want to look into for the Pong game.
 
+When I pitched the idea I had for distributing Pong as a self updating executable he mentioned he expected Microsoft certification issues. I should look into that, there is some process to get certificed that the exes you distribute are not viruses, and that this can be gamed by competitors who maliciously label your exes as viruses.
 
-
-
-Attenditon is the most important thing
-Leisure suit larry. Boss mode?
-Get certified for trusted installs
+Separately. I also read a very long but interesting article on the state of the games industry in 2024, I need to read it again...! Seems promising for smaller developers, and perhaps also for the future of Jai and games made using it and custom engines. https://www.matthewball.vc/all/gaming2024

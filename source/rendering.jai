@@ -6,6 +6,13 @@ render_one_frame :: () {
 
     Simp.set_shader_for_color(true);
 
+    // Cosmetics
+    {
+        game_extents := get_game_extents();
+        draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, .{.5, .5, .5, 1});
+    }
+
+
     if level.level_id != .Empty {
         draw_mesh(level.obstructions.mesh, level.obstructions.transform, level.obstructions.color);
     }
@@ -113,9 +120,21 @@ draw_powerups :: () {
 }
 
 draw_score :: () {
-    text := sprint("%:%", player1.score, player2.score);
-    defer free(text);
-    text_w := Simp.prepare_text(font, text);
-    scale := 0.5;
-    Simp.draw_prepared_text(font, window_width/30, window_height-font.character_height, .{.5, .8, .2, 1});
+    {
+        text := sprint("%", player1.score);
+        defer free(text);
+        text_w := Simp.prepare_text(font, text);
+        scale := 0.5;
+
+        Simp.draw_prepared_text(font, window_width/2, font.character_height, .{.5, .8, .2, 1});
+    }
+
+    {
+        text := sprint("%", player2.score);
+        defer free(text);
+        text_w := Simp.prepare_text(font, text);
+        scale := 0.5;
+
+        Simp.draw_prepared_text(font, window_width/2, window_height-font.character_height, .{.5, .8, .2, 1});
+    }
 }

@@ -11,7 +11,7 @@ get_game_extents :: () -> Vector2 {
 
 // At least this much padding separates the game extents from the edge of the window, in game units
 get_game_padding :: () -> Vector2 {
-    return .{3., 0.};
+    return .{1., 3.};
 }
 
 // Result is in meters
@@ -259,6 +259,15 @@ Player :: struct {
     color : Vector4;
     transform : b2Transform;
 
+    Prismatic_Joint :: struct {
+        anchor : Vector2;
+        axis : Vector2;
+        lower_translation : float;
+        upper_translation : float;
+    }
+
+    joint : Prismatic_Joint; // Constrains the path of the paddle. Initted using the level id 
+
     left : u32;
     right : u32;
     down : u32;
@@ -275,7 +284,7 @@ Player :: struct {
 }
 
 initial_ball_velocity :: () -> Vector2 {
-    return .{.0, -5.0 * PADDLE_EXTENTS.x / 1.};
+    return .{-5.0 * PADDLE_EXTENTS.x / 1., 0};
 }
 
 time_factor := 1.;
@@ -684,7 +693,7 @@ simulate :: () {
 
         if ball_spawn_countdown <= 0  {
             ball.live = true;
-            b2Body.SetTransform(ball.body, .{0, 0}, 0);
+            b2Body.SetTransform(ball.body, .{get_game_extents().x - ball.radius, 0}, 0);
             b2Body.SetLinearVelocity(ball.body, initial_ball_velocity());
             b2Body.SetAngularVelocity(ball.body, 0.);
             b2Body.SetEnabled(ball.body, true);
@@ -694,9 +703,10 @@ simulate :: () {
         break; // Just spawn one new ball
     }
 
+    // simulate_attractor_balls(5000);
 
     for * :LiveBalls ball : balls {
-        center := b2Body.GetPosition(ball.body);
+        center := b2Body.GetPosition(ball.body).*;
         game_extents := get_game_extents();
         if center.y - ball.radius > game_extents.y {
             ball.live = false;
@@ -806,12 +816,17 @@ init_game :: (using init_game_state : Init_Game_State) {
     init_player(*player1, .P1, p1_paddle_shape);
     init_player(*player2, .P2, p2_paddle_shape);
     for * ball : balls {
-        init_ball(ball, ball_shape);
         if it_index == {
-            case 0; ball.color = .{1., 0., 1., 1.};
-            case 1; ball.color = .{1., 1., 0., 1.};
-            case 2; ball.color = .{0., 1., 1., 1.};
+            case 0;
+                ball.color = .{0., 1., 0., 1.};
+                ball.radius *= .3;
+            case 1;
+                ball.color = .{1., 1., 0., 1.};
+                ball.radius *= .7;
+            case 2;
+                ball.color = .{0., 1., 1., 1.};
         }
+        init_ball(ball, ball_shape);
     }
 
     game_mode = .PLAYING;
@@ -896,14 +911,50 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
 init_boundary :: () {
     game_extents := get_game_extents();
 
-    left : *Polyline = array_add(*level.boundary.shape.polylines);
-    array_add(*left.points, -game_extents, Vector2.{-game_extents.x, game_extents.y});
+    #if true {
+        using game_extents;
+        ax := .65 * x;
+        ay := .45 * y;
 
-    right : *Polyline = array_add(*level.boundary.shape.polylines);
-    array_add(*right.points, .{game_extents.x, -game_extents.y}, game_extents);
+        left : *Polyline = array_add(*level.boundary.shape.polylines);
+        array_add(*left.points, .{-ax, -y}, .{-x, -ay}, .{-x, ay}, .{-ax, y});
 
-    //top : *Polyline = array_add(*level.boundary.shape.polylines);
-    //array_add(*top.points, .{-game_extents.x, game_extents.y}, game_extents);
+        right : *Polyline = array_add(*level.boundary.shape.polylines);
+        array_add(*right.points, .{ax, -y}, .{x, -ay}, .{x, ay}, .{ax, y});
+
+        top : *Polyline = array_add(*level.boundary.shape.polylines);
+        array_add(*top.points, .{-ax, y}, .{ax, y});
+
+        player1.joint.anchor = .{0., -y};
+        player1.joint.axis = .{1, 0};
+        player1.joint.lower_translation = -ax + PADDLE_EXTENTS.x;
+        player1.joint.upper_translation =  ax - PADDLE_EXTENTS.x;
+
+        player2.joint.anchor = .{0., y};
+        player2.joint.axis = .{1, 0};
+        player2.joint.lower_translation = -ax + PADDLE_EXTENTS.x;
+        player2.joint.upper_translation =  ax - PADDLE_EXTENTS.x;
+
+    } else {
+        left : *Polyline = array_add(*level.boundary.shape.polylines);
+        array_add(*left.points, -game_extents, Vector2.{-game_extents.x, game_extents.y});
+
+        right : *Polyline = array_add(*level.boundary.shape.polylines);
+        array_add(*right.points, .{game_extents.x, -game_extents.y}, game_extents);
+
+        //top : *Polyline = array_add(*level.boundary.shape.polylines);
+        //array_add(*top.points, .{-game_extents.x, game_extents.y}, game_extents);
+
+        player1.joint.anchor = .{0., -game_extents.y};
+        player1.joint.axis = .{1, 0};
+        player1.joint.lower_translation = -game_extents.x + PADDLE_EXTENTS.x;
+        player1.joint.upper_translation =  game_extents.x - PADDLE_EXTENTS.x;
+
+        player2.joint.anchor = .{0., game_extents.y};
+        player2.joint.axis = .{1, 0};
+        player2.joint.lower_translation = -game_extents.x + PADDLE_EXTENTS.x;
+        player2.joint.upper_translation =  game_extents.x - PADDLE_EXTENTS.x;
+    }
 
     if host_type != .CLIENT {
         init_boundary_physics();
@@ -951,17 +1002,7 @@ init_obstructions_physics :: () {
         body := b2World.CreateBody(world, *body_def);
         level.obstructions.body = body;
 
-        shape : b2PolygonShape;
-        b2PolygonShape.Constructor(*shape);
-        b2PolygonShape.SetAsBox(*shape, extents.x, extents.y, .{}, 0.);
-
-        fixture_def : b2FixtureDef;
-        b2FixtureDef.Constructor(*fixture_def);
-        fixture_def.shape = *shape;
-        fixture_def.density = 0.;
-        fixture_def.friction = WALL_FRICTION;
-        fixture_def.restitution = WALL_RESTITUTION;
-        b2Body.CreateFixture(body, *fixture_def);
+        add_fixture_from_mesh(level.obstructions.body, level.obstructions.mesh);
 
         joint_def : b2PrismaticJointDef;
         b2PrismaticJointDef.Constructor(*joint_def);
@@ -978,9 +1019,32 @@ init_obstructions :: () {
         // Do nothing
     case .Fixed_Box; #through;
     case .Spinning_Box;
-        extents := .25 * get_game_extents();
+        extents := PADDLE_EXTENTS;
+        transform : b2Transform;
+        b2Transform.Constructor(*transform);
 
-        init_prism_mesh(level.obstructions.mesh, extents, 0.);
+        mesh : Mesh;
+        defer deinit_mesh(mesh);
+
+        init_prism_mesh(mesh, extents, 0.);
+        b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, 0.);
+        mesh_transform(*mesh, transform);
+        mesh_merge(*level.obstructions.mesh, mesh);
+
+        mesh_reset(*mesh);
+        init_prism_mesh(mesh, extents, 0.);
+        b2Transform.Set(*transform, .{0, -8*PADDLE_EXTENTS.y}, 0.);
+        mesh_transform(*mesh, transform);
+        mesh_merge(*level.obstructions.mesh, mesh);
+
+        // Close off the parallels
+        //mesh_reset(*mesh);
+        //init_prism_mesh(mesh, extents, 0.);
+        //b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, 0.);
+        //mesh_transform(*mesh, transform);
+        //b2Transform.Set(*transform, .{0, 0}, PI/2.);
+        //mesh_transform(*mesh, transform);
+        //mesh_merge(*level.obstructions.mesh, mesh);
     }
 
     if host_type != .CLIENT {
@@ -1054,28 +1118,16 @@ init_player_physics :: (using player : *Player) {
             }
 
         case .Dome;
-            for t : mesh.triangles {
-                polygon_shape : b2PolygonShape;
-                b2PolygonShape.Constructor(*polygon_shape);
-                points : [3]Vector2 = .[mesh.vertices[t.i], mesh.vertices[t.j], mesh.vertices[t.k]];
-                b2PolygonShape.Set(*polygon_shape, points.data, 3);
 
-                fixture_def : b2FixtureDef;
-                b2FixtureDef.Constructor(*fixture_def);
-                fixture_def.shape = *polygon_shape;
-                fixture_def.density = PADDLE_DENSITY;
-                fixture_def.friction = PADDLE_FRICTION;
-                fixture_def.restitution = .5 * PADDLE_RESTITUTION;
-                b2Body.CreateFixture(body, *fixture_def);
-            }
+            add_fixture_from_mesh(body, mesh);
     }
 
     // Constrain player movement
     joint_def : b2PrismaticJointDef;
     b2PrismaticJointDef.Constructor(*joint_def);
-    b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, -game_extents, .{1., 0.});
-    joint_def.lowerTranslation = -game_extents.x + PADDLE_EXTENTS.x;
-    joint_def.upperTranslation =  game_extents.x - PADDLE_EXTENTS.x;
+    b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, joint.anchor, joint.axis);
+    joint_def.lowerTranslation = joint.lower_translation;
+    joint_def.upperTranslation = joint.upper_translation;
     joint_def.enableLimit = true;
     b2World.CreateJoint(world, *joint_def);
 }
@@ -1129,6 +1181,7 @@ Enet :: #import "enet";
 #load "networking.jai";
 #load "menu.jai";
 #load "rendering.jai";
+#load "simulate.jai";
 #load "mesh.jai";
 #load "carpet.jai";
 #load "numeric.jai";

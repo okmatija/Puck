@@ -42,6 +42,19 @@ Mesh :: struct {
     triangles : [..]Tuple3;
 }
 
+// We don't really need to pass a pointer here but it makes it clearer we are modifying the struct?
+mesh_transform :: (mesh : *Mesh, transform : b2Transform) {
+    for * mesh.vertices {
+        it.* = apply_transform(transform, it.*);
+    }
+}
+
+mesh_reset :: (mesh : *Mesh) {
+    array_reset(*mesh.vertices);
+    array_reset(*mesh.triangles);
+}
+
+// @Cleanupp rename to mesh_deinit
 deinit_mesh :: (mesh : Mesh) {
     array_reset(*mesh.vertices);
     array_reset(*mesh.triangles);
@@ -134,4 +147,26 @@ init_dome_mesh :: (mesh : Mesh, extents : Vector2, radius : float, segment_count
 
     // Debug: shift up by exents.y
     // for * v : mesh.vertices v.y += extents.y;
+}
+
+
+mesh_merge :: (dst : *Mesh, src : Mesh) {
+    positions_offset := dst.vertices.count;
+    triangles_offset := dst.triangles.count;
+
+    // dst_model_from_world := inverse(dst.world_from_model);
+    // dst_model_from_world_vector := transpose(inverse(dst_model_from_world));
+    // src_world_from_model_vector := transpose(inverse(src.world_from_model));
+
+    array_resize(*dst.vertices, dst.vertices.count + src.vertices.count);
+    for i : 0..src.vertices.count-1 {
+        dst.vertices[positions_offset + i] = src.vertices[i];
+    }
+
+    array_resize(*dst.triangles, dst.triangles.count + src.triangles.count);
+    for i : 0..src.triangles.count-1 {
+        dst.triangles[triangles_offset + i].i = xx positions_offset + src.triangles[i].i;
+        dst.triangles[triangles_offset + i].j = xx positions_offset + src.triangles[i].j;
+        dst.triangles[triangles_offset + i].k = xx positions_offset + src.triangles[i].k;
+    }
 }
