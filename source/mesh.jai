@@ -54,8 +54,7 @@ mesh_reset :: (mesh : *Mesh) {
     array_reset(*mesh.triangles);
 }
 
-// @Cleanupp rename to mesh_deinit
-deinit_mesh :: (mesh : Mesh) {
+mesh_deinit :: (mesh : Mesh) {
     array_reset(*mesh.vertices);
     array_reset(*mesh.triangles);
 }
@@ -76,9 +75,8 @@ init_prism_mesh :: (mesh : Mesh, extents : Vector2, alpha : float) {
 }
 
 // Centered around the origin
-init_circle_mesh :: (mesh : Mesh, radius : float) {
+init_circle_mesh :: (mesh : Mesh, radius : float, $CIRCLE_SEGMENTS : int = 16) {
     // @Cleanup use circle_segment_mesh instead?
-    CIRCLE_SEGMENTS :: 16;
     CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
     sinInc := sin(CIRCLE_INCREMENT);
     cosInc := cos(CIRCLE_INCREMENT);

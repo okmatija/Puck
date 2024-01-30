@@ -40,10 +40,6 @@ main :: () {
     window = create_window(window_name="Pong", width=window_width, height=window_height, window_x=window_x, window_y=window_y);
     Simp.set_render_target(window);
 
-    // We'll draw the cursor manually when we're in the menu
-    // Note: @CompilerBug show_cursor() and hide_cursor() didn't seem to work correctly when called in the game/menu, but its not clear why
-    hide_cursor();
-
     if !Enet.initialize() {
         log_error("Failed to initialize enet");
         return;
@@ -240,6 +236,9 @@ init_fonts :: () {
     // @Cleanup: Don't have path + name be separate.
     font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", pixel_height);
     assert(font != null);
+
+    version_font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", pixel_height / 2);
+    assert(font != null);
 }
 
 init_textures :: () {
@@ -253,7 +252,7 @@ init_textures :: () {
     }
 
     sky_map = make_texture("sky.png");
-    menu_map = make_texture("pong.png");
+    menu_map = make_texture("pong2.png");
 }
 
 init_sounds :: (window : *Window_Type) {

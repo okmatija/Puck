@@ -1,6 +1,8 @@
 menu :: () {
 
-    Simp.clear_render_target(1, 0, 0, 1);
+    hide_cursor();
+
+    Simp.clear_render_target(0, 0, 0, 1);
 
     draw_menu_background();
 
@@ -67,6 +69,7 @@ main_menu :: () {
     _, _, released := UI.button(r, "Play Local Game", *button_theme);
     if released {
         game_menu = .PLAY_LOCAL_GAME_MENU;
+        player_count = .One_Player; // Default to 1 player for local games
     }
 
     r = NextRect(3.25*k.x, .75*k.y);
@@ -92,6 +95,13 @@ main_menu :: () {
     if released {
         game_quitting = true;
     }
+
+    text_w := Simp.prepare_text(version_font, PONG_VERSION);
+    scale := 0.2;
+    Simp.draw_prepared_text(version_font,
+        10,
+        version_font.character_height/2,
+        .{1, 1, 1, 1});
 }
 
 settings_menu :: () {
@@ -145,12 +155,16 @@ play_local_game_menu :: () {
 
     dropdown_theme := *ui_theme.dropdown_theme;
 
+    player_count_s32 := cast(s32)player_count;
     paddle_shape_s32 := cast(s32)paddle_shape;
     ball_shape_s32 := cast(s32)ball_shape;
     level_s32 := cast(s32)level_id;
 
     cursor := CenteredCursor(5.2*k.y);
     l, r : UI.Rect;
+
+    l, r = NextRect2(2.2*k.x, .5*k.y);
+    PlayerCountDropdown(l, r);
 
     l, r = NextRect2(2.2*k.x, .5*k.y);
     BallShapeDropdown(l, r);
@@ -186,10 +200,12 @@ play_local_game_menu :: () {
         init_game_state.p2_paddle_shape = paddle_shape;
         init_game_state.ball_shape = ball_shape;
         init_game_state.level_id = level_id;
+        init_game_state.player_count = player_count;
         init_game(init_game_state);
     }
 
     UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
+    player_count = cast(Player_Count)player_count_s32;
     paddle_shape = cast(Paddle_Shape)paddle_shape_s32;
     ball_shape = cast(Ball_Shape)ball_shape_s32;
     level_id = cast(Level_Id)level_s32;
@@ -400,6 +416,7 @@ waiting_for_players_menu :: () {
     server.init_game_state.p1_paddle_shape = paddle_shape;
     server.init_game_state.ball_shape = ball_shape;
     server.init_game_state.level_id = level_id;
+    server.init_game_state.player_count = player_count;
 
     disconnect := false;
     for event : network_events_this_frame {
@@ -460,6 +477,10 @@ BallShapeDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
 LevelDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
     UI.label(l, "Play Area", *`label_theme);
     UI.dropdown(r, level_choices, *`level_s32, `dropdown_theme);
+}
+PlayerCountDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
+    UI.label(l, "Players", *`label_theme);
+    UI.dropdown(r, player_count_choices, *`player_count_s32, `dropdown_theme);
 }
 
 ball_shape : Ball_Shape = .Circle;

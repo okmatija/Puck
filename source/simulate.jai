@@ -1,7 +1,6 @@
 simulate :: () {
 
     apply_impulse_to_move_player :: (using player : *Player) {
-
         Control_Mode :: enum {
             KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
             KEYBOARD_SET_VELOCITY_NFRAME_ACCELERATION;
@@ -96,7 +95,9 @@ simulate :: () {
     }
 
     apply_impulse_to_move_player(*player1);
-    apply_impulse_to_move_player(*player2);
+    if player_count >= .Two_Player {
+        apply_impulse_to_move_player(*player2);
+    }
 
     // If there are any dead balls revive one after the spawn countdown
     for * :DeadBalls ball : balls {
@@ -104,8 +105,14 @@ simulate :: () {
 
         if ball_spawn_countdown <= 0  {
             ball.live = true;
-            b2Body.SetTransform(ball.body, .{get_game_extents().x - ball.radius, 0}, 0);
-            b2Body.SetLinearVelocity(ball.body, initial_ball_velocity());
+
+            if ball.shape == .Circle {
+                b2Body.SetTransform(ball.body, .{get_game_extents().x - ball.radius, 0}, 0);
+                b2Body.SetLinearVelocity(ball.body, initial_ball_velocity());
+            } else {
+                b2Body.SetTransform(ball.body, .{0, 0}, 0);
+                b2Body.SetLinearVelocity(ball.body, .{0., 0.});
+            }
             b2Body.SetAngularVelocity(ball.body, 0.);
             b2Body.SetEnabled(ball.body, true);
             ball_spawn_countdown = 2.;
@@ -135,7 +142,9 @@ simulate :: () {
 
     // Update the transforms used for rendering
     player1.transform = b2Body.GetTransform(player1.body);
-    player2.transform = b2Body.GetTransform(player2.body);
+    if player_count >= .Two_Player {
+        player2.transform = b2Body.GetTransform(player2.body);
+    }
     for * balls {
         it.transform = b2Body.GetTransform(it.body);
     }

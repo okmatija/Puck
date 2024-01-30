@@ -48,7 +48,7 @@ init_server :: (server_port : u16) {
     address.port = server_port;
     server.host, success = Enet.host_create(
         address=*address,
-        peer_count=1, // player_count-1, currently only 2 players are supported
+        peer_count=cast(int)player_count - 1,
         channel_limit=1,
         incoming_bandwidth=bandwidth_bytes_per_second,
         outgoing_bandwidth=bandwidth_bytes_per_second);
@@ -109,6 +109,7 @@ Init_Game_State :: struct {
     p2_paddle_shape : Paddle_Shape;
     ball_shape : Ball_Shape;
     level_id : Level_Id;
+    player_count : Player_Count;
 } 
 
 // @TODO Better way of distinguishing packets...!

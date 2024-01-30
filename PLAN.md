@@ -6,6 +6,8 @@ A pong game to play at work in breaks
 
 [ ] Make it a mobile android game, make it work on LAN if both phones are on the same wifi. Add left and right buttons which light up when the left/right key is pressed (to indicate what this might be like on a phone)
 
+[ ] Separate physics worlds for each player, so you can control time near you only
+
 [ ] Give balls a timer until they explode
 
 [ ] Implement a dedicated server
@@ -181,3 +183,22 @@ He also mentioned the Leisure Suit Larry boss key which I want to look into for 
 When I pitched the idea I had for distributing Pong as a self updating executable he mentioned he expected Microsoft certification issues. I should look into that, there is some process to get certificed that the exes you distribute are not viruses, and that this can be gamed by competitors who maliciously label your exes as viruses.
 
 Separately. I also read a very long but interesting article on the state of the games industry in 2024, I need to read it again...! Seems promising for smaller developers, and perhaps also for the future of Jai and games made using it and custom engines. https://www.matthewball.vc/all/gaming2024
+
+## 2024/01/29
+
+Spent almost the whole day implementing a function to fit one rect in another preserving the aspect ratios..! Geez, sometimes programming is so hard. Maybe I'm just discovering that games programming is harder than it looks..! 
+
+Felt put out working on Pong at the end of today, it felt like it'll never get fun...
+
+
+## 2024/01/30
+
+Feeling much more motivated today, spent the morning doing some refactoring which was satisfying. I'm motivated to do the following:
+
+- Make a google doc for game design.
+- Send the builds more often to family
+- Start tweeting progress
+- Make it an android game which you can play over lan by connecting multiple phones to the same wifi
+
+
+The plan file is better for short term TODOs which I actually do, maybe I should just keep the TODOs in the code so I am more motivated to get rid of them 

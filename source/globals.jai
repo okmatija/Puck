@@ -1,3 +1,5 @@
+PONG_VERSION :: "Version 0.2.0";
+
 // Default to 1080p
 WINDOW_WIDTH_INITIAL :: 1920;
 WINDOW_HEIGHT_INITIAL :: 1080;
@@ -34,6 +36,7 @@ window_height : s32;
 window_width  : s32;
 
 font : *Simp.Dynamic_Font;
+version_font : *Simp.Dynamic_Font;
 
 game_quitting : bool;
 game_menu : Game_Menu;
@@ -47,6 +50,7 @@ last_time:  float64; // Seconds
 level : Level;
 player1 : Player;
 player2 : Player;
+player_count : Player_Count = .Two_Player;
 balls : [BALL_COUNT_MAX]Ball;
 
 ball_spawn_countdown := 0.;

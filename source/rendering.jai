@@ -1,7 +1,11 @@
+BOUNDARY_COLOR :: Vector4.{1,1,1,1};
+BOUNDARY_COLOR_NO_COLLISION :: Vector4.{.5, .5, .5, 1};
+POWERUP_BASE_COLOR :: Vector4.{.7,.7,.7,1};
+
 render_one_frame :: () {
     hide_cursor();
 
-    Simp.clear_render_target(1, 0, 0, 1);
+    Simp.clear_render_target(0, 0, 0, 1);
     draw_game_background();
 
     Simp.set_shader_for_color(true);
@@ -9,7 +13,17 @@ render_one_frame :: () {
     // Cosmetics
     {
         game_extents := get_game_extents();
-        draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, .{.5, .5, .5, 1});
+        draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, BOUNDARY_COLOR_NO_COLLISION);
+        
+        circle : Mesh;
+        init_circle_mesh(*circle, PADDLE_EXTENTS.x, 32);
+        defer mesh_deinit(circle);
+        color := BOUNDARY_COLOR_NO_COLLISION;
+        color.w = .2;
+        transform : b2Transform;
+        b2Transform.Constructor(*transform);
+        b2Transform.SetIdentity(*transform);
+        draw_mesh(circle, transform, color);
     }
 
 
@@ -113,13 +127,19 @@ draw_powerups :: () {
         font.character_height/2,
         ifx player1.warp_active then warp_active_color else warp_ready_color);
 
-    Simp.draw_prepared_text(font,
-        window_width - 3 * window_width/30,
-        window_height - font.character_height,
-        ifx player2.warp_active then warp_active_color else warp_ready_color);
+    if player_count >= .Two_Player {
+        Simp.draw_prepared_text(font,
+            window_width - 3 * window_width/30,
+            window_height - font.character_height,
+            ifx player2.warp_active then warp_active_color else warp_ready_color);
+    }
 }
 
 draw_score :: () {
+    if player_count == .One_Player {
+        return;
+    }
+
     {
         text := sprint("%", player1.score);
         defer free(text);

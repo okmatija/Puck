@@ -43,11 +43,19 @@ Level_Id :: enum {
 };
 #insert #run generate_dropdown_choices("level_choices", Level_Id);
 
+// @Volatile, keep synced with Player_Index
+Player_Count :: enum u8 #specified {
+    One_Player :: 0;
+    Two_Player :: 1;
+    //Three_Player :: 2;
+}
+#insert #run generate_dropdown_choices("player_count_choices", Player_Count);
+
 
 Player_Index :: enum u8 #specified {
-    P1 :: 1;
-    P2 :: 2;
-    //P3 :: ;
+    P1 :: 0;
+    P2 :: 1;
+    //P3 :: 2;
     //P4 :: 4;
 }
 
@@ -151,7 +159,7 @@ get_game_size :: () -> Vector2 {
 
 deinit_player :: (player : *Player) {
     player.score = 0;
-    deinit_mesh(player.mesh);
+    mesh_deinit(player.mesh);
     if host_type != .CLIENT {
         b2World.DestroyBody(world, player.body);
     }
@@ -162,7 +170,9 @@ deinit_game :: () {
     if game_mode != .NOT_STARTED {
         deinit_level();
         deinit_player(*player1);
-        deinit_player(*player2);
+        if player_count >= .Two_Player {
+            deinit_player(*player2);
+        }
         for * ball : balls {
             deinit_ball(ball);
         }
@@ -184,28 +194,36 @@ deinit_game :: () {
     game_mode = .NOT_STARTED;
 }
 
-init_game :: (using init_game_state : Init_Game_State) {
+init_game :: (init_game_state : Init_Game_State) {
     assert(game_mode == .NOT_STARTED);
 
     if host_type != .CLIENT {
         init_world();
     }
 
-    init_level(level_id); // Must come before players since they are constrained relative to the level boundary
-    init_player(*player1, .P1, p1_paddle_shape);
-    init_player(*player2, .P2, p2_paddle_shape);
+    player_count = init_game_state.player_count;
+    init_level(init_game_state.level_id); // Must come before players since they are constrained relative to the level boundary
+
+    init_player(*player1, .P1, init_game_state.p1_paddle_shape);
+    if player_count >= .Two_Player {
+        init_player(*player2, .P2, init_game_state.p2_paddle_shape);
+    }
+
     for * ball : balls {
         if it_index == {
             case 0;
-                ball.color = .{0., 1., 0., 1.};
-                ball.radius *= .3;
+                ball.color = POWERUP_BASE_COLOR;
+                ball.radius = BALL_RADIUS_INITIAL;
+                init_ball(ball, .Square);
             case 1;
                 ball.color = .{1., 1., 0., 1.};
-                ball.radius *= .7;
+                ball.radius = .7 * BALL_RADIUS_INITIAL;
+                init_ball(ball, init_game_state.ball_shape);
             case 2;
                 ball.color = .{0., 1., 1., 1.};
+                ball.radius = BALL_RADIUS_INITIAL;
+                init_ball(ball, init_game_state.ball_shape);
         }
-        init_ball(ball, ball_shape);
     }
 
     game_mode = .PLAYING;
@@ -227,7 +245,7 @@ deinit_ball :: (ball : *Ball) {
 
     ball.live = false;
 
-    deinit_mesh(ball.mesh);
+    mesh_deinit(ball.mesh);
 
     if host_type != .CLIENT {
         b2World.DestroyBody(world, ball.body);
@@ -266,8 +284,10 @@ init_boundary :: () {
         right : *Polyline = array_add(*level.boundary.shape.polylines);
         array_add(*right.points, .{ax, -y}, .{x, -ay}, .{x, ay}, .{ax, y});
 
-        top : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*top.points, .{-ax, y}, .{ax, y});
+        if player_count == .One_Player {
+            top : *Polyline = array_add(*level.boundary.shape.polylines);
+            array_add(*top.points, .{-ax, y}, .{ax, y});
+        }
 
         player1.joint.anchor = .{0., -y};
         player1.joint.axis = .{1, 0};
@@ -316,15 +336,15 @@ init_obstructions :: () {
         b2Transform.Constructor(*transform);
 
         mesh : Mesh;
-        defer deinit_mesh(mesh);
+        defer mesh_deinit(mesh);
 
-        init_prism_mesh(mesh, extents, 0.);
-        b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, 0.);
+        init_prism_mesh(mesh, extents, .2);
+        b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, PI);
         mesh_transform(*mesh, transform);
         mesh_merge(*level.obstructions.mesh, mesh);
 
         mesh_reset(*mesh);
-        init_prism_mesh(mesh, extents, 0.);
+        init_prism_mesh(mesh, extents, 0.2);
         b2Transform.Set(*transform, .{0, -8*PADDLE_EXTENTS.y}, 0.);
         mesh_transform(*mesh, transform);
         mesh_merge(*level.obstructions.mesh, mesh);

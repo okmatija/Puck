@@ -63,12 +63,15 @@ init_ball_physics :: (ball : *Ball) {
     if #complete ball.shape == {
     case .Circle;
         fixture_def.shape = *circle_shape;
+        fixture_def.density = BALL_DENSITY;
+        fixture_def.friction = BALL_FRICTION;
+        fixture_def.restitution = BALL_RESTITUTION;
     case .Square;
         fixture_def.shape = *square_shape;
+        fixture_def.density = 20 * BALL_DENSITY;
+        fixture_def.friction = BALL_FRICTION;
+        fixture_def.restitution = BALL_RESTITUTION;
     }
-    fixture_def.density = BALL_DENSITY;
-    fixture_def.friction = BALL_FRICTION;
-    fixture_def.restitution = BALL_RESTITUTION;
     b2Body.CreateFixture(ball.body, *fixture_def);
 
     b2Body.SetEnabled(ball.body, false);
