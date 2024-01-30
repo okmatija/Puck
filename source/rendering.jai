@@ -1,6 +1,10 @@
-BOUNDARY_COLOR :: Vector4.{1,1,1,1};
-BOUNDARY_COLOR_NO_COLLISION :: Vector4.{.5, .5, .5, 1};
-POWERUP_BASE_COLOR :: Vector4.{.7,.7,.7,1};
+WHITE :: Vector4.{1,1,1,1};
+GREY_50 :: Vector4.{.5,.5,.5,1};
+GREY_70 :: Vector4.{.7,.7,.7,1};
+
+BOUNDARY_COLOR :: WHITE;
+BOUNDARY_COLOR_NO_COLLISION :: GREY_50;
+POWERUP_BASE_COLOR :: GREY_70;
 
 render_one_frame :: () {
     hide_cursor();

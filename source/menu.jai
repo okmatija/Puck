@@ -2,7 +2,10 @@ menu :: () {
 
     hide_cursor();
 
-    Simp.clear_render_target(0, 0, 0, 1);
+    {
+        using GREY_70;
+        Simp.clear_render_target(x, y, z, w);
+    }
 
     draw_menu_background();
 
@@ -358,7 +361,7 @@ connecting_to_server_menu :: () {
     button_theme.label_theme.alignment = .Center;
 
     label_theme := ui_theme.label_theme;
-    label_theme.text_color = .{0, 0, 0, 1};
+    label_theme.text_color = WHITE;
 
     cursor := CenteredCursor(5*k.y);
     r := NextRect(5*k.x, .75*k.y);
@@ -406,7 +409,7 @@ waiting_for_players_menu :: () {
     button_theme.label_theme.alignment = .Center;
 
     label_theme := ui_theme.label_theme;
-    label_theme.text_color = .{0, 0, 0, 1};
+    label_theme.text_color = WHITE;
 
     cursor := CenteredCursor(5*k.y);
     r := NextRect(5*k.x, .75*k.y);

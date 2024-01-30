@@ -142,6 +142,7 @@ Player :: struct {
 
 // Tight bbox of the playable area. Half-width/height in meters
 get_game_extents :: () -> Vector2 {
+    // return .{10., 20.};
     return .{10., 10.};
 }
 
