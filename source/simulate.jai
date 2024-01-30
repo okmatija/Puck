@@ -105,6 +105,7 @@ simulate :: () {
 
         if ball_spawn_countdown <= 0  {
             ball.live = true;
+            ball.color = get_ball_default_color(ball.shape);
 
             if ball.shape == .Circle {
                 b2Body.SetTransform(ball.body, .{get_game_extents().x - ball.radius, 0}, 0);

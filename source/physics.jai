@@ -6,6 +6,54 @@ init_world :: () {
             stream := Sound.make_stream(*sound_collision2, .GENERAL_SFX);
             stream.rate_scale = random_get_within_range(0.7, 1.22);
             Sound.start_playing(stream);
+
+            // @FIXMEEE Need to check Is
+            a : *b2Fixture = b2Contact.GetFixtureA(contact);
+            b : *b2Fixture = b2Contact.GetFixtureB(contact);
+
+            a_body : *b2Body = b2Fixture.GetBody(a);
+            a_speed2 := length_squared(b2Body.GetLinearVelocity(a_body).*);
+            a_data : *b2BodyUserData = b2Body.GetUserData(a_body);
+            a_kind : Entity.Kind = ifx a_data && a_data.pointer then (cast(*Entity)a_data.pointer).kind else .Unknown;
+
+            b_body : *b2Body = b2Fixture.GetBody(b);
+            b_speed2 := length_squared(b2Body.GetLinearVelocity(b_body).*);
+            b_data : *b2BodyUserData = b2Body.GetUserData(b_body);
+            b_kind : Entity.Kind = ifx b_data && b_data.pointer then (cast(*Entity)b_data.pointer).kind else .Unknown;
+
+            if a_kind == .Ball && b_kind == .Ball {
+                a_ball := cast(*Ball)a_data.pointer;
+                b_ball := cast(*Ball)b_data.pointer;
+                assert(a_ball != b_ball);
+
+                if a_speed2 > b_speed2 {
+                    b_ball.color = a_ball.color;
+                } else {
+                    a_ball.color = b_ball.color;
+                }
+
+                // if a_ball.color == get_ball_default_color(a_ball.shape) &&
+                //    b_ball.color != get_ball_default_color(b_ball.shape) {
+                //     a_ball.color = b_ball.color;
+                // }
+
+                // if b_ball.color == get_ball_default_color(a_ball.shape) &&
+                //    a_ball.color != get_ball_default_color(a_ball.shape) {
+                //     b_ball.color = a_ball.color; 
+                // }
+            }
+
+            if a_kind == .Ball && b_kind == .Player {
+                ball := cast(*Ball)a_data.pointer;
+                player := cast(*Player)b_data.pointer;
+                ball.color = player.color;
+            }
+
+            if a_kind == .Player && b_kind == .Ball {
+                player := cast(*Player)a_data.pointer;
+                ball := cast(*Ball)b_data.pointer;
+                ball.color = player.color;
+            }
         }
     }
     end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
@@ -42,12 +90,18 @@ init_world :: () {
 init_ball_physics :: (ball : *Ball) {
     assert(host_type == .SERVER || host_type == .LOCAL);
 
+    user_data : b2BodyUserData;
+    b2BodyUserData.Constructor(*user_data);
+    user_data.pointer = xx ball;
+
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     body_def.type = .b2_dynamicBody;
     body_def.bullet=true; // Balls can move very fast!
+    body_def.userData = user_data;
 
     ball.body = b2World.CreateBody(world, *body_def);
+
     b2Body.SetSleepingAllowed(ball.body, false);
 
     circle_shape : b2CircleShape;
@@ -147,8 +201,13 @@ init_player_physics :: (using player : *Player) {
 
     game_extents := get_game_extents();
 
+    user_data : b2BodyUserData;
+    b2BodyUserData.Constructor(*user_data);
+    user_data.pointer = xx player;
+
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
+    body_def.userData = user_data;
     body_def.type = .b2_dynamicBody;
     if index == {
     case .P1;

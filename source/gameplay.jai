@@ -1,3 +1,15 @@
+Entity :: struct {
+    Kind :: enum {
+        Unknown;
+        Ball;
+        Player;
+        //Obstruction;
+        //PowerUp;
+    }
+
+    kind : Kind;
+}
+
 // @Cleanup Menus should be a state machine using this enum
 Game_Menu :: enum u8 {
     MAIN_MENU :: 0;
@@ -57,6 +69,7 @@ Player_Index :: enum u8 #specified {
     P2 :: 1;
     //P3 :: 2;
     //P4 :: 4;
+    UNKNOWN :: 0xFF;
 }
 
 Obstruction :: struct {
@@ -83,13 +96,16 @@ Level :: struct {
 }
 
 Ball :: struct {
+    using #as base : Entity;
+    base.kind = .Ball;
+
     live : bool;
 
     shape : Ball_Shape;
     radius : float = BALL_RADIUS_INITIAL;
 
     mesh : Mesh;
-    color : Vector4 = .{0, 1, 0, 1};
+    color : Vector4 = YELLOW;
     transform : b2Transform;
 
     // Used on the server only:
@@ -100,6 +116,9 @@ Ball :: struct {
 }
 
 Player :: struct {
+    using #as base : Entity;
+    base.kind = .Player;
+
     index : Player_Index;
 
     paddle_shape : Paddle_Shape;
@@ -217,11 +236,9 @@ init_game :: (init_game_state : Init_Game_State) {
                 ball.radius = BALL_RADIUS_INITIAL;
                 init_ball(ball, .Square);
             case 1;
-                ball.color = .{1., 1., 0., 1.};
                 ball.radius = .7 * BALL_RADIUS_INITIAL;
                 init_ball(ball, init_game_state.ball_shape);
             case 2;
-                ball.color = .{0., 1., 1., 1.};
                 ball.radius = BALL_RADIUS_INITIAL;
                 init_ball(ball, init_game_state.ball_shape);
         }
@@ -276,8 +293,8 @@ init_boundary :: () {
 
     #if true {
         using game_extents;
-        ax := .65 * x;
-        ay := .45 * y;
+        ax := .85 * x;
+        ay := .75 * y;
 
         left : *Polyline = array_add(*level.boundary.shape.polylines);
         array_add(*left.points, .{-ax, -y}, .{-x, -ay}, .{-x, ay}, .{-ax, y});
@@ -339,7 +356,7 @@ init_obstructions :: () {
         mesh : Mesh;
         defer mesh_deinit(mesh);
 
-        init_prism_mesh(mesh, extents, .2);
+        init_prism_mesh(mesh, extents, 0.2);
         b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, PI);
         mesh_transform(*mesh, transform);
         mesh_merge(*level.obstructions.mesh, mesh);
@@ -375,7 +392,7 @@ init_level :: (level_id : Level_Id) {
 init_player :: (using player : *Player, player_index : Player_Index, player_paddle_shape : Paddle_Shape) {
 
     index = player_index;
-    color = ifx index == .P1 then Vector4.{1., .1, .1, 1.} else Vector4.{.1, .1, 1., 1.};
+    color = ifx index == .P1 then PLAYER1_COLOR else PLAYER2_COLOR;
     paddle_shape = player_paddle_shape;
 
     if #complete paddle_shape == {
@@ -429,4 +446,12 @@ LiveBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags
             #insert body;
         }
     }
+}
+
+get_ball_default_color :: (shape : Ball_Shape) -> Vector4 {
+    if #complete shape == {
+        case .Circle; return YELLOW;
+        case .Square; return POWERUP_BASE_COLOR;
+    }
+    return WHITE;
 }

@@ -1,6 +1,13 @@
+RED :: Vector4.{1,0,0,1};
+GREEN :: Vector4.{0,1,0,1};
+BLUE :: Vector4.{0,0,1,1};
+YELLOW :: Vector4.{1,1,0,1};
 WHITE :: Vector4.{1,1,1,1};
 GREY_50 :: Vector4.{.5,.5,.5,1};
 GREY_70 :: Vector4.{.7,.7,.7,1};
+
+PLAYER1_COLOR :: Vector4.{1., .3, .2, 1};
+PLAYER2_COLOR :: Vector4.{.5, 0., 1., 1};
 
 BOUNDARY_COLOR :: WHITE;
 BOUNDARY_COLOR_NO_COLLISION :: GREY_50;
