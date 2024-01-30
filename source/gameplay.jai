@@ -353,6 +353,9 @@ init_obstructions :: () {
         transform : b2Transform;
         b2Transform.Constructor(*transform);
 
+        // @Think Why is this needed with -release?? @CompilerBug??
+        mesh_reset(*level.obstructions.mesh);
+
         mesh : Mesh;
         defer mesh_deinit(mesh);
 

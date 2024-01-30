@@ -1,4 +1,4 @@
-PONG_VERSION :: "Version 0.2.0";
+PONG_VERSION :: "Version 0.2.1";
 
 // Default to 1080p
 WINDOW_WIDTH_INITIAL :: 1920;
