@@ -1,3 +1,7 @@
+# Version 0.3.0, WIP
+
+* Fixed networking
+
 # Version 0.2.1, 30 January 2024
 
 * Workaround the crash in 0.2.0 (hopefully???)

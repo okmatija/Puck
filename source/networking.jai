@@ -43,12 +43,14 @@ init_server :: (server_port : u16) {
     // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth
     bandwidth_bytes_per_second := 0;
 
+    assert(player_count == .Two_Player); // Update peer count to count-1
+
     address : Enet.Address;
     address.host = Enet.HOST_ANY;
     address.port = server_port;
     server.host, success = Enet.host_create(
         address=*address,
-        peer_count=cast(int)player_count - 1,
+        peer_count=1,
         channel_limit=1,
         incoming_bandwidth=bandwidth_bytes_per_second,
         outgoing_bandwidth=bandwidth_bytes_per_second);
