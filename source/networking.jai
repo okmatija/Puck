@@ -293,7 +293,7 @@ get_host_info :: (hostname : string) -> bool, u32 {
 }
 
 read_network_events_this_frame_debug_count := 5;
-read_network_events_this_frame :: ($debug : bool = false) {
+read_network_events_this_frame :: () {
     host_service_start_time := to_microseconds(current_time_monotonic());
 
     array_reset_keeping_memory(*network_events_this_frame);
@@ -306,13 +306,17 @@ read_network_events_this_frame :: ($debug : bool = false) {
         array_add(*network_events_this_frame, event);
     }
 
+    debug :: false;
     #if debug {
-        if host_type == .CLIENT printv(host_service_start_time);
+        // if host_type == .CLIENT printv(host_service_start_time);
         if network_events_this_frame {
             if host_type == .SERVER printv(host_service_start_time);
 
             read_network_events_this_frame_debug_count -= 1;
-            if read_network_events_this_frame_debug_count < 0 exit(0);
+            if read_network_events_this_frame_debug_count < 0 {
+                print("Exiting at %\n", #location(#this));
+                exit(0);
+            }
 
             print("************************************\n");
             print("% got % events:\n", host_type, network_events_this_frame.count);

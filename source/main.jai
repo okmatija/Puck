@@ -159,7 +159,7 @@ main :: () {
             }
 
             // Debug/inspect enet
-            debug_network_game();
+            //debug_network_game();
 
             // Draw game state
             render_one_frame();
