@@ -11,7 +11,7 @@ DT_MAX : float : 0.15;
 
 BALL_RADIUS_INITIAL :: 0.4;
 BALL_DENSITY :: 1.0;
-BALL_FRICTION :: 0.3;
+BALL_FRICTION :: 1.0;
 BALL_RESTITUTION :: 1.0;
 BALL_COUNT_MAX :: 4;
 BALL_KILL_SPEED :: #run 6. * length(initial_ball_velocity());

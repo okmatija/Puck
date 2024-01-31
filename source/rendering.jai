@@ -27,10 +27,14 @@ render_one_frame :: () {
     {
         game_extents := get_game_extents();
         draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, BOUNDARY_COLOR_NO_COLLISION);
+
+        // @Volatile :Markings
+        ax := .85 * game_extents.x;
+        draw_segment(.{-ax, -game_extents.y}, .{ax, -game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
+        draw_segment(.{-ax,  game_extents.y}, .{ax,  game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
         
-        if false {
         circle : Mesh;
-        init_circle_mesh(*circle, PADDLE_EXTENTS.x, 32);
+        init_circle_mesh(*circle, 2*PADDLE_EXTENTS.x, 32);
         defer mesh_deinit(circle);
         color := BOUNDARY_COLOR_NO_COLLISION;
         color.w = .2;
@@ -38,7 +42,6 @@ render_one_frame :: () {
         b2Transform.Constructor(*transform);
         b2Transform.SetIdentity(*transform);
         draw_mesh(circle, transform, color);
-        }
     }
 
 

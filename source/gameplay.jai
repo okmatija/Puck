@@ -347,6 +347,7 @@ init_boundary :: () {
 
     #if true {
         using game_extents;
+        // @Volatile :Markings
         ax := .85 * x;
         ay := .75 * y;
         padding := get_game_padding();
