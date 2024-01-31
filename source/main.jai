@@ -166,6 +166,10 @@ main :: () {
             // Draw game state
             render_one_frame();
 
+            if game_over_countdown <= 0 {
+                deinit_game();
+            }
+
         } else {
             menu();
         }

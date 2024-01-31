@@ -1,6 +1,7 @@
 # Version 0.3.0, WIP
 
-* TODO Replaced scores with hearts/lives behind the players
+* Replaced text scores with hearts/lives behind the players
+* Win the game by destroying all the opponents hearts!
 * Increased maximum number of balls to 4
 * Balls exploded on (non-player) collisions if they are move fast enough
 * Fixed networking (many WIP things are not replicated on the client yet)

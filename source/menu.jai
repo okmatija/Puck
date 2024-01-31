@@ -72,7 +72,6 @@ main_menu :: () {
     _, _, released := UI.button(r, "Play Local Game", *button_theme);
     if released {
         game_menu = .PLAY_LOCAL_GAME_MENU;
-        player_count = .One_Player; // Default to 1 player for local games
     }
 
     r = NextRect(3.25*k.x, .75*k.y);

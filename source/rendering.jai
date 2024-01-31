@@ -7,8 +7,9 @@ BLACK :: Vector4.{0,0,0,1};
 GREY_50 :: Vector4.{.5,.5,.5,1};
 GREY_70 :: Vector4.{.7,.7,.7,1};
 
-PLAYER1_COLOR :: Vector4.{1., .3, .2, 1};
-PLAYER2_COLOR :: Vector4.{.5, 0., 1., 1};
+PLAYER1_COLOR :: Vector4.{1., .3, .2, 1.};
+PLAYER2_COLOR :: Vector4.{.5, 0., 1., 1.};
+LIFE_COLOR ::    Vector4.{.7, 0., .2, 1.};
 
 BOUNDARY_COLOR :: WHITE;
 BOUNDARY_COLOR_NO_COLLISION :: GREY_50;
@@ -52,8 +53,18 @@ render_one_frame :: () {
         draw_segment(segment.from, segment.to, level.boundary.color);
     }
 
-    draw_mesh(player1.mesh, player1.transform, player1.color);
-    draw_mesh(player2.mesh, player2.transform, player2.color);
+    draw_player :: (player : Player) {
+        draw_mesh(player.mesh, player.transform, player.color);
+        for life : player.lives {
+            if life.health > 0 {
+                use_color := lerp(BLACK, LIFE_COLOR, life.health/LIFE_MAX_HEALTH);
+                draw_mesh(life.mesh, life.transform, use_color);
+            }
+        }
+    }
+
+    draw_player(player1);
+    draw_player(player2);
 
     for :LiveBalls balls {
         draw_mesh(it.mesh, it.transform, it.color);
@@ -82,7 +93,12 @@ render_one_frame :: () {
         draw_mesh(circle, transform, use_color);
     }
 
-    draw_score();
+    //draw_score();
+
+    if game_over_text {
+        text_w := Simp.prepare_text(font, game_over_text);
+        Simp.draw_prepared_text(font, window_width/2, font.character_height, .{.5, .8, .2, 1});
+    }
 
     draw_powerups();
 

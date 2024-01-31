@@ -35,6 +35,9 @@ PADDLE_SPEED :: #run (5.0 * PADDLE_EXTENTS.x / 0.35); // move 5 paddle widths in
 PADDLE_DENSITY :: 1000;
 PADDLE_FRICTION :: 1.;
 PADDLE_RESTITUTION :: 1.2;
+PLAYER_MAX_LIVES :: 9;
+LIFE_RADIUS :: BALL_RADIUS_INITIAL;
+LIFE_MAX_HEALTH :: 100.;
 
 DEFAULT_PORT : u16 : 42069;
 
@@ -56,6 +59,10 @@ version_font : *Simp.Dynamic_Font;
 game_quitting : bool;
 game_menu : Game_Menu;
 game_mode : Game_Mode;
+game_over_countdown := GAME_OVER_COUNTDOWN;
+game_over_text : string;
+GAME_OVER_COUNTDOWN :: 3.;
+
 
 current_frame : u64;
 current_dt: float = 1. / 60.; // Seconds

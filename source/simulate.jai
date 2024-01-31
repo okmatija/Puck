@@ -161,16 +161,33 @@ simulate :: () {
     b2World.Step(world, current_dt, 6, 2);
 
     // Update the transforms used for rendering
-    player1.transform = b2Body.GetTransform(player1.body);
-    if player_count >= .Two_Player {
-        player2.transform = b2Body.GetTransform(player2.body);
+    update_player :: (player : *Player) {
+        player.transform = b2Body.GetTransform(player.body);
+        for * player.lives {
+            it.transform = b2Body.GetTransform(it.body);
+        }
+
+        // Disable all lives that died
+        for * life : player.lives {
+            if life.health <= 0. {
+                b2Body.SetEnabled(life.body, false);
+            }
+        }
     }
+
+    update_player(*player1);
+    if player_count >= .Two_Player {
+        update_player(*player2);
+    }
+
     for * balls {
         it.transform = b2Body.GetTransform(it.body);
     }
     if level.obstructions.body {
         level.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
     }
+
+    check_winning_condition();
 
     // for live_emitters update_emitter(it, current_dt);
 }
@@ -243,18 +260,29 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
                     a_ball.color = b_ball.color;
                 }
             }
-        }
+        } else if a_kind == .Ball && b_kind == .Player {
 
-        if a_kind == .Ball && b_kind == .Player {
             ball := cast(*Ball)a_data.pointer;
             player := cast(*Player)b_data.pointer;
             ball.color = player.color;
-        }
 
-        if a_kind == .Player && b_kind == .Ball {
+        } else if a_kind == .Player && b_kind == .Ball {
+
             player := cast(*Player)a_data.pointer;
             ball := cast(*Ball)b_data.pointer;
             ball.color = player.color;
+
+        } else if a_kind == .Life && b_kind == .Ball {
+
+            // @Gameplay Maybe our color balls add health? (but can only set ball color from hitting on the front of paddle?)
+            life := cast(*Life)a_data.pointer;
+            life.health -= LIFE_MAX_HEALTH / 2.;
+
+        } else if a_kind == .Ball && b_kind == .Life {
+
+            life := cast(*Life)b_data.pointer;
+            life.health -= LIFE_MAX_HEALTH / 2.;
+
         }
     }
 }

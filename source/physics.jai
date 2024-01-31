@@ -145,6 +145,32 @@ init_player_physics :: (using player : *Player) {
     b2BodyUserData.Constructor(*user_data);
     user_data.pointer = xx player;
 
+    for * life : lives {
+        game_size := get_game_size();
+        dy := BALL_RADIUS_INITIAL;
+        dx := game_extents.x / PLAYER_MAX_LIVES;
+
+        user_data : b2BodyUserData;
+        b2BodyUserData.Constructor(*user_data);
+        user_data.pointer = xx life;
+
+        body_def : b2BodyDef;
+        b2BodyDef.Constructor(*body_def);
+        body_def.userData = user_data;
+        body_def.type = .b2_staticBody;
+        if index == {
+        case .P1;
+            body_def.position = Vector2.{(xx it_index+.5)*dx - game_extents.x/2, -game_size.y + 2.5*dy};
+            body_def.angle = PI;
+        case .P2;
+            body_def.position = Vector2.{(xx it_index+.5)*dx - game_extents.x/2,  game_size.y - 2.5*dy};
+            body_def.angle = 0;
+        }
+        life.body = b2World.CreateBody(world, *body_def);
+
+        add_fixture_from_mesh(life.body, life.mesh);
+    }
+
     body_def : b2BodyDef;
     b2BodyDef.Constructor(*body_def);
     body_def.userData = user_data;

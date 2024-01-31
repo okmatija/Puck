@@ -3,6 +3,7 @@ Entity :: struct {
         Unknown;
         Ball;
         Player;
+        Life;
         //Obstruction;
         //PowerUp;
     }
@@ -143,11 +144,26 @@ Player :: struct {
     warp_active := false;
     warp_countdown := WARP_COUNTDOWN;
 
+    lives : [PLAYER_MAX_LIVES]Life;
+
+    // @Cleanup remove this
     score : int;
 
     // Some powerups will change the size of the player
     // Note: The body shape is collision geometry not render geometry
     body : *b2Body; // Physics. This is not initialized or used by clients!
+}
+
+Life :: struct {
+    using #as base : Entity;
+    base.kind = .Life;
+
+    body : *b2Body;
+
+    mesh : Mesh;
+    transform : b2Transform;
+
+    health : float = LIFE_MAX_HEALTH;
 }
 
 
@@ -175,13 +191,48 @@ get_game_size :: () -> Vector2 {
     return get_game_extents() + get_game_padding();
 }
 
+check_winning_condition :: () {
+    is_player_dead :: (player : Player) -> bool {
+        for player.lives {
+            if it.health > 0 {
+                return false;
+            }
+        }
+        return true;
+    }
 
+    if #complete player_count == {
+    case .One_Player;
+    case .Two_Player;
+        player1_dead := is_player_dead(player1);
+        player2_dead := is_player_dead(player2);
+        if player1_dead && player2_dead {
+            // Draw!
+            countdown(*game_over_countdown);
+            game_over_text = "Draw!";
+        } else if !player1_dead && player2_dead {
+            countdown(*game_over_countdown);
+            game_over_text = "Player 1 Wins!";
+        } else if player1_dead && !player2_dead {
+            countdown(*game_over_countdown);
+            game_over_text = "Player 2 Wins!";
+        } else {
+            // Game continues
+            game_over_text = "";
+        }
+    }
+}
 
 deinit_player :: (player : *Player) {
     player.score = 0;
     mesh_deinit(player.mesh);
     if host_type != .CLIENT {
         b2World.DestroyBody(world, player.body);
+
+        for life : player.lives {
+            mesh_deinit(life.mesh);
+            b2World.DestroyBody(world, life.body);
+        }
     }
 }
 
@@ -244,6 +295,7 @@ init_game :: (init_game_state : Init_Game_State) {
         }
     }
 
+    game_over_countdown = GAME_OVER_COUNTDOWN;
     game_mode = .PLAYING;
 }
 
@@ -425,6 +477,11 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
         init_prism_mesh(mesh, PADDLE_EXTENTS, 1./3.);
     case .Dome;
         init_dome_mesh(mesh, PADDLE_EXTENTS, 2. * PADDLE_EXTENTS.x, 11);
+    }
+
+    for * life : lives {
+        // @Bug cannot use alpha=0 here, it triggers an assert in box2d.dll
+        init_prism_mesh(life.mesh, .{LIFE_RADIUS, LIFE_RADIUS}, .75);
     }
 
     if host_type != .CLIENT {
