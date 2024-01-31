@@ -107,6 +107,8 @@ main :: () {
 
         if game_mode == .PLAYING {
 
+            // debug_explosion_animation();
+
             if esc_pressed {
                 // @Cleanup Is this correct? What even is the QUIT event?
                 game_menu = .PAUSE_MENU;
@@ -263,6 +265,7 @@ init_sounds :: (window : *Window_Type) {
     sound_start_game = Sound.load_audio_file(tprint("%/start_game.wav", data_folder));
     sound_collision1 = Sound.load_audio_file(tprint("%/collision1.wav", data_folder));
     sound_collision2 = Sound.load_audio_file(tprint("%/collision2.wav", data_folder));
+    sound_ball_explode = Sound.load_audio_file(tprint("%/mixkit-short-explosion-1694.wav", data_folder));
 
     success := Sound.sound_player_init(.{});
     assert(success);

@@ -295,6 +295,8 @@ init_boundary :: () {
         using game_extents;
         ax := .85 * x;
         ay := .75 * y;
+        padding := get_game_padding();
+        py := .8 * padding.y;
 
         left : *Polyline = array_add(*level.boundary.shape.polylines);
         array_add(*left.points, .{-ax, -y}, .{-x, -ay}, .{-x, ay}, .{-ax, y});
@@ -302,9 +304,14 @@ init_boundary :: () {
         right : *Polyline = array_add(*level.boundary.shape.polylines);
         array_add(*right.points, .{ax, -y}, .{x, -ay}, .{x, ay}, .{ax, y});
 
+        bottom : *Polyline = array_add(*level.boundary.shape.polylines);
+        array_add(*bottom.points, .{-ax, -y}, .{-ax, -y-py}, .{ax, -y-py}, .{ax, -y});
+
+        top : *Polyline = array_add(*level.boundary.shape.polylines);
         if player_count == .One_Player {
-            top : *Polyline = array_add(*level.boundary.shape.polylines);
             array_add(*top.points, .{-ax, y}, .{ax, y});
+        } else if player_count == .Two_Player {
+            array_add(*top.points, .{-ax, y}, .{-ax, y+py}, .{ax, y+py}, .{ax, y});
         }
 
         player1.joint.anchor = .{0., -y};

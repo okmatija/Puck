@@ -14,6 +14,17 @@ BALL_DENSITY :: 1.0;
 BALL_FRICTION :: 0.3;
 BALL_RESTITUTION :: 1.0;
 BALL_COUNT_MAX :: 3;
+BALL_KILL_SPEED :: #run 6. * length(initial_ball_velocity());
+
+Explosion :: struct {
+    EXPLOSION_DURATION :: .5; // Seconds
+    countdown := EXPLOSION_DURATION;
+
+    position : Vector2;
+    radius : float;
+    color : Vector4;
+}
+ball_explosions : [..]Explosion;
 
 WALL_FRICTION :: 0.0; // Set to zero because otherwise we get into situations where the ball bounces back and forth horizontally... also it seems better to have the spin only affected by player movement
 WALL_RESTITUTION :: 0.0;
@@ -58,6 +69,7 @@ player_count : Player_Count = .Two_Player;
 balls : [BALL_COUNT_MAX]Ball;
 
 ball_spawn_countdown := 0.;
+BALL_SPAWN_COUNTDOWN :: 2.;
 
 world : *b2World;
 contact_listener : b2ContactListener;
@@ -79,6 +91,7 @@ menu_map : Texture;
 sound_start_game : Sound.Sound_Data;
 sound_collision1 : Sound.Sound_Data;
 sound_collision2 : Sound.Sound_Data;
+sound_ball_explode : Sound.Sound_Data;
 
 time_factor := 1.;
 TIME_FACTOR :: .3;

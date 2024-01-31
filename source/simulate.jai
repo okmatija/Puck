@@ -116,7 +116,7 @@ simulate :: () {
             }
             b2Body.SetAngularVelocity(ball.body, 0.);
             b2Body.SetEnabled(ball.body, true);
-            ball_spawn_countdown = 2.;
+            ball_spawn_countdown = BALL_SPAWN_COUNTDOWN;
         }
 
         break; // Just spawn one new ball
@@ -124,19 +124,28 @@ simulate :: () {
 
     // simulate_attractor_balls(5000);
 
-    for * :LiveBalls ball : balls {
-        center := b2Body.GetPosition(ball.body).*;
-        game_extents := get_game_extents();
-        if center.y - ball.radius > game_extents.y {
-            ball.live = false;
+    // Disable all balls that died/exploded
+    for * ball : balls {
+        if !ball.live {
             b2Body.SetEnabled(ball.body, false);
-            player1.score += 1;
-        } else if center.y + ball.radius < -game_extents.y {
-            ball.live = false;
-            b2Body.SetEnabled(ball.body, false);
-            player2.score += 1;
         }
     }
+
+    // Old code to increment the score
+    //for * :LiveBalls ball : balls {
+    //    center := b2Body.GetPosition(ball.body).*;
+    //    game_extents := get_game_extents();
+    //    if center.y - ball.radius > game_extents.y {
+    //        ball.live = false;
+    //        b2Body.SetEnabled(ball.body, false);
+    //        player1.score += 1;
+    //    } else if center.y + ball.radius < -game_extents.y {
+    //        ball.live = false;
+    //        b2Body.SetEnabled(ball.body, false);
+    //        player2.score += 1;
+    //    }
+    //}
+
 
     // Important: Do this after SetTransform above (see the comment on b2Body::SetTransform)
     b2World.Step(world, current_dt, 6, 2);
@@ -156,14 +165,94 @@ simulate :: () {
     // for live_emitters update_emitter(it, current_dt);
 }
 
+initial_ball_velocity :: () -> Vector2 {
+    return .{-5.0 * PADDLE_EXTENTS.x / 1., 0};
+}
+
+begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
+    new_context : Context;
+    push_context new_context {
+        stream := Sound.make_stream(*sound_collision2, .GENERAL_SFX);
+        stream.rate_scale = random_get_within_range(0.7, 1.22);
+        Sound.start_playing(stream);
+
+        // @FIXMEEE Need to check Is
+        a : *b2Fixture = b2Contact.GetFixtureA(contact);
+        b : *b2Fixture = b2Contact.GetFixtureB(contact);
+
+        a_body : *b2Body = b2Fixture.GetBody(a);
+        a_speed2 := length_squared(b2Body.GetLinearVelocity(a_body).*);
+        a_data : *b2BodyUserData = b2Body.GetUserData(a_body);
+        a_kind : Entity.Kind = ifx a_data && a_data.pointer then (cast(*Entity)a_data.pointer).kind else .Unknown;
+
+        b_body : *b2Body = b2Fixture.GetBody(b);
+        b_speed2 := length_squared(b2Body.GetLinearVelocity(b_body).*);
+        b_data : *b2BodyUserData = b2Body.GetUserData(b_body);
+        b_kind : Entity.Kind = ifx b_data && b_data.pointer then (cast(*Entity)b_data.pointer).kind else .Unknown;
+
+        // Explode the ball if its moving too fast
+        if a_kind == .Ball && a_speed2 > BALL_KILL_SPEED*BALL_KILL_SPEED {
+            a_ball := cast(*Ball)a_data.pointer;
+            // a_ball.SetEnabled(false); // Disable the collision
+            a_ball.live = false;
+            explosion := Explosion.{position=b2Body.GetPosition(a_body), radius=a_ball.radius, color=a_ball.color};
+            array_add(*ball_explosions, explosion);
+
+            // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
+
+            stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
+            stream.rate_scale = random_get_within_range(0.7, 1.22);
+            Sound.start_playing(stream);
+        }
+
+        // Explode the ball if its moving too fast
+        if b_kind == .Ball && b_speed2 > BALL_KILL_SPEED*BALL_KILL_SPEED {
+            b_ball := cast(*Ball)b_data.pointer;
+            // b_ball.SetEnabled(false); // Disable the collision
+            b_ball.live = false;
+            explosion := Explosion.{position=b2Body.GetPosition(b_body), radius=b_ball.radius, color=b_ball.color};
+            array_add(*ball_explosions, explosion);
+
+            stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
+            stream.rate_scale = random_get_within_range(0.7, 1.22);
+            Sound.start_playing(stream);
+        }
+
+        if a_kind == .Ball && b_kind == .Ball {
+            a_ball := cast(*Ball)a_data.pointer;
+            b_ball := cast(*Ball)b_data.pointer;
+            assert(a_ball != b_ball);
+
+            if a_ball.live && b_ball.live {
+                if a_speed2 > b_speed2 {
+                    b_ball.color = a_ball.color;
+                } else {
+                    a_ball.color = b_ball.color;
+                }
+            }
+        }
+
+        if a_kind == .Ball && b_kind == .Player {
+            ball := cast(*Ball)a_data.pointer;
+            player := cast(*Player)b_data.pointer;
+            ball.color = player.color;
+        }
+
+        if a_kind == .Player && b_kind == .Ball {
+            player := cast(*Player)a_data.pointer;
+            ball := cast(*Ball)b_data.pointer;
+            ball.color = player.color;
+        }
+    }
+}
+end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
+pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {}
+post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
+destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
 
 
 #scope_file
 
-
-initial_ball_velocity :: () -> Vector2 {
-    return .{-5.0 * PADDLE_EXTENTS.x / 1., 0};
-}
 
 
 simulate_attractor_balls :: (power : float) {

@@ -217,3 +217,15 @@ debug_network_game :: () {
         log("total_received_data_length = %", get_host().total_received_data_length);
     }
 }
+
+debug_explosion_animation :: () {
+    // Test ball explosion animation
+    if ball_explosions.count == 0 {
+        index := cast(int)random_get_within_range(0.1, 3.99);
+        colors : [4]Vector4 : .[RED, GREEN, BLUE, WHITE];
+        explosion : Explosion;
+        explosion.color = colors[index];
+        explosion.radius = BALL_RADIUS_INITIAL;
+        array_add(*ball_explosions, explosion);
+    }
+}

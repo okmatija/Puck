@@ -3,6 +3,7 @@ GREEN :: Vector4.{0,1,0,1};
 BLUE :: Vector4.{0,0,1,1};
 YELLOW :: Vector4.{1,1,0,1};
 WHITE :: Vector4.{1,1,1,1};
+BLACK :: Vector4.{0,0,0,1};
 GREY_50 :: Vector4.{.5,.5,.5,1};
 GREY_70 :: Vector4.{.7,.7,.7,1};
 
@@ -56,6 +57,29 @@ render_one_frame :: () {
 
     for :LiveBalls balls {
         draw_mesh(it.mesh, it.transform, it.color);
+    }
+
+    for ball_explosions {
+        r := it.radius;
+        t := it.countdown/it.EXPLOSION_DURATION;
+        use_color := lerp(BLACK, it.color, t);
+        use_color.w = lerp(0., 1., t);
+
+        use_radius := 0.;
+        t_peak := .9;
+        if t < t_peak {
+            use_radius = lerp(r, 3.*r, t/t_peak);
+        } else {
+            use_radius = lerp(3.*r, 0., (t-t_peak)/(1.-t_peak));
+        }
+
+        circle : Mesh;
+        init_circle_mesh(*circle, use_radius, 32);
+        defer mesh_deinit(circle);
+        transform : b2Transform;
+        b2Transform.Constructor(*transform);
+        b2Transform.Set(*transform, it.position, 0.);
+        draw_mesh(circle, transform, use_color);
     }
 
     draw_score();
