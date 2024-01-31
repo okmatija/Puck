@@ -133,6 +133,14 @@ simulate :: () {
         }
     }
 
+    // Update explosions
+    for ball_explosions {
+        countdown(*it.countdown);
+        if it.countdown <= 0 {
+            remove;
+        }
+    }
+
     // Old code to increment the score
     //for * :LiveBalls ball : balls {
     //    center := b2Body.GetPosition(ball.body).*;
