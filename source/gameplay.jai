@@ -212,10 +212,10 @@ check_winning_condition :: () {
             game_over_text = "Draw!";
         } else if !player1_dead && player2_dead {
             countdown(*game_over_countdown);
-            game_over_text = "Player 1 Wins!";
+            game_over_text = "Player 1 Wins!"; // @Volatile search literal!
         } else if player1_dead && !player2_dead {
             countdown(*game_over_countdown);
-            game_over_text = "Player 2 Wins!";
+            game_over_text = "Player 2 Wins!"; // @Volatile search literal!
         } else {
             // Game continues
             game_over_text = "";
@@ -282,6 +282,7 @@ init_game :: (init_game_state : Init_Game_State) {
 
     for * ball : balls {
         if it_index == {
+            /*
             case 0;
                 ball.color = POWERUP_BASE_COLOR;
                 ball.radius = BALL_RADIUS_INITIAL;
@@ -289,6 +290,7 @@ init_game :: (init_game_state : Init_Game_State) {
             case 1;
                 ball.radius = .7 * BALL_RADIUS_INITIAL;
                 init_ball(ball, init_game_state.ball_shape);
+            */
             case;
                 ball.radius = BALL_RADIUS_INITIAL;
                 init_ball(ball, init_game_state.ball_shape);
@@ -431,13 +433,13 @@ init_obstructions :: () {
         mesh : Mesh;
         defer mesh_deinit(mesh);
 
-        init_prism_mesh(mesh, extents, 0.2);
+        init_prism_mesh(mesh, extents, 0.);
         b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, PI);
         mesh_transform(*mesh, transform);
         mesh_merge(*level.obstructions.mesh, mesh);
 
         mesh_reset(*mesh);
-        init_prism_mesh(mesh, extents, 0.2);
+        init_prism_mesh(mesh, extents, 0.);
         b2Transform.Set(*transform, .{0, -8*PADDLE_EXTENTS.y}, 0.);
         mesh_transform(*mesh, transform);
         mesh_merge(*level.obstructions.mesh, mesh);
@@ -469,6 +471,10 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
     index = player_index;
     color = ifx index == .P1 then PLAYER1_COLOR else PLAYER2_COLOR;
     paddle_shape = player_paddle_shape;
+
+    for * lives {
+        it.health = LIFE_MAX_HEALTH;
+    }
 
     if #complete paddle_shape == {
     case .Box;

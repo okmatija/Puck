@@ -55,6 +55,7 @@ window_width  : s32;
 
 font : *Simp.Dynamic_Font;
 version_font : *Simp.Dynamic_Font;
+game_over_font : *Simp.Dynamic_Font;
 
 game_quitting : bool;
 game_menu : Game_Menu;

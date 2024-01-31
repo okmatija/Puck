@@ -28,6 +28,7 @@ render_one_frame :: () {
         game_extents := get_game_extents();
         draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, BOUNDARY_COLOR_NO_COLLISION);
         
+        if false {
         circle : Mesh;
         init_circle_mesh(*circle, PADDLE_EXTENTS.x, 32);
         defer mesh_deinit(circle);
@@ -37,6 +38,7 @@ render_one_frame :: () {
         b2Transform.Constructor(*transform);
         b2Transform.SetIdentity(*transform);
         draw_mesh(circle, transform, color);
+        }
     }
 
 
@@ -96,8 +98,20 @@ render_one_frame :: () {
     //draw_score();
 
     if game_over_text {
-        text_w := Simp.prepare_text(font, game_over_text);
-        Simp.draw_prepared_text(font, window_width/2, font.character_height, .{.5, .8, .2, 1});
+        text_w := Simp.prepare_text(game_over_font, game_over_text);
+
+        base_color : Vector4 = GREEN;
+        if game_over_text == "Player 1 Wins!" {
+            base_color = player1.color;
+        } else if game_over_text == "Player 2 Wins!" {
+            base_color = player2.color;
+        }
+        use_color := lerp(WHITE, base_color, xx sin(5 * current_time));
+
+        Simp.draw_prepared_text(game_over_font,
+            xx(.33 * window_width),
+            window_height/2-game_over_font.character_height/3,
+            use_color);
     }
 
     draw_powerups();

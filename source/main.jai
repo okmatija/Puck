@@ -244,7 +244,10 @@ init_fonts :: () {
     assert(font != null);
 
     version_font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", pixel_height / 2);
-    assert(font != null);
+    assert(version_font != null);
+
+    game_over_font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", 2 * pixel_height);
+    assert(game_over_font != null);
 }
 
 init_textures :: () {

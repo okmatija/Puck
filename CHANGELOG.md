@@ -1,4 +1,4 @@
-# Version 0.3.0, WIP
+# Version 0.3.0, 31 January 2024
 
 * Replaced text scores with hearts/lives behind the players
 * Win the game by destroying all the opponents hearts!

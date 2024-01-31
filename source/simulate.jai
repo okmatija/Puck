@@ -158,7 +158,9 @@ simulate :: () {
 
 
     // Important: Do this after SetTransform above (see the comment on b2Body::SetTransform)
-    b2World.Step(world, current_dt, 6, 2);
+    if game_over_countdown == GAME_OVER_COUNTDOWN {
+        b2World.Step(world, current_dt, 6, 2);
+    }
 
     // Update the transforms used for rendering
     update_player :: (player : *Player) {
@@ -218,37 +220,31 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
         b_data : *b2BodyUserData = b2Body.GetUserData(b_body);
         b_kind : Entity.Kind = ifx b_data && b_data.pointer then (cast(*Entity)b_data.pointer).kind else .Unknown;
 
-        // Explode the ball if its moving too fast
-        if a_kind == .Ball && a_speed2 > BALL_KILL_SPEED*BALL_KILL_SPEED {
-            a_ball := cast(*Ball)a_data.pointer;
-            // a_ball.SetEnabled(false); // Disable the collision
-            a_ball.live = false;
-            explosion := Explosion.{position=b2Body.GetPosition(a_body), radius=a_ball.radius, color=a_ball.color};
-            array_add(*ball_explosions, explosion);
 
-            // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
+        // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
+        maybe_explode_ball :: (kind : Entity.Kind, speed2 : float, data : *b2BodyUserData) {
+            if kind == .Ball && speed2 > BALL_KILL_SPEED*BALL_KILL_SPEED {
+                ball := cast(*Ball)data.pointer;
+                // ball.SetEnabled(false); // Disable the collision
+                ball.live = false;
+                explosion := Explosion.{position=b2Body.GetPosition(ball.body), radius=ball.radius, color=ball.color};
+                array_add(*ball_explosions, explosion);
 
-            stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
-            stream.rate_scale = random_get_within_range(0.7, 1.22);
-            stream.user_volume_scale = user_sfx_volume;
-            Sound.start_playing(stream);
+                // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
+
+                stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
+                stream.rate_scale = random_get_within_range(0.7, 1.22);
+                stream.user_volume_scale = user_sfx_volume;
+                Sound.start_playing(stream);
+            }
         }
 
-        // Explode the ball if its moving too fast
-        if b_kind == .Ball && b_speed2 > BALL_KILL_SPEED*BALL_KILL_SPEED {
-            b_ball := cast(*Ball)b_data.pointer;
-            // b_ball.SetEnabled(false); // Disable the collision
-            b_ball.live = false;
-            explosion := Explosion.{position=b2Body.GetPosition(b_body), radius=b_ball.radius, color=b_ball.color};
-            array_add(*ball_explosions, explosion);
+        maybe_explode_ball(a_kind, a_speed2, a_data);
+        maybe_explode_ball(b_kind, b_speed2, b_data);
 
-            stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
-            stream.rate_scale = random_get_within_range(0.7, 1.22);
-            stream.user_volume_scale = user_sfx_volume;
-            Sound.start_playing(stream);
-        }
 
-        if a_kind == .Ball && b_kind == .Ball {
+        DO_COLOR :: false;
+        if DO_COLOR && a_kind == .Ball && b_kind == .Ball {
             a_ball := cast(*Ball)a_data.pointer;
             b_ball := cast(*Ball)b_data.pointer;
             assert(a_ball != b_ball);
@@ -264,12 +260,14 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
 
             ball := cast(*Ball)a_data.pointer;
             player := cast(*Player)b_data.pointer;
+            if DO_COLOR
             ball.color = player.color;
 
         } else if a_kind == .Player && b_kind == .Ball {
 
             player := cast(*Player)a_data.pointer;
             ball := cast(*Ball)b_data.pointer;
+            if DO_COLOR
             ball.color = player.color;
 
         } else if a_kind == .Life && b_kind == .Ball {
