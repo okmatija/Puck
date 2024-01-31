@@ -238,7 +238,7 @@ init_game :: (init_game_state : Init_Game_State) {
             case 1;
                 ball.radius = .7 * BALL_RADIUS_INITIAL;
                 init_ball(ball, init_game_state.ball_shape);
-            case 2;
+            case;
                 ball.radius = BALL_RADIUS_INITIAL;
                 init_ball(ball, init_game_state.ball_shape);
         }
@@ -296,7 +296,8 @@ init_boundary :: () {
         ax := .85 * x;
         ay := .75 * y;
         padding := get_game_padding();
-        py := .8 * padding.y;
+        py := .7 * padding.y;
+        dd := .1 * padding.y;
 
         left : *Polyline = array_add(*level.boundary.shape.polylines);
         array_add(*left.points, .{-ax, -y}, .{-x, -ay}, .{-x, ay}, .{-ax, y});
@@ -305,13 +306,25 @@ init_boundary :: () {
         array_add(*right.points, .{ax, -y}, .{x, -ay}, .{x, ay}, .{ax, y});
 
         bottom : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*bottom.points, .{-ax, -y}, .{-ax, -y-py}, .{ax, -y-py}, .{ax, -y});
+        array_add(*bottom.points,
+            .{-ax,    -y},
+            .{-ax,    -y-py},
+            .{-ax+dd, -y-py-dd},
+            .{ ax-dd, -y-py-dd},
+            .{ ax,    -y-py},
+            .{ ax,    -y});
 
         top : *Polyline = array_add(*level.boundary.shape.polylines);
         if player_count == .One_Player {
             array_add(*top.points, .{-ax, y}, .{ax, y});
         } else if player_count == .Two_Player {
-            array_add(*top.points, .{-ax, y}, .{-ax, y+py}, .{ax, y+py}, .{ax, y});
+            array_add(*top.points,
+                .{-ax,    y},
+                .{-ax,    y+py},
+                .{-ax+dd, y+py+dd},
+                .{ ax-dd, y+py+dd},
+                .{ ax,    y+py},
+                .{ ax,    y});
         }
 
         player1.joint.anchor = .{0., -y};

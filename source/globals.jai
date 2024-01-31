@@ -13,7 +13,7 @@ BALL_RADIUS_INITIAL :: 0.4;
 BALL_DENSITY :: 1.0;
 BALL_FRICTION :: 0.3;
 BALL_RESTITUTION :: 1.0;
-BALL_COUNT_MAX :: 3;
+BALL_COUNT_MAX :: 4;
 BALL_KILL_SPEED :: #run 6. * length(initial_ball_velocity());
 
 Explosion :: struct {
