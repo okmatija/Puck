@@ -34,6 +34,7 @@ simulate :: () {
                 if down && warp_countdown == WARP_COUNTDOWN {
                     stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
                     stream.rate_scale = .5;
+                    stream.user_volume_scale = user_sfx_volume;
                     Sound.start_playing(stream);
 
                     warp_active = true;
@@ -48,6 +49,7 @@ simulate :: () {
                 if warp_countdown <= 0  {
                     stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
                     stream.rate_scale = -.8;
+                    stream.user_volume_scale = user_sfx_volume;
                     Sound.start_playing(stream);
 
                     warp_active = false;
@@ -174,6 +176,7 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
     push_context new_context {
         stream := Sound.make_stream(*sound_collision2, .GENERAL_SFX);
         stream.rate_scale = random_get_within_range(0.7, 1.22);
+        stream.user_volume_scale = user_sfx_volume;
         Sound.start_playing(stream);
 
         // @FIXMEEE Need to check Is
@@ -202,6 +205,7 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
 
             stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
             stream.rate_scale = random_get_within_range(0.7, 1.22);
+            stream.user_volume_scale = user_sfx_volume;
             Sound.start_playing(stream);
         }
 
@@ -215,6 +219,7 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
 
             stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
             stream.rate_scale = random_get_within_range(0.7, 1.22);
+            stream.user_volume_scale = user_sfx_volume;
             Sound.start_playing(stream);
         }
 

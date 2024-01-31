@@ -93,6 +93,8 @@ sound_collision1 : Sound.Sound_Data;
 sound_collision2 : Sound.Sound_Data;
 sound_ball_explode : Sound.Sound_Data;
 
+user_sfx_volume : float = .1;
+
 time_factor := 1.;
 TIME_FACTOR :: .3;
 WARP_SPEEDUP :: #run 1. / TIME_FACTOR;

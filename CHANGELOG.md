@@ -3,6 +3,7 @@
 * TODO Replaced scores with hearts/lives behind the players
 * Balls exploded on (non-player) collisions if they are move fast enough
 * Fixed networking (many WIP things are not replicated on the client yet)
+* Added a SFX volume control to the Settings menu
 
 # Version 0.2.1, 30 January 2024
 

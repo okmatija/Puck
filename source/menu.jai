@@ -90,6 +90,7 @@ main_menu :: () {
     r = NextRect(1.75*k.x, .75*k.y);
     _, _, released = UI.button(r, "Settings", *button_theme);
     if released {
+        settings_back_target_menu = .MAIN_MENU;
         game_menu = .SETTINGS_MENU;
     }
 
@@ -115,11 +116,20 @@ settings_menu :: () {
     button_theme.enable_variable_frame_thickness = true;
     button_theme.label_theme.alignment = .Center;
 
+    slider_theme := ui_theme.slider_theme;
+    slider_theme.foreground.font = font;
+    slider_theme.surface_style = .NUB;
+
     cursor := CenteredCursor(5.2*k.y);
-    r := NextRect(1.25*k.x, .75*k.y);
+    r : UI.Rect;
+
+    r = NextRect(4*k.x, .75*k.y);
+    UI.slider(r, *user_sfx_volume, 0.0, 1.0, 0.1, *slider_theme, "", " SFX volume");
+
+    r = NextRect(1.25*k.x, .75*k.y);
     _, _, released := UI.button(r, "Back", *button_theme);
     if released || esc_pressed {
-        game_menu = .MAIN_MENU;
+        game_menu = settings_back_target_menu;
     }
 }
 
@@ -132,9 +142,17 @@ pause_menu :: () {
     button_theme.label_theme.alignment = .Center;
 
     cursor := CenteredCursor(5.2*k.y);
+    l, r : UI.Rect;
 
-    l, r := NextRect2(1.25*k.x, .75*k.y);
-    _, _, released := UI.button(r, "Resume", *button_theme);
+    r = NextRect(1.75*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Settings", *button_theme);
+    if released {
+        settings_back_target_menu = .PAUSE_MENU;
+        game_menu = .SETTINGS_MENU;
+    }
+
+    l, r = NextRect2(1.25*k.x, .75*k.y);
+    _, _, released = UI.button(r, "Resume", *button_theme);
     if released {
         game_mode = .PLAYING;
     }
@@ -489,3 +507,5 @@ PlayerCountDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
 ball_shape : Ball_Shape = .Circle;
 paddle_shape : Paddle_Shape = .Dome;
 level_id : Level_Id = .Spinning_Box;
+
+settings_back_target_menu : Game_Menu = .MAIN_MENU;
