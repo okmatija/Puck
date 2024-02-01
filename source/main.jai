@@ -262,6 +262,7 @@ init_textures :: () {
 
     sky_map = make_texture("sky.png");
     menu_map = make_texture("pong2.png");
+    okpong_map = make_texture("okPONG2.png");
 }
 
 init_sounds :: (window : *Window_Type) {

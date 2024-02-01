@@ -1,3 +1,7 @@
+# Version 0.3.1, WIP
+
+* Updated the logo and menu
+
 # Version 0.3.0, 31 January 2024
 
 * Replaced text scores with hearts/lives behind the players

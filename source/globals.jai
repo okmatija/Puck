@@ -1,4 +1,4 @@
-PONG_VERSION :: "Version 0.2.1";
+PONG_VERSION :: "Version 0.3.1";
 
 // Default to 1080p
 WINDOW_WIDTH_INITIAL :: 1920;
@@ -96,6 +96,7 @@ esc_pressed : bool;
 data_folder: string;
 sky_map : Texture;
 menu_map : Texture;
+okpong_map : Texture;
 sound_start_game : Sound.Sound_Data;
 sound_collision1 : Sound.Sound_Data;
 sound_collision2 : Sound.Sound_Data;

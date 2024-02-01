@@ -126,9 +126,18 @@ render_one_frame :: () {
     //b2World.DebugDraw(world);
 }
 
-draw_menu_background :: () {
-    Simp.set_shader_for_images(*menu_map);
-    Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
+draw_menu_logo :: () {
+    t := cast(float)(sin(current_time) + 1.) / 2.;
+    Clamp(*t, 0., 1.);
+    use_color := lerp(WHITE, GREY_70, t);
+    Simp.set_shader_for_images(*okpong_map);
+    w, h : float = cast(float)window_width, cast(float)window_height;
+    Simp.immediate_quad(
+        .{w/3., h/2.},
+        .{2.*w/3., h/2.},
+        .{2.*w/3., h/2.+h/4},
+        .{w/3., h/2.+h/4},
+        use_color);
 }
 
 

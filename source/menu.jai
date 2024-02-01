@@ -3,11 +3,11 @@ menu :: () {
     hide_cursor();
 
     {
-        using GREY_70;
+        using color := PLAYER2_COLOR * .7;
         Simp.clear_render_target(x, y, z, w);
     }
 
-    draw_menu_background();
+    draw_menu_logo();
 
     _, _, width, height := get_dimensions(window, true);
     UI.ui_per_frame_update(window, width, height, current_time);
@@ -45,6 +45,14 @@ menu :: () {
 
         waiting_for_players_menu();
     }
+
+
+    text_w := Simp.prepare_text(version_font, PONG_VERSION);
+    scale := 0.2;
+    Simp.draw_prepared_text(version_font,
+        10,
+        version_font.character_height/2,
+        .{1, 1, 1, 1});
 
     draw_cursor();
 }
@@ -98,13 +106,6 @@ main_menu :: () {
     if released {
         game_quitting = true;
     }
-
-    text_w := Simp.prepare_text(version_font, PONG_VERSION);
-    scale := 0.2;
-    Simp.draw_prepared_text(version_font,
-        10,
-        version_font.character_height/2,
-        .{1, 1, 1, 1});
 }
 
 settings_menu :: () {
