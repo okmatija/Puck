@@ -127,7 +127,7 @@ circle_segment_mesh :: (mesh : Mesh, radius : float, start_angle_radians : float
 
 init_dome_mesh :: (mesh : Mesh, extents : Vector2, radius : float, segment_count : int) {
     // The calculations below only work when radius >= extents.x but the intention is that radius >> extents.x
-    radius = max(radius, 2 * extents.x);
+    assert(radius >= extents.x);
 
     wedge_angle := PI - 2 * acos(extents.x / radius);
 

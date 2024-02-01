@@ -14,7 +14,8 @@ BALL_DENSITY :: 1.0;
 BALL_FRICTION :: 1.0;
 BALL_RESTITUTION :: 1.0;
 BALL_COUNT_MAX :: 4;
-BALL_KILL_SPEED :: #run 6. * length(initial_ball_velocity());
+BALL_DAMAGE_SPEED :: #run 6. * length(initial_ball_velocity());
+BALL_MAX_HEALTH :: 100.;
 
 Explosion :: struct {
     EXPLOSION_DURATION :: .5; // Seconds
@@ -101,6 +102,11 @@ sound_start_game : Sound.Sound_Data;
 sound_collision1 : Sound.Sound_Data;
 sound_collision2 : Sound.Sound_Data;
 sound_ball_explode : Sound.Sound_Data;
+
+previous_mouse_x : s32;
+previous_mouse_y : s32;
+draw_mouse_in_game_countdown : float = DRAW_MOUSE_IN_GAME_COUNTDOWN;
+DRAW_MOUSE_IN_GAME_COUNTDOWN :: .5;
 
 user_sfx_volume : float = .1;
 

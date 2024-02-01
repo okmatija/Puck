@@ -105,7 +105,24 @@ main :: () {
 
         handle_inputs();
 
-        if game_mode == .PLAYING {
+        if game_mode == .PAUSED {
+            _, _, width, height := get_dimensions(window, true);
+            UI.ui_per_frame_update(window, width, height, current_time);
+
+            // draw game state
+            render_one_frame();
+
+            if game_menu == {
+            case .PAUSE_MENU;
+                pause_menu();
+            case.SETTINGS_MENU;
+                settings_menu();
+            case;
+                assert(false, tprint("% should only be reachable from the call in menu.jai", game_menu));
+            }
+
+            draw_cursor();
+        } else if game_mode == .PLAYING {
 
             // debug_explosion_animation();
 

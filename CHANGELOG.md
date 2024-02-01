@@ -1,6 +1,10 @@
 # Version 0.3.1, WIP
 
 * Updated the logo and menu
+* Showing the pause menu on top of the paused game
+* Tweaked ball explosions so it happens when ball health is zero
+* Hide mouse pointer when playing game, but show it if it moves
+
 
 # Version 0.3.0, 31 January 2024
 

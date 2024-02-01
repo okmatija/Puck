@@ -1,8 +1,31 @@
 # Why/What?
 
 A pong game to play at work in breaks
+Starting competitive mobile e-sports!
 
 # General
+
+
+[ ] Balls taking damage from moving too fast should have their speed reduced after the damaging collision
+[ ] Maybe the balls coming from left/right are the ones for P1/P2...
+[ ] Launch balls from left and right in alternating direction, have a shape that directs the ball from one side to the other. Maybe have a button that launches a 
+
+
+    |\
+    | \
+    |  \
+    |   \
+    +....+
+
+[ ] Three full line of textured boxes for lives behind the player, so you can get a really damaging ball in a tunnel. Maybe the front row have more health so balls can get trapped inside
+[ ] Powerup to change the shape of the opponents hearts so your balls get stuck amongst them easier??
+[ ] Make the pause menu render on top of the game
+[ ] Make a better sense of control e.g., rotate bat so you can direct your shots better
+[ ] Maybe bouncing the ball behind you, risking your lives should have a good benefit for you e.g., powers up the ball somehow??
+
+[ ] Make animated point text
+[ ] Power up
+    - medical ball to heal lives
 
 [ ] Make it a mobile android game, make it work on LAN if both phones are on the same wifi. Add left and right buttons which light up when the left/right key is pressed (to indicate what this might be like on a phone)
 

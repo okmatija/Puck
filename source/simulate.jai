@@ -107,6 +107,7 @@ simulate :: () {
 
         if ball_spawn_countdown <= 0  {
             ball.live = true;
+            ball.health = BALL_MAX_HEALTH;
             ball.color = get_ball_default_color(ball.shape);
 
             if ball.shape == .Circle {
@@ -223,19 +224,24 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
 
         // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
         maybe_explode_ball :: (kind : Entity.Kind, speed2 : float, data : *b2BodyUserData) {
-            if kind == .Ball && speed2 > BALL_KILL_SPEED*BALL_KILL_SPEED {
+            if kind == .Ball && speed2 > BALL_DAMAGE_SPEED*BALL_DAMAGE_SPEED {
                 ball := cast(*Ball)data.pointer;
-                // ball.SetEnabled(false); // Disable the collision
-                ball.live = false;
-                explosion := Explosion.{position=b2Body.GetPosition(ball.body), radius=ball.radius, color=ball.color};
-                array_add(*ball_explosions, explosion);
 
-                // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
+                ball.health -= (BALL_MAX_HEALTH / 2. + 1.); // +1 so 2 high speed collisions definitely kills the ball
 
-                stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
-                stream.rate_scale = random_get_within_range(0.7, 1.22);
-                stream.user_volume_scale = user_sfx_volume;
-                Sound.start_playing(stream);
+                if ball.health < 0. {
+                    // ball.SetEnabled(false); // Disable the collision
+                    ball.live = false;
+                    explosion := Explosion.{position=b2Body.GetPosition(ball.body), radius=ball.radius, color=ball.color};
+                    array_add(*ball_explosions, explosion);
+
+                    // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
+
+                    stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
+                    stream.rate_scale = random_get_within_range(0.7, 1.22);
+                    stream.user_volume_scale = user_sfx_volume;
+                    Sound.start_playing(stream);
+                }
             }
         }
 

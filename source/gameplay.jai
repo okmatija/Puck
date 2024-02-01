@@ -100,7 +100,8 @@ Ball :: struct {
     using #as base : Entity;
     base.kind = .Ball;
 
-    live : bool;
+    live : bool; // Orthogonal to health, since we might want to disable a ball without changing its health
+    health : float = BALL_MAX_HEALTH;
 
     shape : Ball_Shape;
     radius : float = BALL_RADIUS_INITIAL;
@@ -176,9 +177,15 @@ Life :: struct {
 // - Depends on level (shape of play area)
 
 // Tight bbox of the playable area. Half-width/height in meters
-get_game_extents :: () -> Vector2 {
-    // return .{10., 20.};
-    return .{10., 10.};
+get_game_extents :: () -> Vector2, float {
+    extents := Vector2.{10., 10.};
+    return extents, .75 * extents.y;
+}
+
+get_goal_extents :: () -> Vector2, float {
+    padding := get_game_padding();
+    extents := get_game_extents();
+    return .{ .85 * extents.x, .7 * padding.y}, .1 * padding.y;
 }
 
 // At least this much padding separates the game extents from the edge of the window, in game units
@@ -315,8 +322,6 @@ deinit_level :: () {
 deinit_ball :: (ball : *Ball) {
     log_verbose("deinit_ball");
 
-    ball.live = false;
-
     mesh_deinit(ball.mesh);
 
     if host_type != .CLIENT {
@@ -326,7 +331,8 @@ deinit_ball :: (ball : *Ball) {
 
 init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
     live = false;
-    ball.shape = initial_shape;
+    health = BALL_MAX_HEALTH;
+    shape = initial_shape;
 
     if #complete shape == {
     case .Circle;
@@ -343,75 +349,58 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
 }
 
 init_boundary :: () {
-    game_extents := get_game_extents();
+    // The goal should fit within the extents and padding (two player game!)
+    assert(get_goal_extents().x < get_game_extents().x);
+    assert(get_goal_extents().y < get_game_padding().y);
 
-    #if true {
-        using game_extents;
-        // @Volatile :Markings
-        ax := .85 * x;
-        ay := .75 * y;
-        padding := get_game_padding();
-        py := .7 * padding.y;
-        dd := .1 * padding.y;
+    game, game_dy := get_game_extents();
+    goal, goal_dy := get_goal_extents();
 
-        left : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*left.points, .{-ax, -y}, .{-x, -ay}, .{-x, ay}, .{-ax, y});
+    left : *Polyline = array_add(*level.boundary.shape.polylines);
+    array_add(*left.points,
+        .{-goal.x, -game.y},
+        .{-game.x, -game_dy},
+        .{-game.x,  game_dy},
+        .{-goal.x,  game.y});
 
-        right : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*right.points, .{ax, -y}, .{x, -ay}, .{x, ay}, .{ax, y});
+    right : *Polyline = array_add(*level.boundary.shape.polylines);
+    array_add(*right.points,
+        .{goal.x, -game.y},
+        .{game.x, -game_dy},
+        .{game.x,  game_dy},
+        .{goal.x,  game.y});
 
-        bottom : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*bottom.points,
-            .{-ax,    -y},
-            .{-ax,    -y-py},
-            .{-ax+dd, -y-py-dd},
-            .{ ax-dd, -y-py-dd},
-            .{ ax,    -y-py},
-            .{ ax,    -y});
+    bottom : *Polyline = array_add(*level.boundary.shape.polylines);
+    array_add(*bottom.points,
+        .{-goal.x,         -game.y},
+        .{-goal.x,         -game.y-goal.y},
+        .{-goal.x+goal_dy, -game.y-goal.y-goal_dy},
+        .{ goal.x-goal_dy, -game.y-goal.y-goal_dy},
+        .{ goal.x,         -game.y-goal.y},
+        .{ goal.x,         -game.y});
 
-        top : *Polyline = array_add(*level.boundary.shape.polylines);
-        if player_count == .One_Player {
-            array_add(*top.points, .{-ax, y}, .{ax, y});
-        } else if player_count == .Two_Player {
-            array_add(*top.points,
-                .{-ax,    y},
-                .{-ax,    y+py},
-                .{-ax+dd, y+py+dd},
-                .{ ax-dd, y+py+dd},
-                .{ ax,    y+py},
-                .{ ax,    y});
-        }
-
-        player1.joint.anchor = .{0., -y};
-        player1.joint.axis = .{1, 0};
-        player1.joint.lower_translation = -ax + PADDLE_EXTENTS.x;
-        player1.joint.upper_translation =  ax - PADDLE_EXTENTS.x;
-
-        player2.joint.anchor = .{0., y};
-        player2.joint.axis = .{1, 0};
-        player2.joint.lower_translation = -ax + PADDLE_EXTENTS.x;
-        player2.joint.upper_translation =  ax - PADDLE_EXTENTS.x;
-
-    } else {
-        left : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*left.points, -game_extents, Vector2.{-game_extents.x, game_extents.y});
-
-        right : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*right.points, .{game_extents.x, -game_extents.y}, game_extents);
-
-        //top : *Polyline = array_add(*level.boundary.shape.polylines);
-        //array_add(*top.points, .{-game_extents.x, game_extents.y}, game_extents);
-
-        player1.joint.anchor = .{0., -game_extents.y};
-        player1.joint.axis = .{1, 0};
-        player1.joint.lower_translation = -game_extents.x + PADDLE_EXTENTS.x;
-        player1.joint.upper_translation =  game_extents.x - PADDLE_EXTENTS.x;
-
-        player2.joint.anchor = .{0., game_extents.y};
-        player2.joint.axis = .{1, 0};
-        player2.joint.lower_translation = -game_extents.x + PADDLE_EXTENTS.x;
-        player2.joint.upper_translation =  game_extents.x - PADDLE_EXTENTS.x;
+    top : *Polyline = array_add(*level.boundary.shape.polylines);
+    if player_count == .One_Player {
+        array_add(*top.points, .{-goal.x, game.y}, .{goal.x, game.y});
+    } else if player_count == .Two_Player {
+        array_add(*top.points,
+            .{-goal.x,         game.y},
+            .{-goal.x,         game.y+goal.y},
+            .{-goal.x+goal_dy, game.y+goal.y+goal_dy},
+            .{ goal.x-goal_dy, game.y+goal.y+goal_dy},
+            .{ goal.x,         game.y+goal.y},
+            .{ goal.x,         game.y});
     }
+
+    player1.joint.anchor = .{0., -game.y};
+    player1.joint.axis = .{1, 0};
+    player1.joint.lower_translation = -goal.x + PADDLE_EXTENTS.x;
+    player1.joint.upper_translation =  goal.x - PADDLE_EXTENTS.x;
+
+    player2.joint.anchor = .{0., game.y};
+    player2.joint.axis = .{1, 0};
+    player2.joint.lower_translation = -goal.x + PADDLE_EXTENTS.x;
+    player2.joint.upper_translation =  goal.x - PADDLE_EXTENTS.x;
 
     if host_type != .CLIENT {
         init_boundary_physics();
@@ -434,6 +423,13 @@ init_obstructions :: () {
         mesh : Mesh;
         defer mesh_deinit(mesh);
 
+#if true {
+        init_prism_mesh(mesh, 4*Vector2.{PADDLE_EXTENTS.y, PADDLE_EXTENTS.y}, 0.);
+        // init_circle_mesh(mesh, 2*PADDLE_EXTENTS.y, 32);
+        b2Transform.Set(*transform, .{}, PI);
+        mesh_transform(*mesh, transform);
+        mesh_merge(*level.obstructions.mesh, mesh);
+} else {
         init_prism_mesh(mesh, extents, 0.);
         b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, PI);
         mesh_transform(*mesh, transform);
@@ -453,6 +449,7 @@ init_obstructions :: () {
         //b2Transform.Set(*transform, .{0, 0}, PI/2.);
         //mesh_transform(*mesh, transform);
         //mesh_merge(*level.obstructions.mesh, mesh);
+}
     }
 
     if host_type != .CLIENT {

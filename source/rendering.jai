@@ -5,6 +5,7 @@ YELLOW :: Vector4.{1,1,0,1};
 WHITE :: Vector4.{1,1,1,1};
 BLACK :: Vector4.{0,0,0,1};
 GREY_50 :: Vector4.{.5,.5,.5,1};
+GREY_65 :: Vector4.{.65,.65,.65,1};
 GREY_70 :: Vector4.{.7,.7,.7,1};
 
 PLAYER1_COLOR :: Vector4.{1., .3, .2, 1.};
@@ -28,10 +29,9 @@ render_one_frame :: () {
         game_extents := get_game_extents();
         draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, BOUNDARY_COLOR_NO_COLLISION);
 
-        // @Volatile :Markings
-        ax := .85 * game_extents.x;
-        draw_segment(.{-ax, -game_extents.y}, .{ax, -game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
-        draw_segment(.{-ax,  game_extents.y}, .{ax,  game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
+        goal_extents := get_goal_extents();
+        draw_segment(.{-goal_extents.x, -game_extents.y}, .{goal_extents.x, -game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
+        draw_segment(.{-goal_extents.x,  game_extents.y}, .{goal_extents.x,  game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
         
         circle : Mesh;
         init_circle_mesh(*circle, 2*PADDLE_EXTENTS.x, 32);
@@ -119,17 +119,27 @@ render_one_frame :: () {
 
     draw_powerups();
 
-    // @TODOOO Only draw if the mouse recently moved?
-    draw_cursor();
+    // Only draw the cursor if the mouse recently moved (the cursor is useful to resize the window)
+    {
+        current_mouse_x, current_mouse_y := get_client_mouse_pos(window);
+        if current_mouse_x != previous_mouse_x || current_mouse_y != previous_mouse_y {
+            draw_mouse_in_game_countdown = DRAW_MOUSE_IN_GAME_COUNTDOWN;
+        }
+        previous_mouse_x, previous_mouse_y = current_mouse_x, current_mouse_y;
 
-    // Draws the physics/collision geometry
-    //b2World.DebugDraw(world);
+        countdown(*draw_mouse_in_game_countdown);
+        Clamp(*draw_mouse_in_game_countdown, -1., DRAW_MOUSE_IN_GAME_COUNTDOWN);
+
+        if draw_mouse_in_game_countdown > 0 {
+            draw_cursor();
+        }
+    }
 }
 
 draw_menu_logo :: () {
     t := cast(float)(sin(current_time) + 1.) / 2.;
     Clamp(*t, 0., 1.);
-    use_color := lerp(WHITE, GREY_70, t);
+    use_color := lerp(WHITE, GREY_65, t);
     Simp.set_shader_for_images(*okpong_map);
     w, h : float = cast(float)window_width, cast(float)window_height;
     Simp.immediate_quad(

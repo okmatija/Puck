@@ -19,6 +19,8 @@ menu :: () {
 
     case .PAUSE_MENU;
 
+        // The pause menu should only be reachable via the call in main.jai
+        assert(false, tprint("% should only be reachable from the call in main.jai", game_menu));
         pause_menu();
 
     case .SETTINGS_MENU;
@@ -64,6 +66,60 @@ modify_string :: (ps: *string, new_value: string) {
     ps.* = copy_string(new_value);
 }
 
+pause_menu :: () {
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    cursor := CenteredCursor(5.2*k.y);
+    l, r : UI.Rect;
+
+    r = NextRect(1.75*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Settings", *button_theme);
+    if released {
+        settings_back_target_menu = .PAUSE_MENU;
+        game_menu = .SETTINGS_MENU;
+    }
+
+    l, r = NextRect2(1.25*k.x, .75*k.y);
+    _, _, released = UI.button(r, "Resume", *button_theme);
+    if released || esc_pressed { // @Cleanup only allow esc here for debugging?
+        game_mode = .PLAYING;
+    }
+    _, _, released = UI.button(l, "Leave", *button_theme);
+    if released {
+        deinit_game();
+    }
+}
+
+settings_menu :: () {
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    slider_theme := ui_theme.slider_theme;
+    slider_theme.foreground.font = font;
+    slider_theme.surface_style = .NUB;
+
+    cursor := CenteredCursor(5.2*k.y);
+    r : UI.Rect;
+
+    r = NextRect(4*k.x, .75*k.y);
+    UI.slider(r, *user_sfx_volume, 0.0, 1.0, 0.1, *slider_theme, "", " SFX volume");
+
+    r = NextRect(1.25*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Back", *button_theme);
+    if released || esc_pressed {
+        game_menu = settings_back_target_menu;
+    }
+}
+
 #scope_file
 
 main_menu :: () {
@@ -105,60 +161,6 @@ main_menu :: () {
     _, _, released = UI.button(r, "Quit", *button_theme);
     if released {
         game_quitting = true;
-    }
-}
-
-settings_menu :: () {
-    using ui_state := make_ui_state();
-
-    button_theme := ui_theme.button_theme;
-    button_theme.font = font;
-    button_theme.enable_variable_frame_thickness = true;
-    button_theme.label_theme.alignment = .Center;
-
-    slider_theme := ui_theme.slider_theme;
-    slider_theme.foreground.font = font;
-    slider_theme.surface_style = .NUB;
-
-    cursor := CenteredCursor(5.2*k.y);
-    r : UI.Rect;
-
-    r = NextRect(4*k.x, .75*k.y);
-    UI.slider(r, *user_sfx_volume, 0.0, 1.0, 0.1, *slider_theme, "", " SFX volume");
-
-    r = NextRect(1.25*k.x, .75*k.y);
-    _, _, released := UI.button(r, "Back", *button_theme);
-    if released || esc_pressed {
-        game_menu = settings_back_target_menu;
-    }
-}
-
-pause_menu :: () {
-    using ui_state := make_ui_state();
-
-    button_theme := ui_theme.button_theme;
-    button_theme.font = font;
-    button_theme.enable_variable_frame_thickness = true;
-    button_theme.label_theme.alignment = .Center;
-
-    cursor := CenteredCursor(5.2*k.y);
-    l, r : UI.Rect;
-
-    r = NextRect(1.75*k.x, .75*k.y);
-    _, _, released := UI.button(r, "Settings", *button_theme);
-    if released {
-        settings_back_target_menu = .PAUSE_MENU;
-        game_menu = .SETTINGS_MENU;
-    }
-
-    l, r = NextRect2(1.25*k.x, .75*k.y);
-    _, _, released = UI.button(r, "Resume", *button_theme);
-    if released {
-        game_mode = .PLAYING;
-    }
-    _, _, released = UI.button(l, "Leave", *button_theme);
-    if released {
-        deinit_game();
     }
 }
 
