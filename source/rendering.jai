@@ -12,26 +12,25 @@ PLAYER1_COLOR :: Vector4.{1., .3, .2, 1.};
 PLAYER2_COLOR :: Vector4.{.5, 0., 1., 1.};
 LIFE_COLOR ::    Vector4.{.7, 0., .2, 1.};
 
-BOUNDARY_COLOR :: WHITE;
-BOUNDARY_COLOR_NO_COLLISION :: GREY_50;
+BOUNDARY_COLOR :: Vector4.{0., .3, 0., 1.};
+BOUNDARY_COLOR_NO_COLLISION :: Vector4.{0., .3, 0., .2};
 POWERUP_BASE_COLOR :: GREY_70;
 
 render_one_frame :: () {
     hide_cursor();
 
-    Simp.clear_render_target(0, 0, 0, 1);
-    draw_game_background();
+    Simp.clear_render_target(.8, .4, .5, 1);
 
-    Simp.set_shader_for_color(true);
+    draw_game_background();
 
     // Cosmetics
     {
         game_extents := get_game_extents();
-        draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, BOUNDARY_COLOR_NO_COLLISION);
+        draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, BOUNDARY_COLOR_NO_COLLISION, BOUNDARY_THICKNESS_PX);
 
         goal_extents := get_goal_extents();
-        draw_segment(.{-goal_extents.x, -game_extents.y}, .{goal_extents.x, -game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
-        draw_segment(.{-goal_extents.x,  game_extents.y}, .{goal_extents.x,  game_extents.y}, BOUNDARY_COLOR_NO_COLLISION);
+        draw_segment(.{-goal_extents.x, -game_extents.y}, .{goal_extents.x, -game_extents.y}, BOUNDARY_COLOR_NO_COLLISION, BOUNDARY_THICKNESS_PX);
+        draw_segment(.{-goal_extents.x,  game_extents.y}, .{goal_extents.x,  game_extents.y}, BOUNDARY_COLOR_NO_COLLISION, BOUNDARY_THICKNESS_PX);
         
         circle : Mesh;
         init_circle_mesh(*circle, 2*PADDLE_EXTENTS.x, 32);
@@ -55,15 +54,24 @@ render_one_frame :: () {
     //draw_segment(.{-game_size.x,  game_size.y}, .{ game_size.x, -game_size.y}, .{0, 1, 0, 1});
 
     for :PolylineSegmentIterator segment : level.boundary.shape {
-        draw_segment(segment.from, segment.to, level.boundary.color);
+        draw_segment(segment.from, segment.to, level.boundary.color, BOUNDARY_THICKNESS_PX);
     }
 
     draw_player :: (player : Player) {
         draw_mesh(player.mesh, player.transform, player.color);
         for life : player.lives {
             if life.health > 0 {
+
                 use_color := lerp(BLACK, LIFE_COLOR, life.health/LIFE_MAX_HEALTH);
                 draw_mesh(life.mesh, life.transform, use_color);
+
+                // Simp.set_shader_for_images(*heart_map);
+                // Simp.immediate_quad(
+                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[1])),
+                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[2])),
+                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[3])),
+                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[4])),
+                //     use_color);
             }
         }
     }
@@ -72,7 +80,21 @@ render_one_frame :: () {
     draw_player(player2);
 
     for :LiveBalls balls {
-        draw_mesh(it.mesh, it.transform, it.color);
+        if it.shape == .Square {
+            Simp.set_shader_for_color(true);
+            draw_mesh(it.mesh, it.transform, LIFE_COLOR);
+
+            Simp.set_shader_for_images(*power_up_restore_all_life);
+            Simp.immediate_quad(
+                world_to_screen(apply_transform(it.transform, it.mesh.vertices[1])),
+                world_to_screen(apply_transform(it.transform, it.mesh.vertices[2])),
+                world_to_screen(apply_transform(it.transform, it.mesh.vertices[3])),
+                world_to_screen(apply_transform(it.transform, it.mesh.vertices[4])),
+                Vector4.{1,1,1,1});
+        } else {
+            use_color := lerp(BLACK, it.color, it.health / BALL_MAX_HEALTH);
+            draw_mesh(it.mesh, it.transform, use_color);
+        }
     }
 
     for ball_explosions {
@@ -100,24 +122,7 @@ render_one_frame :: () {
 
     //draw_score();
 
-    if game_over_text {
-        text_w := Simp.prepare_text(game_over_font, game_over_text);
-
-        base_color : Vector4 = GREEN;
-        if game_over_text == "Player 1 Wins!" {
-            base_color = player1.color;
-        } else if game_over_text == "Player 2 Wins!" {
-            base_color = player2.color;
-        }
-        use_color := lerp(WHITE, base_color, xx sin(5 * current_time));
-
-        Simp.draw_prepared_text(game_over_font,
-            xx(.33 * window_width),
-            window_height/2-game_over_font.character_height/3,
-            use_color);
-    }
-
-    draw_powerups();
+    //draw_powerups();
 
     // Only draw the cursor if the mouse recently moved (the cursor is useful to resize the window)
     {
@@ -133,6 +138,16 @@ render_one_frame :: () {
         if draw_mouse_in_game_countdown > 0 {
             draw_cursor();
         }
+    }
+
+    if DEBUGGING {
+        // Draws the physics/collision geometry
+        b2World.DebugDraw(world);
+
+        for debug_draw.segments {
+            draw_segment(it.start, it.end, it.color);
+        }
+        array_reset(*debug_draw.segments);
     }
 }
 
@@ -170,11 +185,22 @@ draw_cursor :: () {
 #scope_file
 
 draw_game_background :: () {
-    Simp.set_shader_for_images(*sky_map);
-    Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
+    #if true {
+        Simp.immediate_quad(.{0, 0}, .{xx window_width, 0}, .{xx window_width, xx window_height}, .{0, xx window_height},
+            .{.6, .5, .5, 1},
+            .{.6, .5, .5, 1},
+            .{.3, .5, .9, 1},
+            .{.3, .5, .9, 1},
+            );
+    } else {
+        Simp.set_shader_for_images(*sky_map);
+        Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
+    }
 }
 
 draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
+    Simp.set_shader_for_color(true);
+
     apply :: (t : b2Transform, v : Vector2) -> Vector3 {
         return .{xy=world_to_screen(apply_transform(t, v))};
     }
@@ -187,8 +213,11 @@ draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
     }
 }
 
-draw_segment :: (start : Vector2, end : Vector2, color : Vector4) {
-    SEGMENT_THICKNESS :: 1.; // Simp units aka pixels
+#scope_export
+
+// SEGMENT_THICKNESS in simp units aka pixels
+draw_segment :: (start : Vector2, end : Vector2, color : Vector4, $SEGMENT_THICKNESS : float = .1) {
+    Simp.set_shader_for_color(true);
 
     n := unit_vector(end - start);
     n.x, n.y = n.y, -n.x; // Rotate the unit direction by 90 degrees

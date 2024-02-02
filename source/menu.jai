@@ -23,6 +23,12 @@ menu :: () {
         assert(false, tprint("% should only be reachable from the call in main.jai", game_menu));
         pause_menu();
 
+    case .GAME_OVER_MENU;
+
+        // The pause menu should only be reachable via the call in main.jai
+        assert(false, tprint("% should only be reachable from the call in main.jai", game_menu));
+        game_over_menu();
+
     case .SETTINGS_MENU;
 
         settings_menu();
@@ -64,6 +70,40 @@ menu :: () {
 modify_string :: (ps: *string, new_value: string) {
     free(ps.*);
     ps.* = copy_string(new_value);
+}
+
+game_over_menu :: () {
+    if game_over_text {
+        text_w := Simp.prepare_text(game_over_font, game_over_text);
+
+        base_color : Vector4 = GREEN;
+        if game_over_text == "Player 1 Wins!" {
+            base_color = player1.color;
+        } else if game_over_text == "Player 2 Wins!" {
+            base_color = player2.color;
+        }
+        use_color := lerp(WHITE, base_color, xx sin(5 * current_time));
+
+        Simp.draw_prepared_text(game_over_font,
+            xx(.33 * window_width),
+            2*window_height/3-game_over_font.character_height/3,
+            use_color);
+    }
+
+    using ui_state := make_ui_state();
+
+    button_theme := ui_theme.button_theme;
+    button_theme.font = font;
+    button_theme.enable_variable_frame_thickness = true;
+    button_theme.label_theme.alignment = .Center;
+
+    cursor := CenteredCursor(5.2*k.y);
+
+    r := NextRect(1.75*k.x, .75*k.y);
+    _, _, released := UI.button(r, "Leave", *button_theme);
+    if released {
+        deinit_game();
+    }
 }
 
 pause_menu :: () {

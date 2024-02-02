@@ -1,4 +1,5 @@
 PONG_VERSION :: "Version 0.3.1";
+DEBUGGING :: false;
 
 // Default to 1080p
 WINDOW_WIDTH_INITIAL :: 1920;
@@ -16,6 +17,8 @@ BALL_RESTITUTION :: 1.0;
 BALL_COUNT_MAX :: 4;
 BALL_DAMAGE_SPEED :: #run 6. * length(initial_ball_velocity());
 BALL_MAX_HEALTH :: 100.;
+
+BOUNDARY_THICKNESS_PX :: 3;
 
 Explosion :: struct {
     EXPLOSION_DURATION :: .5; // Seconds
@@ -36,8 +39,11 @@ PADDLE_SPEED :: #run (5.0 * PADDLE_EXTENTS.x / 0.35); // move 5 paddle widths in
 PADDLE_DENSITY :: 1000;
 PADDLE_FRICTION :: 1.;
 PADDLE_RESTITUTION :: 1.2;
-PLAYER_MAX_LIVES :: 9;
-LIFE_RADIUS :: BALL_RADIUS_INITIAL;
+
+PLAYER_MAX_LIVES :: #run LIVES_GRID_ROWS * LIVES_GRID_COLS;
+LIVES_GRID_COLS :: 13;
+LIVES_GRID_ROWS :: 3;
+LIVES_GRID_SPACING :: .1;
 LIFE_MAX_HEALTH :: 100.;
 
 DEFAULT_PORT : u16 : 42069;
@@ -61,9 +67,7 @@ game_over_font : *Simp.Dynamic_Font;
 game_quitting : bool;
 game_menu : Game_Menu;
 game_mode : Game_Mode;
-game_over_countdown := GAME_OVER_COUNTDOWN;
 game_over_text : string;
-GAME_OVER_COUNTDOWN :: 3.;
 
 
 current_frame : u64;
@@ -98,6 +102,8 @@ data_folder: string;
 sky_map : Texture;
 menu_map : Texture;
 okpong_map : Texture;
+heart_map : Texture;
+power_up_restore_all_life : Texture;
 sound_start_game : Sound.Sound_Data;
 sound_collision1 : Sound.Sound_Data;
 sound_collision2 : Sound.Sound_Data;

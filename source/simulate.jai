@@ -1,5 +1,11 @@
 simulate :: () {
 
+    if game_mode != .PLAYING {
+        return;
+    }
+
+    assert(host_type == .SERVER || host_type == .LOCAL);
+
     apply_impulse_to_move_player :: (using player : *Player) {
         Control_Mode :: enum {
             KEYBOARD_SET_VELOCITY_INF_ACCELERATION;
@@ -113,11 +119,15 @@ simulate :: () {
             if ball.shape == .Circle {
                 b2Body.SetTransform(ball.body, .{get_game_extents().x - ball.radius, 0}, 0);
                 b2Body.SetLinearVelocity(ball.body, initial_ball_velocity());
+                b2Body.SetAngularVelocity(ball.body, 0.);
             } else {
-                b2Body.SetTransform(ball.body, .{0, 0}, 0);
+                d :: #run 3*BALL_RADIUS_INITIAL;
+                offsets : [4]Vector2 : .[.{d, 0}, .{0, d}, .{-d, 0}, .{0, -d}];
+
+                b2Body.SetTransform(ball.body, offsets[it_index], 0);
                 b2Body.SetLinearVelocity(ball.body, .{0., 0.});
+                b2Body.SetAngularVelocity(ball.body, 30);
             }
-            b2Body.SetAngularVelocity(ball.body, 0.);
             b2Body.SetEnabled(ball.body, true);
             ball_spawn_countdown = BALL_SPAWN_COUNTDOWN;
         }
@@ -159,9 +169,7 @@ simulate :: () {
 
 
     // Important: Do this after SetTransform above (see the comment on b2Body::SetTransform)
-    if game_over_countdown == GAME_OVER_COUNTDOWN {
-        b2World.Step(world, current_dt, 6, 2);
-    }
+    b2World.Step(world, current_dt, 6, 2);
 
     // Update the transforms used for rendering
     update_player :: (player : *Player) {

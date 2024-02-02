@@ -21,6 +21,7 @@ Game_Menu :: enum u8 {
     CONNECTING_TO_SERVER_MENU;
     SETTINGS_MENU;
     PAUSE_MENU;
+    GAME_OVER_MENU;
 }
 
 Game_Mode :: enum u8 {
@@ -84,7 +85,7 @@ Obstruction :: struct {
 }
 
 Boundary :: struct {
-    color : Vector4 = .{1., 1., 1., 1.};
+    color : Vector4 = BOUNDARY_COLOR;
     shape : Polyline_Soup;
 
     body : *b2Body; // Physics. This is not initialized or used by clients!
@@ -182,10 +183,10 @@ get_game_extents :: () -> Vector2, float {
     return extents, .75 * extents.y;
 }
 
-get_goal_extents :: () -> Vector2, float {
+get_goal_extents :: () -> Vector2 {
     padding := get_game_padding();
     extents := get_game_extents();
-    return .{ .85 * extents.x, .7 * padding.y}, .1 * padding.y;
+    return .{ .85 * extents.x, .7 * (.5*padding.y)};
 }
 
 // At least this much padding separates the game extents from the edge of the window, in game units
@@ -215,14 +216,17 @@ check_winning_condition :: () {
         player2_dead := is_player_dead(player2);
         if player1_dead && player2_dead {
             // Draw!
-            countdown(*game_over_countdown);
             game_over_text = "Draw!";
+            game_menu = .GAME_OVER_MENU;
+            game_mode = .PAUSED;
         } else if !player1_dead && player2_dead {
-            countdown(*game_over_countdown);
             game_over_text = "Player 1 Wins!"; // @Volatile search literal!
+            game_menu = .GAME_OVER_MENU;
+            game_mode = .PAUSED;
         } else if player1_dead && !player2_dead {
-            countdown(*game_over_countdown);
             game_over_text = "Player 2 Wins!"; // @Volatile search literal!
+            game_menu = .GAME_OVER_MENU;
+            game_mode = .PAUSED;
         } else {
             // Game continues
             game_over_text = "";
@@ -304,7 +308,6 @@ init_game :: (init_game_state : Init_Game_State) {
         }
     }
 
-    game_over_countdown = GAME_OVER_COUNTDOWN;
     game_mode = .PLAYING;
 }
 
@@ -354,7 +357,8 @@ init_boundary :: () {
     assert(get_goal_extents().y < get_game_padding().y);
 
     game, game_dy := get_game_extents();
-    goal, goal_dy := get_goal_extents();
+    goal := get_goal_extents();
+    goal_corner := .8 * goal.y;
 
     left : *Polyline = array_add(*level.boundary.shape.polylines);
     array_add(*left.points,
@@ -370,26 +374,27 @@ init_boundary :: () {
         .{game.x,  game_dy},
         .{goal.x,  game.y});
 
-    bottom : *Polyline = array_add(*level.boundary.shape.polylines);
-    array_add(*bottom.points,
-        .{-goal.x,         -game.y},
-        .{-goal.x,         -game.y-goal.y},
-        .{-goal.x+goal_dy, -game.y-goal.y-goal_dy},
-        .{ goal.x-goal_dy, -game.y-goal.y-goal_dy},
-        .{ goal.x,         -game.y-goal.y},
-        .{ goal.x,         -game.y});
+    goal_p1 : *Polyline = array_add(*level.boundary.shape.polylines);
+    array_add(*goal_p1.points,
+        .{-goal.x, -game.y},
+        .{-goal.x, -game.y - 2*goal.y + goal_corner},
+        .{-goal.x + goal_corner, -game.y-2*goal.y},
+        .{ goal.x - goal_corner, -game.y-2*goal.y},
+        .{ goal.x, -game.y - 2*goal.y + goal_corner},
+        .{ goal.x, -game.y});
 
-    top : *Polyline = array_add(*level.boundary.shape.polylines);
     if player_count == .One_Player {
+        top : *Polyline = array_add(*level.boundary.shape.polylines);
         array_add(*top.points, .{-goal.x, game.y}, .{goal.x, game.y});
     } else if player_count == .Two_Player {
-        array_add(*top.points,
-            .{-goal.x,         game.y},
-            .{-goal.x,         game.y+goal.y},
-            .{-goal.x+goal_dy, game.y+goal.y+goal_dy},
-            .{ goal.x-goal_dy, game.y+goal.y+goal_dy},
-            .{ goal.x,         game.y+goal.y},
-            .{ goal.x,         game.y});
+        goal_p2 : *Polyline = array_add(*level.boundary.shape.polylines);
+        array_add(*goal_p2.points,
+        .{-goal.x,  game.y},
+        .{-goal.x,  game.y + 2*goal.y - goal_corner},
+        .{-goal.x + goal_corner, game.y+2*goal.y},
+        .{ goal.x - goal_corner, game.y+2*goal.y},
+        .{ goal.x,  game.y + 2*goal.y - goal_corner},
+        .{ goal.x,  game.y});
     }
 
     player1.joint.anchor = .{0., -game.y};
@@ -416,6 +421,9 @@ init_obstructions :: () {
         extents := PADDLE_EXTENTS;
         transform : b2Transform;
         b2Transform.Constructor(*transform);
+
+        level.obstructions.color = BOUNDARY_COLOR_NO_COLLISION;
+        level.obstructions.color.w = 1.;
 
         // @Think Why is this needed with -release?? @CompilerBug??
         mesh_reset(*level.obstructions.mesh);
@@ -484,8 +492,9 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
     }
 
     for * life : lives {
-        // @Bug cannot use alpha=0 here, it triggers an assert in box2d.dll
-        init_prism_mesh(life.mesh, .{LIFE_RADIUS, LIFE_RADIUS}, .75);
+        // @Bug cannot use alpha=1. here, it triggers an assert in box2d.dll
+        _, extents, _ := compute_square_grid(get_goal_extents(), LIVES_GRID_COLS, LIVES_GRID_ROWS, LIVES_GRID_SPACING);
+        init_prism_mesh(life.mesh, extents, .0);
     }
 
     if host_type != .CLIENT {
@@ -538,4 +547,19 @@ get_ball_default_color :: (shape : Ball_Shape) -> Vector4 {
         case .Square; return POWERUP_BASE_COLOR;
     }
     return WHITE;
+}
+
+compute_square_grid :: (outer_extents : Vector2, col_count : int, row_count : int, gap : float) -> (offset : Vector2, extents : Vector2, stride : Vector2) {
+    dxdy := 2. * outer_extents - gap * Vector2.{cast(float)col_count+1, cast(float)row_count+1};
+    extents_dxy := min(dxdy.x / col_count, dxdy.y / row_count) / 2;
+
+    extents := Vector2.{extents_dxy, extents_dxy};
+
+    offset : Vector2 = ---;
+    offset.x = (2. * outer_extents.x - col_count * 2. * extents.x - (col_count-1) * gap) / 2.;
+    offset.y = (2. * outer_extents.y - row_count * 2. * extents.y - (row_count-1) * gap) / 2.;
+
+    stride := 2. * extents + Vector2.{gap, gap};
+
+    return offset, extents, stride;
 }

@@ -145,11 +145,11 @@ init_player_physics :: (using player : *Player) {
     b2BodyUserData.Constructor(*user_data);
     user_data.pointer = xx player;
 
-    for * life : lives {
-        game_size := get_game_size();
-        dy := BALL_RADIUS_INITIAL;
-        dx := game_extents.x / PLAYER_MAX_LIVES;
-
+    offset, extents, stride := compute_square_grid(get_goal_extents(), LIVES_GRID_COLS, LIVES_GRID_ROWS, .1);
+    anchor := Vector2.{get_goal_extents().x, 2 * get_goal_extents().y + get_game_extents().y};
+    
+    for row : 0..LIVES_GRID_ROWS-1 for col : 0..LIVES_GRID_COLS-1 {
+        life := *lives[col + row * LIVES_GRID_COLS];
         user_data : b2BodyUserData;
         b2BodyUserData.Constructor(*user_data);
         user_data.pointer = xx life;
@@ -160,11 +160,11 @@ init_player_physics :: (using player : *Player) {
         body_def.type = .b2_staticBody;
         if index == {
         case .P1;
-            body_def.position = Vector2.{(xx it_index+.5)*dx - game_extents.x/2, -game_size.y + 2.5*dy};
-            body_def.angle = PI;
+            body_def.position = -anchor + offset + extents + Vector2.{stride.x * col, stride.y * row};
+            body_def.angle = 0.;
         case .P2;
-            body_def.position = Vector2.{(xx it_index+.5)*dx - game_extents.x/2,  game_size.y - 2.5*dy};
-            body_def.angle = 0;
+            body_def.position =  anchor - offset - extents - Vector2.{stride.x * col, stride.y * row};
+            body_def.angle = PI;
         }
         life.body = b2World.CreateBody(world, *body_def);
 

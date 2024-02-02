@@ -229,3 +229,15 @@ debug_explosion_animation :: () {
         array_add(*ball_explosions, explosion);
     }
 }
+
+debug_draw : Debug_Draw;
+
+Debug_Draw :: struct {
+    segments : [..]Debug_Segment;
+}
+
+Debug_Segment :: struct {
+    start : Vector2;
+    end : Vector2;
+    color : Vector4;
+}

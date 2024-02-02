@@ -106,15 +106,17 @@ main :: () {
         handle_inputs();
 
         if game_mode == .PAUSED {
-            _, _, width, height := get_dimensions(window, true);
-            UI.ui_per_frame_update(window, width, height, current_time);
-
             // draw game state
             render_one_frame();
+
+            _, _, width, height := get_dimensions(window, true);
+            UI.ui_per_frame_update(window, width, height, current_time);
 
             if game_menu == {
             case .PAUSE_MENU;
                 pause_menu();
+            case .GAME_OVER_MENU;
+                game_over_menu();
             case.SETTINGS_MENU;
                 settings_menu();
             case;
@@ -182,10 +184,6 @@ main :: () {
 
             // Draw game state
             render_one_frame();
-
-            if game_over_countdown <= 0 {
-                deinit_game();
-            }
 
         } else {
             menu();
@@ -280,6 +278,8 @@ init_textures :: () {
     sky_map = make_texture("sky.png");
     menu_map = make_texture("pong2.png");
     okpong_map = make_texture("okPONG2.png");
+    heart_map = make_texture("hearts.png");
+    power_up_restore_all_life = make_texture("shining-heart.png");
 }
 
 init_sounds :: (window : *Window_Type) {
