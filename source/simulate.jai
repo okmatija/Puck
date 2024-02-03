@@ -49,7 +49,7 @@ simulate :: () {
 
                 if warp_active {
                     countdown(*warp_countdown);
-                    paddle_speed *= WARP_SPEEDUP;
+                    // paddle_speed *= WARP_SPEEDUP;
                 }
 
                 if warp_countdown <= 0  {
