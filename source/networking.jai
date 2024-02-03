@@ -119,7 +119,7 @@ Init_Game_State :: struct {
 #assert(size_of(Game_State) != size_of(Client_Input));
 #assert(size_of(Game_State) != size_of(Paddle_Shape));
 #assert(size_of(Client_Input) != size_of(Init_Game_State));
-#assert(size_of(Client_Input) != size_of(Paddle_Shape));
+#assert(size_of(Client_Input) != size_of(Paddle_Shape)); // @Think This triggers when Paddle_Shape is not specified as u8??
 #assert(size_of(Paddle_Shape) != size_of(Init_Game_State));
 
 // This data is sent by the server to all connected clients
@@ -167,6 +167,9 @@ Client_Input :: struct {
     right_down : bool;
     down_down : bool;
     up_down : bool;
+
+    power1_down : bool;
+    power2_down : bool;
 
     esc_down : bool;
 }

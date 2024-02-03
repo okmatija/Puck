@@ -142,11 +142,15 @@ main :: () {
                 player1.right = xx input1.right_down;
                 player1.down = xx input1.down_down;
                 player1.up = xx input1.up_down;
+                player1.power1 = xx input1.power1_down;
+                player1.power2 = xx input1.power2_down;
 
                 player2.left = xx input2.left_down;
                 player2.right = xx input2.right_down;
                 player2.down = xx input2.down_down;
                 player2.up = xx input2.up_down;
+                player2.power1 = xx input2.power1_down;
+                player2.power2 = xx input2.power2_down;
 
                 simulate();
 
@@ -156,6 +160,8 @@ main :: () {
                 player1.right = xx input1.right_down;
                 player1.down = xx input1.down_down;
                 player1.up = xx input1.up_down;
+                player1.power1 = xx input1.power1_down;
+                player1.power2 = xx input1.power2_down;
 
                 input, received := receive_input();
                 if received {
@@ -163,6 +169,8 @@ main :: () {
                     player2.right = xx input.right_down;
                     player2.down = xx input.down_down;
                     player2.up = xx input.up_down;
+                    player2.power1 = xx input.power1_down;
+                    player2.power2 = xx input.power2_down;
                 }
 
                 simulate();
@@ -221,14 +229,18 @@ handle_inputs :: () {
         if event.type == .KEYBOARD {
             if event.key_code == {
 
-            case #char "I"; #through; case .ARROW_UP;
+            case #char "I";
                 input1.up_down = xx event.key_pressed;
-            case #char "J"; #through; case .ARROW_LEFT;
+            case #char "J";
                 input1.left_down = xx event.key_pressed;
-            case #char "K"; #through; case .ARROW_DOWN;
+            case #char "K";
                 input1.down_down = xx event.key_pressed;
-            case #char "L"; #through; case .ARROW_RIGHT;
+            case #char "L";
                 input1.right_down = xx event.key_pressed;
+            case #char "U";
+                input1.power1_down = xx event.key_pressed;
+            case #char "O";
+                input1.power2_down = xx event.key_pressed;
 
             case #char "W";
                 input2.up_down = xx event.key_pressed;
@@ -238,7 +250,10 @@ handle_inputs :: () {
                 input2.down_down = xx event.key_pressed;
             case #char "D";
                 input2.right_down = xx event.key_pressed;
-
+            case #char "Q";
+                input2.power1_down = xx event.key_pressed;
+            case #char "E";
+                input2.power2_down = xx event.key_pressed;
             }
         }
 

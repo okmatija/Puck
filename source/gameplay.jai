@@ -42,7 +42,7 @@ Ball_Shape :: enum {
 }
 #insert #run generate_dropdown_choices("ball_shape_choices", Ball_Shape);
 
-Paddle_Shape :: enum {
+Paddle_Shape :: enum u8 {
     Box;     // aka rectangle
     Prism;   // aka isosceles trapezoid
     Dome;    // aka circular segment
@@ -142,6 +142,8 @@ Player :: struct {
     right : u32;
     down : u32;
     up : u32;
+    power1 : u32;
+    power2 : u32;
 
     warp_active := false;
     warp_countdown := WARP_COUNTDOWN;
