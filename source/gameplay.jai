@@ -478,8 +478,17 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
     color = ifx index == .P1 then PLAYER1_COLOR else PLAYER2_COLOR;
     paddle_shape = player_paddle_shape;
 
-    for * lives {
-        it.health = LIFE_MAX_HEALTH;
+    for row : 0..LIVES_GRID_ROWS-1 for col : 0..LIVES_GRID_COLS-1 {
+        life := *lives[col + row * LIVES_GRID_COLS];
+        if row == 2 {
+            if col < 6 || col > LIVES_GRID_COLS-7 {
+                life.health = LIFE_MAX_HEALTH / 2.;
+            } else {
+                life.health = LIFE_MAX_HEALTH;
+            }
+        } else {
+            life.health = 0.;
+        }
     }
 
     if #complete paddle_shape == {
