@@ -15,6 +15,7 @@
 * Added a game over menu rather than automatically exiting to the main menu
 * Added auto hiding of the mouse pointer if it doesn't move during game
 * Updated the logo and tweaked the colors/graphics
+* Changed the font from Anonymous Pro to SkyTree by MONTAGNA
 
 I changed my mind on powerups, I think they would make it worse by diluting what the game is intended to be about: precise movements learning about angles/reflections.
 

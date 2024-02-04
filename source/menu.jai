@@ -217,6 +217,9 @@ play_local_game_menu :: () {
     label_theme.alignment = .Left;
 
     dropdown_theme := *ui_theme.dropdown_theme;
+    dropdown_theme.theme_for_current_value.font = font;
+    dropdown_theme.theme_for_each_choice.font = font;
+    dropdown_theme.theme_for_current_choice.font = font;
 
     player_count_s32 := cast(s32)player_count;
     paddle_shape_s32 := cast(s32)paddle_shape;
@@ -290,6 +293,9 @@ join_network_game_menu :: () {
     label_theme.alignment = .Left;
 
     dropdown_theme := *ui_theme.dropdown_theme;
+    dropdown_theme.theme_for_current_value.font = font;
+    dropdown_theme.theme_for_each_choice.font = font;
+    dropdown_theme.theme_for_current_choice.font = font;
 
     paddle_shape_s32 : s32 = cast(s32)paddle_shape;
 
@@ -353,6 +359,9 @@ host_network_game_menu :: () {
     label_theme.alignment = .Left;
 
     dropdown_theme := *ui_theme.dropdown_theme;
+    dropdown_theme.theme_for_current_value.font = font;
+    dropdown_theme.theme_for_each_choice.font = font;
+    dropdown_theme.theme_for_current_choice.font = font;
 
     paddle_shape_s32 := cast(s32)paddle_shape;
     ball_shape_s32 := cast(s32)ball_shape;

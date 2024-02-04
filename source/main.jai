@@ -269,14 +269,17 @@ init_fonts :: () {
     set_working_directory(path);
     pixel_height := window_height / 24;
 
+    // font_name := "Anonymous Pro.ttf";
+    font_name := "Skytree_by_MONTAGNA.ttf";
+
     // @Cleanup: Don't have path + name be separate.
-    font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", pixel_height);
+    font = Simp.get_font_at_size("data", font_name, pixel_height);
     assert(font != null);
 
-    version_font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", pixel_height / 2);
+    version_font = Simp.get_font_at_size("data", font_name, pixel_height / 2);
     assert(version_font != null);
 
-    game_over_font = Simp.get_font_at_size("data", "Anonymous Pro.ttf", 2 * pixel_height);
+    game_over_font = Simp.get_font_at_size("data", font_name, 2 * pixel_height);
     assert(game_over_font != null);
 }
 
