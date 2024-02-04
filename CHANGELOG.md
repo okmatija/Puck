@@ -1,10 +1,22 @@
-# Version 0.3.1, WIP
+# Version 0.5.0
 
-* Updated the logo and menu
-* Showing the pause menu on top of the paused game
-* Tweaked ball explosions so it happens when ball health is zero
-* Hide mouse pointer when playing game, but show it if it moves
+* TODO Moved time warp to U and Q
+* TODO Added controls menu
 
+# Version 0.4.0, WIP
+
+* Changed hearts to a row of red boxes (aka "lives") behind each player
+* Changed ball colors to match the players, when balls matching your color hit your lives, they heal them rather than inflicting damage
+* Changed ball spawning to come from a notch on left/right for player 1/2
+* Changed explosion mechanics so explosions occur when ball health reaches zero (balls loose health in high-speed collisions)
+* Changed the pause menu so it shows on top of the paused game
+* Allowed the paddle move beyond the boundary so its easier to aim balls
+* Removed arrow key controls for player one, use JKL instead (later UIO and QWE keys will also be used)
+* Added a game over menu rather than automatically exiting to the main menu
+* Added auto hiding of the mouse pointer if it doesn't move during game
+* Updated the logo and tweaked the colors/graphics
+
+I changed my mind on powerups, I think they would make it worse by diluting what the game is intended to be about: precise movements learning about angles/reflections.
 
 # Version 0.3.0, 31 January 2024
 

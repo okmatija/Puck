@@ -10,13 +10,19 @@ WINDOW_HEIGHT_INITIAL :: 1080;
 // WINDOW_HEIGHT_INITIAL :: #run cast(s32)(1.5*800);
 DT_MAX : float : 0.15;
 
-BALL_RADIUS_INITIAL :: 0.4;
+BALL_INITIAL_RADIUS :: 0.4;
 BALL_DENSITY :: 1.0;
 BALL_FRICTION :: 1.0;
 BALL_RESTITUTION :: 1.0;
-BALL_COUNT_MAX :: 4;
-BALL_DAMAGE_SPEED :: #run 6. * length(initial_ball_velocity());
+BALL_COUNT_MAX :: 2;
 BALL_MAX_HEALTH :: 100.;
+BALL_DAMAGE_SPEED :: #run 4. * BALL_INITIAL_SPEED;
+BALL_INITIAL_SPEED :: #run 5. * PADDLE_EXTENTS.x / 1.; // 5 paddle lengths in 1 second
+BALL_SPAWN_COUNTDOWN :: 2.;
+
+
+player1_ball_spawn_countdown := 0.;
+player2_ball_spawn_countdown := 0.;
 
 BOUNDARY_THICKNESS_PX :: 3;
 
@@ -81,8 +87,6 @@ player2 : Player;
 player_count : Player_Count = .Two_Player;
 balls : [BALL_COUNT_MAX]Ball;
 
-ball_spawn_countdown := 0.;
-BALL_SPAWN_COUNTDOWN :: 2.;
 
 world : *b2World;
 contact_listener : b2ContactListener;

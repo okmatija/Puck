@@ -225,7 +225,7 @@ debug_explosion_animation :: () {
         colors : [4]Vector4 : .[RED, GREEN, BLUE, WHITE];
         explosion : Explosion;
         explosion.color = colors[index];
-        explosion.radius = BALL_RADIUS_INITIAL;
+        explosion.radius = BALL_INITIAL_RADIUS;
         array_add(*ball_explosions, explosion);
     }
 }

@@ -8,20 +8,31 @@ apply_transform :: (transform: b2Transform, point: Vector2) -> Vector2 {
 
 
 
-Tuple2 :: struct {
-    x, y : int; // @Cleanup i, j should be primary
+Tuple2 :: struct (T : Type = s8) {
+    x, y : T; // @Cleanup i, j should be primary
 
-#place x; component : [2]int = ---;
+#place x; component : [2]T = ---;
 
-#place x; i : int = ---;
-#place y; j : int = ---;
+#place x; i : T = ---;
+#place y; j : T = ---;
 
-#place x; w : int = ---;
-#place y; h : int = ---;
+#place x; a : T = ---;
+#place y; b : T = ---;
+
+#place x; w : T = ---;
+#place y; h : T = ---;
 }
 
 
 Tuple3 :: struct (T : Type = s8) {
     i, j, k : T;
     #place i; component : [3] T = ---;
+
+#place i; x : T = ---;
+#place j; y : T = ---;
+#place k; z : T = ---;
+
+#place i; a : T = ---;
+#place j; b : T = ---;
+#place k; c : T = ---;
 }

@@ -71,7 +71,7 @@ Player_Index :: enum u8 #specified {
     P2 :: 1;
     //P3 :: 2;
     //P4 :: 4;
-    UNKNOWN :: 0xFF;
+    UNKNOWN :: 0xFF; // @Cleanup Do we need this???
 }
 
 Obstruction :: struct {
@@ -101,11 +101,12 @@ Ball :: struct {
     using #as base : Entity;
     base.kind = .Ball;
 
+    player_index : Player_Index;
     live : bool; // Orthogonal to health, since we might want to disable a ball without changing its health
     health : float = BALL_MAX_HEALTH;
 
     shape : Ball_Shape;
-    radius : float = BALL_RADIUS_INITIAL;
+    radius : float = BALL_INITIAL_RADIUS;
 
     mesh : Mesh;
     color : Vector4 = YELLOW;
@@ -161,6 +162,8 @@ Player :: struct {
 Life :: struct {
     using #as base : Entity;
     base.kind = .Life;
+
+    player_index : Player_Index;
 
     body : *b2Body;
 
@@ -298,14 +301,21 @@ init_game :: (init_game_state : Init_Game_State) {
             /*
             case 0;
                 ball.color = POWERUP_BASE_COLOR;
-                ball.radius = BALL_RADIUS_INITIAL;
+                ball.radius = BALL_INITIAL_RADIUS;
                 init_ball(ball, .Square);
             case 1;
-                ball.radius = .7 * BALL_RADIUS_INITIAL;
+                ball.radius = .7 * BALL_INITIAL_RADIUS;
                 init_ball(ball, init_game_state.ball_shape);
             */
             case;
-                ball.radius = BALL_RADIUS_INITIAL;
+                if it_index % 2 == 0 {
+                    ball.player_index = .P1;
+                    ball.color = player1.color;
+                } else {
+                    ball.player_index = .P2;
+                    ball.color = player2.color;
+                }
+                ball.radius = BALL_INITIAL_RADIUS;
                 init_ball(ball, init_game_state.ball_shape);
         }
     }
@@ -361,11 +371,15 @@ init_boundary :: () {
     game, game_dy := get_game_extents();
     goal := get_goal_extents();
     goal_corner := .8 * goal.y;
+    edge_middle := BALL_INITIAL_RADIUS * sqrt(2.);
 
     left : *Polyline = array_add(*level.boundary.shape.polylines);
     array_add(*left.points,
         .{-goal.x, -game.y},
         .{-game.x, -game_dy},
+        .{-game.x, -edge_middle},
+        .{-game.x + edge_middle, 0.},
+        .{-game.x,  edge_middle},
         .{-game.x,  game_dy},
         .{-goal.x,  game.y});
 
@@ -373,6 +387,9 @@ init_boundary :: () {
     array_add(*right.points,
         .{goal.x, -game.y},
         .{game.x, -game_dy},
+        .{game.x, -edge_middle},
+        .{game.x - edge_middle, 0.},
+        .{game.x,  edge_middle},
         .{game.x,  game_dy},
         .{goal.x,  game.y});
 
@@ -399,15 +416,18 @@ init_boundary :: () {
         .{ goal.x,  game.y});
     }
 
+    // Let the players disappear into the boundary halfway so you can position
+    // the left/right facing edge of the paddle to a ball moving right/left
+
     player1.joint.anchor = .{0., -game.y};
     player1.joint.axis = .{1, 0};
-    player1.joint.lower_translation = -goal.x + PADDLE_EXTENTS.x;
-    player1.joint.upper_translation =  goal.x - PADDLE_EXTENTS.x;
+    player1.joint.lower_translation = -goal.x;
+    player1.joint.upper_translation =  goal.x;
 
     player2.joint.anchor = .{0., game.y};
     player2.joint.axis = .{1, 0};
-    player2.joint.lower_translation = -goal.x + PADDLE_EXTENTS.x;
-    player2.joint.upper_translation =  goal.x - PADDLE_EXTENTS.x;
+    player2.joint.lower_translation = -goal.x;
+    player2.joint.upper_translation =  goal.x;
 
     if host_type != .CLIENT {
         init_boundary_physics();
@@ -434,7 +454,7 @@ init_obstructions :: () {
         defer mesh_deinit(mesh);
 
 #if true {
-        init_prism_mesh(mesh, 4*Vector2.{PADDLE_EXTENTS.y, PADDLE_EXTENTS.y}, 0.);
+        init_prism_mesh(mesh, Vector2.{PADDLE_EXTENTS.x, PADDLE_EXTENTS.y}, 0.);
         // init_circle_mesh(mesh, 2*PADDLE_EXTENTS.y, 32);
         b2Transform.Set(*transform, .{}, PI);
         mesh_transform(*mesh, transform);
@@ -482,6 +502,7 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
 
     for row : 0..LIVES_GRID_ROWS-1 for col : 0..LIVES_GRID_COLS-1 {
         life := *lives[col + row * LIVES_GRID_COLS];
+        life.player_index = player_index;
         if row == 2 {
             if col < 6 || col > LIVES_GRID_COLS-7 {
                 life.health = LIFE_MAX_HEALTH / 2.;
@@ -550,14 +571,6 @@ LiveBalls :: (ball_array : *[BALL_COUNT_MAX]Ball, body : Code, flags : For_Flags
             #insert body;
         }
     }
-}
-
-get_ball_default_color :: (shape : Ball_Shape) -> Vector4 {
-    if #complete shape == {
-        case .Circle; return YELLOW;
-        case .Square; return POWERUP_BASE_COLOR;
-    }
-    return WHITE;
 }
 
 compute_square_grid :: (outer_extents : Vector2, col_count : int, row_count : int, gap : float) -> (offset : Vector2, extents : Vector2, stride : Vector2) {

@@ -53,10 +53,6 @@ render_one_frame :: () {
     //draw_segment(.{-game_size.x, -game_size.y}, .{ game_size.x,  game_size.y}, .{1, 0, 0, 1});
     //draw_segment(.{-game_size.x,  game_size.y}, .{ game_size.x, -game_size.y}, .{0, 1, 0, 1});
 
-    for :PolylineSegmentIterator segment : level.boundary.shape {
-        draw_segment(segment.from, segment.to, level.boundary.color, BOUNDARY_THICKNESS_PX);
-    }
-
     draw_player :: (player : Player) {
         draw_mesh(player.mesh, player.transform, player.color);
         for life : player.lives {
@@ -94,8 +90,21 @@ render_one_frame :: () {
         } else {
             use_color := lerp(BLACK, it.color, it.health / BALL_MAX_HEALTH);
             draw_mesh(it.mesh, it.transform, use_color);
+
+            for t : it.mesh.triangles {
+                start := apply_transform(it.transform, it.mesh.vertices[t.b]);
+                end :=   apply_transform(it.transform, it.mesh.vertices[t.c]);
+                edge_color := YELLOW;
+                edge_color.w = .7;
+                draw_segment(start, end, edge_color, 3);
+            }
         }
     }
+
+    for :PolylineSegmentIterator segment : level.boundary.shape {
+        draw_segment(segment.from, segment.to, level.boundary.color, BOUNDARY_THICKNESS_PX);
+    }
+
 
     for ball_explosions {
         r := it.radius;
@@ -182,21 +191,6 @@ draw_cursor :: () {
     Simp.immediate_quad(v[0], v[1], v[2], v[3], color);
 }
 
-#scope_file
-
-draw_game_background :: () {
-    #if true {
-        Simp.immediate_quad(.{0, 0}, .{xx window_width, 0}, .{xx window_width, xx window_height}, .{0, xx window_height},
-            .{.6, .5, .5, 1},
-            .{.6, .5, .5, 1},
-            .{.3, .5, .9, 1},
-            .{.3, .5, .9, 1},
-            );
-    } else {
-        Simp.set_shader_for_images(*sky_map);
-        Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
-    }
-}
 
 draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
     Simp.set_shader_for_color(true);
@@ -213,10 +207,8 @@ draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
     }
 }
 
-#scope_export
-
 // SEGMENT_THICKNESS in simp units aka pixels
-draw_segment :: (start : Vector2, end : Vector2, color : Vector4, $SEGMENT_THICKNESS : float = .1) {
+draw_segment :: (start : Vector2, end : Vector2, color : Vector4, SEGMENT_THICKNESS : float = .1) {
     Simp.set_shader_for_color(true);
 
     n := unit_vector(end - start);
@@ -230,6 +222,9 @@ draw_segment :: (start : Vector2, end : Vector2, color : Vector4, $SEGMENT_THICK
     q1 := e + n * .5 * SEGMENT_THICKNESS;
     Simp.immediate_quad(q0, q1, q2, q3, color, color, color, color);
 }
+
+
+#scope_file
 
 draw_powerups :: () {
     text_w := Simp.prepare_text(font, "Warp");
@@ -248,6 +243,20 @@ draw_powerups :: () {
             window_width - 3 * window_width/30,
             window_height - font.character_height,
             ifx player2.warp_active then warp_active_color else warp_ready_color);
+    }
+}
+
+draw_game_background :: () {
+    #if true {
+        Simp.immediate_quad(.{0, 0}, .{xx window_width, 0}, .{xx window_width, xx window_height}, .{0, xx window_height},
+            .{.6, .5, .5, 1},
+            .{.6, .5, .5, 1},
+            .{.3, .5, .9, 1},
+            .{.3, .5, .9, 1},
+            );
+    } else {
+        Simp.set_shader_for_images(*sky_map);
+        Simp.immediate_quad(0, 0, xx window_width, xx window_height, Vector4.{1,1,1,1});
     }
 }
 

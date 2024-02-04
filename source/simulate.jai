@@ -59,8 +59,8 @@ simulate :: () {
                     Sound.start_playing(stream);
 
                     warp_active = false;
-                    time_factor = 1.;
                     warp_countdown = WARP_COUNTDOWN;
+                    time_factor = 1.;
                 }
             }
 
@@ -109,19 +109,39 @@ simulate :: () {
 
     // If there are any dead balls revive one after the spawn countdown
     for * :DeadBalls ball : balls {
-        countdown(*ball_spawn_countdown);
+        ball_spawn_countdown : *float;
+        if #complete ball.player_index == {
+        case .P1;
+            ball_spawn_countdown = *player1_ball_spawn_countdown;
+        case .P2;
+            ball_spawn_countdown = *player2_ball_spawn_countdown;
+        case .UNKNOWN;
+            assert(false);
+        }
 
-        if ball_spawn_countdown <= 0  {
+        countdown(ball_spawn_countdown);
+
+        if ball_spawn_countdown.* <= 0.  {
             ball.live = true;
             ball.health = BALL_MAX_HEALTH;
-            ball.color = get_ball_default_color(ball.shape);
 
             if ball.shape == .Circle {
-                b2Body.SetTransform(ball.body, .{get_game_extents().x - ball.radius, 0}, 0);
-                b2Body.SetLinearVelocity(ball.body, initial_ball_velocity());
-                b2Body.SetAngularVelocity(ball.body, 0.);
+                if #complete ball.player_index == {
+                case .P1;
+                    b2Body.SetTransform(ball.body, .{get_game_extents().x - ball.radius, -ball.radius}, 0);
+                    ball_velocity := BALL_INITIAL_SPEED * unit_vector(Vector2.{-1., -1.});
+                    b2Body.SetLinearVelocity(ball.body, ball_velocity);
+                    b2Body.SetAngularVelocity(ball.body, 0.);
+                case .P2;
+                    b2Body.SetTransform(ball.body, .{-get_game_extents().x + ball.radius, ball.radius}, 0);
+                    ball_velocity := BALL_INITIAL_SPEED * unit_vector(Vector2.{1., 1.});
+                    b2Body.SetLinearVelocity(ball.body, ball_velocity);
+                    b2Body.SetAngularVelocity(ball.body, 0.);
+                case .UNKNOWN;
+                    assert(false);
+                }
             } else {
-                d :: #run 3*BALL_RADIUS_INITIAL;
+                d :: #run 3*BALL_INITIAL_RADIUS;
                 offsets : [4]Vector2 : .[.{d, 0}, .{0, d}, .{-d, 0}, .{0, -d}];
 
                 b2Body.SetTransform(ball.body, offsets[it_index], 0);
@@ -129,10 +149,10 @@ simulate :: () {
                 b2Body.SetAngularVelocity(ball.body, 30);
             }
             b2Body.SetEnabled(ball.body, true);
-            ball_spawn_countdown = BALL_SPAWN_COUNTDOWN;
+            ball_spawn_countdown.* = BALL_SPAWN_COUNTDOWN;
         }
 
-        break; // Just spawn one new ball
+        // break; // Just spawn one new ball
     }
 
     // simulate_attractor_balls(5000);
@@ -203,8 +223,6 @@ simulate :: () {
     // for live_emitters update_emitter(it, current_dt);
 }
 
-initial_ball_velocity :: () -> Vector2 {
-    return .{-5.0 * PADDLE_EXTENTS.x / 1., 0};
 }
 
 begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
@@ -215,7 +233,7 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
         stream.user_volume_scale = user_sfx_volume;
         Sound.start_playing(stream);
 
-        // @FIXMEEE Need to check Is
+        // @FIXMEEE Need to check IsTouching???
         a : *b2Fixture = b2Contact.GetFixtureA(contact);
         b : *b2Fixture = b2Contact.GetFixtureB(contact);
 
@@ -235,7 +253,8 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
             if kind == .Ball && speed2 > BALL_DAMAGE_SPEED*BALL_DAMAGE_SPEED {
                 ball := cast(*Ball)data.pointer;
 
-                ball.health -= (BALL_MAX_HEALTH / 2. + 1.); // +1 so 2 high speed collisions definitely kills the ball
+                N :: 3.;
+                ball.health -= (BALL_MAX_HEALTH / N + 1.); // +1 so N high speed collisions definitely kills the ball
 
                 if ball.health < 0. {
                     // ball.SetEnabled(false); // Disable the collision
@@ -288,12 +307,24 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
 
             // @Gameplay Maybe our color balls add health? (but can only set ball color from hitting on the front of paddle?)
             life := cast(*Life)a_data.pointer;
-            life.health -= LIFE_MAX_HEALTH / 2.;
+            ball := cast(*Ball)b_data.pointer;
+            if life. player_index == ball.player_index {
+                life.health += LIFE_MAX_HEALTH / 2.;
+            } else {
+                life.health -= LIFE_MAX_HEALTH / 2.;
+            }
+            Clamp(*life.health, 0., LIFE_MAX_HEALTH);
 
         } else if a_kind == .Ball && b_kind == .Life {
 
             life := cast(*Life)b_data.pointer;
-            life.health -= LIFE_MAX_HEALTH / 2.;
+            ball := cast(*Ball)a_data.pointer;
+            if life. player_index == ball.player_index {
+                life.health += LIFE_MAX_HEALTH / 2.;
+            } else {
+                life.health -= LIFE_MAX_HEALTH / 2.;
+            }
+            Clamp(*life.health, 0., LIFE_MAX_HEALTH);
 
         }
     }
