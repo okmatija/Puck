@@ -58,7 +58,7 @@ draw_body :: (body : *b2Body, color : Vector4) #deprecated "Render using mesh/tr
 
         transform :: (body : *b2Body, v : Vector2) -> Vector3 {
             t := b2Body.GetTransform(body);
-            return .{xy=world_to_screen(apply_transform(t, v))};
+            return .{xy=world_to_screen(b2Mul(t, v))};
         }
 
         if shape_type == .polygon {

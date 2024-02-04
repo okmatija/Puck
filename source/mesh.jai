@@ -37,15 +37,17 @@ deinit_polyline_soup :: (soup : *Polyline_Soup) {
     array_reset(*soup.polylines);
 }
 
+Triangle :: Tuple3(s16); // @Volatile This limits max vertices
+
 Mesh :: struct {
     vertices : [..]Vector2;
-    triangles : [..]Tuple3;
+    triangles : [..]Triangle;
 }
 
 // We don't really need to pass a pointer here but it makes it clearer we are modifying the struct?
 mesh_transform :: (mesh : *Mesh, transform : b2Transform) {
     for * mesh.vertices {
-        it.* = apply_transform(transform, it.*);
+        it.* = b2Mul(transform, it.*);
     }
 }
 
@@ -83,7 +85,7 @@ init_circle_mesh :: (mesh : Mesh, radius : float, $CIRCLE_SEGMENTS : int = 16) {
 
     r1 : Vector2 = .{cosInc, sinInc};
     v1 : Vector2 = radius * r1;
-    t0 : s8 = 0;
+    t0 : Triangle.T = 0;
     for i : 0..CIRCLE_SEGMENTS-1 {
         // Perform rotation to avoid additional trigonometry.
         r2 : Vector2 = ---;
@@ -107,7 +109,7 @@ circle_segment_mesh :: (mesh : Mesh, radius : float, start_angle_radians : float
 
     r1 : Vector2 = .{cos(start_angle_radians), sin(start_angle_radians)};
     v1 : Vector2 = radius * r1;
-    i0 : s8 = 0;
+    i0 : Triangle.T = 0;
     for i : 0..segment_count-1 {
         // Perform rotation to avoid additional trigonometry.
         r2 : Vector2 = ---;

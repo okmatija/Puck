@@ -63,10 +63,10 @@ render_one_frame :: () {
 
                 // Simp.set_shader_for_images(*heart_map);
                 // Simp.immediate_quad(
-                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[1])),
-                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[2])),
-                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[3])),
-                //     world_to_screen(apply_transform(life.transform, life.mesh.vertices[4])),
+                //     world_to_screen(b2Mul(life.transform, life.mesh.vertices[1])),
+                //     world_to_screen(b2Mul(life.transform, life.mesh.vertices[2])),
+                //     world_to_screen(b2Mul(life.transform, life.mesh.vertices[3])),
+                //     world_to_screen(b2Mul(life.transform, life.mesh.vertices[4])),
                 //     use_color);
             }
         }
@@ -82,18 +82,18 @@ render_one_frame :: () {
 
             Simp.set_shader_for_images(*power_up_restore_all_life);
             Simp.immediate_quad(
-                world_to_screen(apply_transform(it.transform, it.mesh.vertices[1])),
-                world_to_screen(apply_transform(it.transform, it.mesh.vertices[2])),
-                world_to_screen(apply_transform(it.transform, it.mesh.vertices[3])),
-                world_to_screen(apply_transform(it.transform, it.mesh.vertices[4])),
+                world_to_screen(b2Mul(it.transform, it.mesh.vertices[1])),
+                world_to_screen(b2Mul(it.transform, it.mesh.vertices[2])),
+                world_to_screen(b2Mul(it.transform, it.mesh.vertices[3])),
+                world_to_screen(b2Mul(it.transform, it.mesh.vertices[4])),
                 Vector4.{1,1,1,1});
         } else {
             use_color := lerp(BLACK, it.color, it.health / BALL_MAX_HEALTH);
             draw_mesh(it.mesh, it.transform, use_color);
 
             for t : it.mesh.triangles {
-                start := apply_transform(it.transform, it.mesh.vertices[t.b]);
-                end :=   apply_transform(it.transform, it.mesh.vertices[t.c]);
+                start := b2Mul(it.transform, it.mesh.vertices[t.b]);
+                end :=   b2Mul(it.transform, it.mesh.vertices[t.c]);
                 edge_color := YELLOW;
                 edge_color.w = .7;
                 draw_segment(start, end, edge_color, 3);
@@ -199,7 +199,7 @@ draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
     Simp.set_shader_for_color(true);
 
     apply :: (t : b2Transform, v : Vector2) -> Vector3 {
-        return .{xy=world_to_screen(apply_transform(t, v))};
+        return .{xy=world_to_screen(b2Mul(t, v))};
     }
 
     for t : mesh.triangles {
