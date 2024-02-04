@@ -421,13 +421,13 @@ init_boundary :: () {
 
     player1.joint.anchor = .{0., -game.y};
     player1.joint.axis = .{1, 0};
-    player1.joint.lower_translation = -goal.x;
-    player1.joint.upper_translation =  goal.x;
+    player1.joint.lower_translation = -goal.x - PADDLE_EXTENTS.x;
+    player1.joint.upper_translation =  goal.x + PADDLE_EXTENTS.x;
 
     player2.joint.anchor = .{0., game.y};
     player2.joint.axis = .{1, 0};
-    player2.joint.lower_translation = -goal.x;
-    player2.joint.upper_translation =  goal.x;
+    player2.joint.lower_translation = -goal.x - PADDLE_EXTENTS.x;
+    player2.joint.upper_translation =  goal.x + PADDLE_EXTENTS.x;
 
     if host_type != .CLIENT {
         init_boundary_physics();
