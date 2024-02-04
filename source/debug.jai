@@ -232,6 +232,12 @@ debug_explosion_animation :: () {
 
 debug_draw : Debug_Draw;
 
+add_debug_segment :: (segment : Debug_Segment) {
+    #if DEBUG_DRAW {
+        array_add(*debug_draw.segments, segment);
+    }
+}
+
 Debug_Draw :: struct {
     segments : [..]Debug_Segment;
 }
@@ -240,4 +246,5 @@ Debug_Segment :: struct {
     start : Vector2;
     end : Vector2;
     color : Vector4;
+    thickness : float = 4.;
 }

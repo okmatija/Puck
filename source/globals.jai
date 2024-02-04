@@ -1,5 +1,6 @@
-PONG_VERSION :: "Version 0.3.1";
-DEBUGGING :: false;
+PONG_VERSION :: "Version 0.4.0";
+DEBUG_DRAW :: false;
+DEBUG_DRAW_BOX2D :: false;
 
 // Default to 1080p
 WINDOW_WIDTH_INITIAL :: 1920;
@@ -123,4 +124,5 @@ user_sfx_volume : float = .1;
 time_factor := 1.;
 TIME_FACTOR :: .3;
 WARP_SPEEDUP :: #run 1. / TIME_FACTOR;
-WARP_COUNTDOWN :: .4;;
+WARP_COUNTDOWN :: .4;
+

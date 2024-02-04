@@ -149,12 +149,15 @@ render_one_frame :: () {
         }
     }
 
-    if DEBUGGING {
+    if DEBUG_DRAW_BOX2D {
         // Draws the physics/collision geometry
         b2World.DebugDraw(world);
+    }
 
+
+    if DEBUG_DRAW {
         for debug_draw.segments {
-            draw_segment(it.start, it.end, it.color);
+            draw_segment(it.start, it.end, it.color, it.thickness);
         }
         array_reset(*debug_draw.segments);
     }
