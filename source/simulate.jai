@@ -223,8 +223,6 @@ simulate :: () {
     // for live_emitters update_emitter(it, current_dt);
 }
 
-}
-
 begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
     new_context : Context;
     push_context new_context {
