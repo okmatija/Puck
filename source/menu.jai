@@ -222,6 +222,7 @@ play_local_game_menu :: () {
     dropdown_theme.theme_for_current_choice.font = font;
 
     player_count_s32 := cast(s32)player_count;
+    ai_skill_s32 := cast(s32)ai_player.skill;
     paddle_shape_s32 := cast(s32)paddle_shape;
     ball_shape_s32 := cast(s32)ball_shape;
     level_s32 := cast(s32)level_id;
@@ -232,8 +233,10 @@ play_local_game_menu :: () {
     l, r = NextRect2(2.2*k.x, .5*k.y);
     PlayerCountDropdown(l, r);
 
-    l, r = NextRect2(2.2*k.x, .5*k.y);
-    BallShapeDropdown(l, r);
+    if player_count == .One_Player {
+        l, r = NextRect2(2.2*k.x, .5*k.y);
+        AiSkillDropdown(l, r);
+    }
 
     // @TODOO Player 1 and 2 paddle shapes
     l, r = NextRect2(2.2*k.x, .5*k.y);
@@ -272,6 +275,7 @@ play_local_game_menu :: () {
 
     UI.draw_popups();  // This draws Subwindows as well. Used by dropdowns
     player_count = cast(Player_Count)player_count_s32;
+    ai_player.skill = cast(Ai_Skill)ai_skill_s32;
     paddle_shape = cast(Paddle_Shape)paddle_shape_s32;
     ball_shape = cast(Ball_Shape)ball_shape_s32;
     level_id = cast(Level_Id)level_s32;
@@ -554,6 +558,11 @@ PlayerCountDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
     UI.label(l, "Players", *`label_theme);
     UI.dropdown(r, player_count_choices, *`player_count_s32, `dropdown_theme);
 }
+AiSkillDropdown :: (l : UI.Rect, r : UI.Rect) #expand {
+    UI.label(l, "Ai Skill", *`label_theme);
+    UI.dropdown(r, ai_skill_choices, *`ai_skill_s32, `dropdown_theme);
+}
+
 
 ball_shape : Ball_Shape = .Circle;
 paddle_shape : Paddle_Shape = .Dome;

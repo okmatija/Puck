@@ -207,9 +207,7 @@ simulate :: () {
     }
 
     update_player(*player1);
-    if player_count >= .Two_Player {
-        update_player(*player2);
-    }
+    update_player(*player2);
 
     for * balls {
         it.transform = b2Body.GetTransform(it.body);

@@ -2,6 +2,8 @@
 
 * TODO Moved time warp to U and Q
 * TODO Added controls menu
+* TODO Make explosions affect the paddles to make it harder to aim if someone blows up next to you
+* TODO Experiment with lives put on spring but then falling back to the grid shape. This way explosions would look cooler and could have collateral damage
 
 # Version 0.4.0, WIP
 
@@ -14,6 +16,7 @@
 * Removed arrow key controls for player one, use JKL instead (later UIO and QWE keys will also be used)
 * Added a game over menu rather than automatically exiting to the main menu
 * Added auto hiding of the mouse pointer if it doesn't move during game
+* Changed single player mode to include an AI opponent. AI skill levels are WIP, Moron does nothing and Mindless/Smart just move left/right
 * Updated the logo and tweaked the colors/graphics
 * Changed the font from Anonymous Pro to SkyTree by MONTAGNA
 

@@ -31,6 +31,13 @@ Game_Mode :: enum u8 {
     PAUSED;
 }
 
+Ai_Skill :: enum {
+    Moron;  // TODO Actively tries to lose
+    Mindless; // Very dumb AI
+    Smart;  // Uses simulation to make sure it wins?
+}
+#insert #run generate_dropdown_choices("ai_skill_choices", Ai_Skill);
+
 Ball_Shape :: enum {
     Circle;
     Square;
@@ -215,7 +222,7 @@ check_winning_condition :: () {
     }
 
     if #complete player_count == {
-    case .One_Player;
+    case .One_Player; #through;
     case .Two_Player;
         player1_dead := is_player_dead(player1);
         player2_dead := is_player_dead(player2);
@@ -257,9 +264,7 @@ deinit_game :: () {
     if game_mode != .NOT_STARTED {
         deinit_level();
         deinit_player(*player1);
-        if player_count >= .Two_Player {
-            deinit_player(*player2);
-        }
+        deinit_player(*player2);
         for * ball : balls {
             deinit_ball(ball);
         }
@@ -288,13 +293,14 @@ init_game :: (init_game_state : Init_Game_State) {
         init_world();
     }
 
+    // Reset any AI players
+    ai_player = Ai_Player.{};
+
     player_count = init_game_state.player_count;
     init_level(init_game_state.level_id); // Must come before players since they are constrained relative to the level boundary
 
     init_player(*player1, .P1, init_game_state.p1_paddle_shape);
-    if player_count >= .Two_Player {
-        init_player(*player2, .P2, init_game_state.p2_paddle_shape);
-    }
+    init_player(*player2, .P2, init_game_state.p2_paddle_shape);
 
     for * ball : balls {
         if it_index == {
@@ -402,19 +408,14 @@ init_boundary :: () {
         .{ goal.x, -game.y - 2*goal.y + goal_corner},
         .{ goal.x, -game.y});
 
-    if player_count == .One_Player {
-        top : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*top.points, .{-goal.x, game.y}, .{goal.x, game.y});
-    } else if player_count == .Two_Player {
-        goal_p2 : *Polyline = array_add(*level.boundary.shape.polylines);
-        array_add(*goal_p2.points,
-        .{-goal.x,  game.y},
-        .{-goal.x,  game.y + 2*goal.y - goal_corner},
-        .{-goal.x + goal_corner, game.y+2*goal.y},
-        .{ goal.x - goal_corner, game.y+2*goal.y},
-        .{ goal.x,  game.y + 2*goal.y - goal_corner},
-        .{ goal.x,  game.y});
-    }
+    goal_p2 : *Polyline = array_add(*level.boundary.shape.polylines);
+    array_add(*goal_p2.points,
+    .{-goal.x,  game.y},
+    .{-goal.x,  game.y + 2*goal.y - goal_corner},
+    .{-goal.x + goal_corner, game.y+2*goal.y},
+    .{ goal.x - goal_corner, game.y+2*goal.y},
+    .{ goal.x,  game.y + 2*goal.y - goal_corner},
+    .{ goal.x,  game.y});
 
     // Let the players disappear into the boundary halfway so you can position
     // the left/right facing edge of the paddle to a ball moving right/left

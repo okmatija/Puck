@@ -145,12 +145,19 @@ main :: () {
                 player1.power1 = xx input1.power1_down;
                 player1.power2 = xx input1.power2_down;
 
-                player2.left = xx input2.left_down;
-                player2.right = xx input2.right_down;
-                player2.down = xx input2.down_down;
-                player2.up = xx input2.up_down;
-                player2.power1 = xx input2.power1_down;
-                player2.power2 = xx input2.power2_down;
+                if #complete player_count == {
+                case .One_Player;
+
+                    compute_ai_inputs(*player2);
+
+                case .Two_Player;
+                    player2.left = xx input2.left_down;
+                    player2.right = xx input2.right_down;
+                    player2.down = xx input2.down_down;
+                    player2.up = xx input2.up_down;
+                    player2.power1 = xx input2.power1_down;
+                    player2.power2 = xx input2.power2_down;
+                }
 
                 simulate();
 
@@ -355,3 +362,4 @@ Enet :: #import "enet";
 #load "carpet.jai";
 #load "numeric.jai";
 #load "debug.jai";
+#load "ai.jai";

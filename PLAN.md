@@ -6,7 +6,11 @@ Pong/BlockBreaker/RocketLeague/JBlows billiards game
 
 # General
 
-
+[ ] Add friction to the bottom of the paddle
+[ ] Have a speed up as well as a slow down? Maybe this would also need a world for things moving toward P1 and toward P2?
+[ ] Warp should be limited, maybe a fixed amount for the whole game, and you get more by exploding your own ball? e.g., to sacrifice something you get something
+[ ] Balls should not spin, use SetAngularDamping function to stop that
+[ ] Balls should take damage when being in a goal so they can't stay there forever
 [ ] Balls taking damage from moving too fast should have their speed reduced after the damaging collision
 [ ] Maybe the balls coming from left/right are the ones for P1/P2...
 [ ] Launch balls from left and right in alternating direction, have a shape that directs the ball from one side to the other. Maybe have a button that launches a 

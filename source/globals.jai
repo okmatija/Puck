@@ -22,6 +22,16 @@ BALL_INITIAL_SPEED :: #run 5. * PADDLE_EXTENTS.x / 1.; // 5 paddle lengths in 1 
 BALL_SPAWN_COUNTDOWN :: 2.;
 
 
+Ai_Player :: struct {
+    skill : Ai_Skill = .Mindless;
+    direction : int = 1; // -1 => -x direction, 0 => stationary, 1 => +x direction
+    direction_prev : int = 1;
+
+    countdown : float = COUNTDOWN / 2.; // initialli
+    COUNTDOWN : float : .3;
+}
+ai_player : Ai_Player;
+
 player1_ball_spawn_countdown := 0.;
 player2_ball_spawn_countdown := 0.;
 
