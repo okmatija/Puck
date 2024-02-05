@@ -26,7 +26,8 @@ render_one_frame :: () {
     // Cosmetics
     {
         game_extents := get_game_extents();
-        draw_segment(.{-game_extents.x, 0}, .{game_extents.x, 0}, BOUNDARY_COLOR_NO_COLLISION, BOUNDARY_THICKNESS_PX);
+        edge_middle := BALL_INITIAL_RADIUS * sqrt(2.); // @Volatile
+        draw_segment(.{-game_extents.x + edge_middle, 0}, .{game_extents.x - edge_middle, 0}, BOUNDARY_COLOR_NO_COLLISION, BOUNDARY_THICKNESS_PX);
 
         goal_extents := get_goal_extents();
         draw_segment(.{-goal_extents.x, -game_extents.y}, .{goal_extents.x, -game_extents.y}, BOUNDARY_COLOR_NO_COLLISION, BOUNDARY_THICKNESS_PX);
@@ -96,7 +97,7 @@ render_one_frame :: () {
                 end :=   b2Mul(it.transform, it.mesh.vertices[t.c]);
                 edge_color := YELLOW;
                 edge_color.w = .7;
-                draw_segment(start, end, edge_color, 3);
+                draw_segment(start, end, edge_color, 2);
             }
         }
     }
@@ -129,9 +130,8 @@ render_one_frame :: () {
         draw_mesh(circle, transform, use_color);
     }
 
-    //draw_score();
+    draw_aim_lasers();
 
-    //draw_powerups();
 
     // Only draw the cursor if the mouse recently moved (the cursor is useful to resize the window)
     {
@@ -229,26 +229,6 @@ draw_segment :: (start : Vector2, end : Vector2, color : Vector4, SEGMENT_THICKN
 
 #scope_file
 
-draw_powerups :: () {
-    text_w := Simp.prepare_text(font, "Warp");
-    scale := 0.5;
-
-    warp_ready_color :: Vector4.{.8, .2, .0, 1.};
-    warp_active_color :: Vector4.{.6, .6, .6, 1.};
-
-    Simp.draw_prepared_text(font,
-        window_width - 3 * window_width/30,
-        font.character_height/2,
-        ifx player1.warp_active then warp_active_color else warp_ready_color);
-
-    if player_count >= .Two_Player {
-        Simp.draw_prepared_text(font,
-            window_width - 3 * window_width/30,
-            window_height - font.character_height,
-            ifx player2.warp_active then warp_active_color else warp_ready_color);
-    }
-}
-
 draw_game_background :: () {
     #if true {
         Simp.immediate_quad(.{0, 0}, .{xx window_width, 0}, .{xx window_width, xx window_height}, .{0, xx window_height},
@@ -263,6 +243,7 @@ draw_game_background :: () {
     }
 }
 
+// @TODO This could draw a tennis-like game board (use a dot-matrix fonts like in Hoop Land)
 draw_score :: () {
     if player_count == .One_Player {
         return;
@@ -284,5 +265,97 @@ draw_score :: () {
         scale := 0.5;
 
         Simp.draw_prepared_text(font, window_width/2, window_height-font.character_height, .{.5, .8, .2, 1});
+    }
+}
+
+draw_aim_lasers :: () {
+    for :LiveBalls ball : balls {
+        if host_type == .SERVER && ball.player_index != .P1 continue;
+        if host_type == .CLIENT && ball.player_index != .P2 continue;
+
+        player := ifx ball.player_index == .P1 then *player1 else *player2;
+
+        // @Cleanup Get this from the ball
+        ball_shape : b2CircleShape;
+        b2CircleShape.Constructor(*ball_shape);
+        ball_shape.m_radius = BALL_INITIAL_RADIUS;
+
+        // @Cleanup Get this from the player?
+        paddle_shape : b2CircleShape;
+        b2CircleShape.Constructor(*paddle_shape);
+        paddle_shape.m_radius = 2. * PADDLE_EXTENTS.x;
+
+        dpa : b2DistanceProxy;
+        b2DistanceProxy.Constructor(*dpa);
+        b2DistanceProxy.Set(*dpa, *paddle_shape, 0);
+
+        dpb : b2DistanceProxy;
+        b2DistanceProxy.Constructor(*dpb);
+        b2DistanceProxy.Set(*dpb, *ball_shape, 0);
+
+        input : b2ShapeCastInput;
+        input.proxyA = dpa;
+        input.proxyB = dpb;
+        input.transformA = b2Body.GetTransform(player.body).*;
+
+        radius := 2. * PADDLE_EXTENTS.x;
+        extents := PADDLE_EXTENTS;
+        delta_y := sqrt(radius*radius - extents.x*extents.x) + PADDLE_EXTENTS.y;
+        shift : b2Transform;
+        b2Transform.Constructor(*shift);
+        b2Transform.Set(*shift, .{0, -delta_y}, 0.);
+        input.transformA = b2Mul(input.transformA, shift);
+
+        input.transformB = b2Body.GetTransform(ball.body).*;
+        input.translationB = 100. * unit_vector(b2Body.GetLinearVelocity(ball.body));
+
+        output : b2ShapeCastOutput;
+
+        hit := b2ShapeCast(*output, *input);
+        origin := output.point + ball.radius * output.normal;
+
+        allowed := false;
+        if player.index == {
+        case .P1;
+            // @FIXME this isn't quite the right condition
+            allowed = origin.y > -get_game_extents().y;
+        case .P2;
+            // @FIXME this isn't quite the right condition
+            allowed = origin.y < get_game_extents().y;
+        }
+
+        if hit && allowed {
+
+            dir_in := origin - b2Body.GetPosition(ball.body);
+            dir_out := -reflect_vector(dir_in, output.normal);
+
+            unit_in := unit_vector(dir_in);
+            unit_out := unit_vector(dir_out);
+            game_radius := 2 * length(get_game_extents());
+
+            laser_alpha := lerp(0., 1., pow(length(dir_in), 10.));
+
+            use_color_in, use_color_in_core := GREEN, player.color;
+            use_color_in.w = laser_alpha;
+            use_color_in_core.w = laser_alpha;
+
+            center := b2Body.GetPosition(ball.body).*;
+            draw_segment(origin, center + ball.radius * unit_in, use_color_in, LASER_THICKNESS);
+            draw_segment(origin, center + ball.radius * unit_in, use_color_in_core, LASER_THICKNESS_CORE);
+
+            ray_cast_callback_data = .{}; // Clear previous result
+            ray_cast_callback_data.ignore_body = ball.body;
+            b2World.RayCast(world, *ray_cast_callback, origin, origin + game_radius*unit_out);
+
+            use_color_out, use_color_out_core := RED, player.color;
+            use_color_out.w = laser_alpha;
+            use_color_out_core.w = laser_alpha;
+
+            if ray_cast_callback_data.fraction && use_color_in.w > 0.05 {
+                target := origin + ray_cast_callback_data.fraction * game_radius * unit_out;
+                draw_segment(origin, target, use_color_out, LASER_THICKNESS);
+                draw_segment(origin, target, use_color_out_core, LASER_THICKNESS_CORE);
+            }
+        }
     }
 }

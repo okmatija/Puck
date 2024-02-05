@@ -1,12 +1,5 @@
 
 init_world :: () {
-    contact_listener.vtable = New(b2ContactListener_VTable); // @Leak
-    contact_listener.vtable.BeginContact = begin_contact;
-    contact_listener.vtable.EndContact = end_contact;
-    contact_listener.vtable.PreSolve = pre_solve;
-    contact_listener.vtable.PostSolve = post_solve;
-    contact_listener.vtable.Destructor = destructor;
-
     world = New(b2World); // @Leak
     b2World.Constructor(world, Vector2.{0., 0.});
 
@@ -19,9 +12,40 @@ init_world :: () {
     //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.centerOfMassBit);
     b2World.SetDebugDraw(world, world_debug_draw);
 
+    contact_listener.vtable = New(b2ContactListener_VTable); // @Leak
+    contact_listener.vtable.BeginContact = contact_listener_begin_contact;
+    contact_listener.vtable.EndContact = contact_listener_end_contact;
+    contact_listener.vtable.PreSolve = contact_listener_pre_solve;
+    contact_listener.vtable.PostSolve = contact_listener_post_solve;
+    contact_listener.vtable.Destructor = contact_listener_destructor;
     b2World.SetContactListener(world, *contact_listener);
+
+    // Setup ray cast callback used to render lasers for aiming
+    ray_cast_callback.vtable = New(b2RayCastCallback_VTable); // @Leak
+    ray_cast_callback.vtable.ReportFixture = ray_cast_report_fixture;
+    ray_cast_callback.vtable.Destructor = ray_cast_callback_destructor;
 }
 
+ray_cast_report_fixture :: (this: *b2RayCastCallback, fixture: *b2Fixture, point: *b2Vec2, normal: *b2Vec2, fraction: float) -> float #cpp_method {
+    new_context : Context;
+    push_context new_context {
+        body := b2Fixture.GetBody(fixture);
+        if body == ray_cast_callback_data.ignore_body {
+            // Ignore this collision: don't update data and don't change the ray length
+            return 1.;
+        }
+
+        if fraction < ray_cast_callback_data.fraction {
+            ray_cast_callback_data.fraction = fraction;
+            ray_cast_callback_data.fixture = fixture;
+            ray_cast_callback_data.point = point;
+            ray_cast_callback_data.normal = normal;
+        }
+        return fraction;
+    }
+}
+
+ray_cast_callback_destructor :: (this: *b2RayCastCallback, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
 
 
 
@@ -54,6 +78,8 @@ init_ball_physics :: (ball : *Ball) {
 
     fixture_def : b2FixtureDef;
     b2FixtureDef.Constructor(*fixture_def);
+    fixture_def.filter.categoryBits = Ball_Category;
+    fixture_def.filter.maskBits = Ball_Mask;
     if #complete ball.shape == {
     case .Circle;
         fixture_def.shape = *circle_shape;
@@ -91,7 +117,7 @@ init_obstructions_physics :: () {
         body := b2World.CreateBody(world, *body_def);
         level.obstructions.body = body;
 
-        add_fixture_from_mesh(level.obstructions.body, level.obstructions.mesh);
+        add_fixture_from_mesh(level.obstructions.body, level.obstructions.mesh, Boundary_Category, Boundary_Mask);
 
         joint_def : b2PrismaticJointDef;
         b2PrismaticJointDef.Constructor(*joint_def);
@@ -120,6 +146,8 @@ init_boundary_physics :: () {
 
     fixture_def : b2FixtureDef;
     b2FixtureDef.Constructor(*fixture_def);
+    fixture_def.filter.categoryBits = Boundary_Category;
+    fixture_def.filter.maskBits = Boundary_Mask;
     fixture_def.shape = *edge_shape;
     fixture_def.density = 0.;
     fixture_def.friction = WALL_FRICTION;
@@ -168,7 +196,7 @@ init_player_physics :: (using player : *Player) {
         }
         life.body = b2World.CreateBody(world, *body_def);
 
-        add_fixture_from_mesh(life.body, life.mesh);
+        add_fixture_from_mesh(life.body, life.mesh, Life_Category, Life_Mask);
     }
 
     body_def : b2BodyDef;
@@ -202,6 +230,8 @@ init_player_physics :: (using player : *Player) {
 
                 fixture_def : b2FixtureDef;
                 b2FixtureDef.Constructor(*fixture_def);
+                fixture_def.filter.categoryBits = Player_Category;
+                fixture_def.filter.maskBits = Player_Mask;
                 fixture_def.shape = *polygon_shape;
                 fixture_def.density = PADDLE_DENSITY;
                 fixture_def.friction = PADDLE_FRICTION;
@@ -218,6 +248,8 @@ init_player_physics :: (using player : *Player) {
 
                 fixture_def : b2FixtureDef;
                 b2FixtureDef.Constructor(*fixture_def);
+                fixture_def.filter.categoryBits = Player_Category;
+                fixture_def.filter.maskBits = Player_Mask;
                 fixture_def.shape = *polygon_shape;
                 fixture_def.density = PADDLE_DENSITY;
                 fixture_def.friction = PADDLE_FRICTION;
@@ -227,7 +259,44 @@ init_player_physics :: (using player : *Player) {
 
         case .Dome;
 
-            add_fixture_from_mesh(body, mesh);
+            // @TODOOO We must change to using a circle for the player and discard collisions below the bottom of the paddle!
+            // add_fixture_from_mesh(body, mesh, Player_Category, Player_Mask);
+
+            radius := 2. * PADDLE_EXTENTS.x;
+
+            circle_shape : b2CircleShape;
+            b2CircleShape.Constructor(*circle_shape);
+            circle_shape.m_radius = radius;
+            extents := PADDLE_EXTENTS;
+            delta_y := sqrt(radius*radius - extents.x*extents.x);
+            circle_shape.m_p.y = -delta_y - PADDLE_EXTENTS.y;
+
+            circle_fixture_user_data : b2FixtureUserData;
+            b2FixtureUserData.Constructor(*circle_fixture_user_data);
+            circle_fixture_user_data.pointer = xx player;
+
+            fixture_def : b2FixtureDef;
+            b2FixtureDef.Constructor(*fixture_def);
+            fixture_def.filter.categoryBits = Player_Category;
+            fixture_def.filter.maskBits = Player_Mask;
+            fixture_def.userData = xx circle_fixture_user_data;
+            fixture_def.shape = *circle_shape;
+            fixture_def.density = PADDLE_DENSITY;
+            fixture_def.friction = PADDLE_FRICTION;
+            fixture_def.restitution = .5 * PADDLE_RESTITUTION;
+            b2Body.CreateFixture(body, *fixture_def);
+
+            // Just to get collisions working with the bottom of the paddle
+
+            bottom_mesh : Mesh;
+            defer mesh_deinit(bottom_mesh);
+            bottom_extents := PADDLE_EXTENTS;
+            bottom_extents.y *= .5;
+            init_prism_mesh(bottom_mesh, bottom_extents, .9);
+            for * bottom_mesh.vertices {
+                it.y -= bottom_extents.y;
+            }
+            add_fixture_from_mesh(body, bottom_mesh, Player_Category, Player_Mask);
     }
 
     // Constrain player movement
@@ -253,10 +322,20 @@ kinetic_energy :: (body : *b2Body) -> float {
 }
 
 
+ray_cast_callback : b2RayCastCallback;
+ray_cast_callback_data : Ray_Cast_Callback_Data;
+Ray_Cast_Callback_Data :: struct {
+    fixture: *b2Fixture;
+    point: *b2Vec2;
+    normal: *b2Vec2;
+    fraction: float = FLOAT32_INFINITY;
+
+    ignore_body : *b2Body; // We will set this to the ball whose trajectory we are inspecting via ray cast
+}
 
 #scope_file
 
-add_fixture_from_mesh :: (body : *b2Body, mesh : Mesh) {
+add_fixture_from_mesh :: (body : *b2Body, mesh : Mesh, category_bits : u16, mask_bits : u16) {
     for t : mesh.triangles {
         polygon_shape : b2PolygonShape;
         b2PolygonShape.Constructor(*polygon_shape);
@@ -266,6 +345,8 @@ add_fixture_from_mesh :: (body : *b2Body, mesh : Mesh) {
         // No friction or energy loss for obstruction collisions, so its less likely balls get stuck
         fixture_def : b2FixtureDef;
         b2FixtureDef.Constructor(*fixture_def);
+        fixture_def.filter.categoryBits = category_bits;
+        fixture_def.filter.maskBits = mask_bits;
         fixture_def.shape = *polygon_shape;
         fixture_def.density = PADDLE_DENSITY;
         fixture_def.friction = 0.;
@@ -273,3 +354,18 @@ add_fixture_from_mesh :: (body : *b2Body, mesh : Mesh) {
         b2Body.CreateFixture(body, *fixture_def);
     }
 }
+
+// @Cleanup make these #type,isa?
+
+// Box2D collision categories (I am a...)
+Player_Category : u16 : 0x0001;
+Ball_Category : u16 : 0x0002;
+Life_Category : u16 : 0x0004;
+Boundary_Category : u16 : 0x0008;
+
+// Box2D collision masks (I will collide with...)
+Player_Mask : u16 : #run 0xFFFF ^ Boundary_Category;
+Ball_Mask : u16 : 0xFFFF; // Everything
+Life_Mask : u16 : Ball_Category;
+Boundary_Mask : u16 : Ball_Category;
+

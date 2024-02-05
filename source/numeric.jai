@@ -65,3 +65,12 @@ Tuple3 :: struct (T : Type) {
 #place j; b : T = ---;
 #place k; c : T = ---;
 }
+
+
+reflect_vector :: (v : Vector2, n : Vector2) -> Vector2 {
+	unit_n := unit_vector(n);
+	vn := dot_product(v, unit_n);
+	projection_v := vn * unit_n;
+	rejection_v := v - projection_v;
+	return projection_v - rejection_v;
+}

@@ -36,32 +36,15 @@ simulate :: () {
 
             paddle_speed := PADDLE_SPEED;
 
-            {
-                if down && warp_countdown == WARP_COUNTDOWN {
-                    stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-                    stream.rate_scale = .5;
-                    stream.user_volume_scale = user_sfx_volume;
-                    Sound.start_playing(stream);
-
-                    warp_active = true;
-                    time_factor = TIME_FACTOR;
+            if down {
+                time_factor = .1;
+            } else if up {
+                if player_count == .One_Player {
+                    // @TODO Implement speed up warps for multiplayer (need per-player physics worlds...)
+                    time_factor = 3.;
                 }
-
-                if warp_active {
-                    countdown(*warp_countdown);
-                    // paddle_speed *= WARP_SPEEDUP;
-                }
-
-                if warp_countdown <= 0  {
-                    stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-                    stream.rate_scale = -.8;
-                    stream.user_volume_scale = user_sfx_volume;
-                    Sound.start_playing(stream);
-
-                    warp_active = false;
-                    warp_countdown = WARP_COUNTDOWN;
-                    time_factor = 1.;
-                }
+            } else {
+                time_factor = 1.;
             }
 
             accel := (paddle_speed / (3 * current_dt));
@@ -103,8 +86,42 @@ simulate :: () {
     }
 
     apply_impulse_to_move_player(*player1);
-    if player_count >= .Two_Player {
-        apply_impulse_to_move_player(*player2);
+    apply_impulse_to_move_player(*player2);
+
+    if player1.time_factor == TIME_FACTOR_SLOW ||
+       player2.time_factor == TIME_FACTOR_SLOW {
+        if world_time_factor == 1. {
+            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            stream.rate_scale = .5;
+            stream.user_volume_scale = user_sfx_volume;
+            Sound.start_playing(stream);
+        }
+
+        world_time_factor = TIME_FACTOR_SLOW;
+    } else if player1.time_factor == TIME_FACTOR_FAST ||
+              player2.time_factor == TIME_FACTOR_FAST {
+        if world_time_factor != TIME_FACTOR_FAST {
+            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            // stream.rate_scale = -.8;
+            // stream.user_volume_scale = user_sfx_volume;
+            // Sound.start_playing(stream);
+        }
+
+        world_time_factor = TIME_FACTOR_FAST;
+    } else {
+        if world_time_factor == TIME_FACTOR_SLOW {
+            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            stream.rate_scale = -.8;
+            stream.user_volume_scale = user_sfx_volume;
+            Sound.start_playing(stream);
+        } else if world_time_factor == TIME_FACTOR_FAST {
+            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            // stream.rate_scale = .3;
+            // stream.user_volume_scale = user_sfx_volume;
+            // Sound.start_playing(stream);
+        }
+
+        world_time_factor = 1.;
     }
 
     // If there are any dead balls revive one after the spawn countdown
@@ -221,7 +238,7 @@ simulate :: () {
     // for live_emitters update_emitter(it, current_dt);
 }
 
-begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
+contact_listener_begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {
     new_context : Context;
     push_context new_context {
         stream := Sound.make_stream(*sound_collision2, .GENERAL_SFX);
@@ -229,7 +246,6 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
         stream.user_volume_scale = user_sfx_volume;
         Sound.start_playing(stream);
 
-        // @FIXMEEE Need to check IsTouching???
         a : *b2Fixture = b2Contact.GetFixtureA(contact);
         b : *b2Fixture = b2Contact.GetFixtureB(contact);
 
@@ -325,10 +341,56 @@ begin_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_me
         }
     }
 }
-end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
-pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {}
-post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
-destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
+
+contact_listener_pre_solve :: (this: *b2ContactListener, contact: *b2Contact, oldManifold: *b2Manifold) -> void #cpp_method {
+    new_context : Context;
+    push_context new_context {
+
+        // Disable the player-ball collisions that occur in the goal and on the circle part of the player
+
+        a : *b2Fixture = b2Contact.GetFixtureA(contact);
+        a_body : *b2Body = b2Fixture.GetBody(a);
+        a_data : *b2BodyUserData = b2Body.GetUserData(a_body);
+        a_kind : Entity.Kind = ifx a_data && a_data.pointer then (cast(*Entity)a_data.pointer).kind else .Unknown;
+
+        b : *b2Fixture = b2Contact.GetFixtureB(contact);
+        b_body : *b2Body = b2Fixture.GetBody(b);
+        b_data : *b2BodyUserData = b2Body.GetUserData(b_body);
+        b_kind : Entity.Kind = ifx b_data && b_data.pointer then (cast(*Entity)b_data.pointer).kind else .Unknown;
+
+        ball : *Ball;
+        player : *Player;
+
+        if a_kind == .Ball && b_kind == .Player {
+            ball = cast(*Ball)a_data.pointer;
+            player = cast(*Player)b_data.pointer;
+        } else if a_kind == .Player && b_kind == .Ball {
+            player = cast(*Player)a_data.pointer;
+            ball = cast(*Ball)b_data.pointer;
+        }
+
+        if player && ball {
+            world_manifold : b2WorldManifold;
+            b2Contact.GetWorldManifold(contact, *world_manifold);
+            if player.index == .P1 {
+                if world_manifold.points[0].y < -get_game_extents().y ||
+                world_manifold.points[1].y < -get_game_extents().y {
+                    b2Contact.SetEnabled(contact, false);
+                }
+            } else if player.index == .P2 {
+                if world_manifold.points[0].y > get_game_extents().y ||
+                world_manifold.points[1].y > get_game_extents().y {
+                    b2Contact.SetEnabled(contact, false);
+                }
+            }
+
+        }
+    }
+}
+
+contact_listener_end_contact :: (this: *b2ContactListener, contact: *b2Contact) -> void #cpp_method {}
+contact_listener_post_solve :: (this: *b2ContactListener, contact: *b2Contact, impulse: *b2ContactImpulse) -> void #cpp_method {}
+contact_listener_destructor :: (this: *b2ContactListener, flags: Msvc_Destructor_Flags = .NONE) -> void #cpp_method {}
 
 
 #scope_file

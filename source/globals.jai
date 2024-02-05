@@ -13,13 +13,16 @@ DT_MAX : float : 0.15;
 
 BALL_INITIAL_RADIUS :: 0.4;
 BALL_DENSITY :: 1.0;
-BALL_FRICTION :: 1.0;
+BALL_FRICTION :: 0.0; // @Hack? We did the balls don't spin so that the predicted trajectory by shape-casting is accurate... maybe this doesn't matter though? I think it does since this is what the game is about...
 BALL_RESTITUTION :: 1.0;
-BALL_COUNT_MAX :: 2;
+BALL_COUNT_MAX :: 4;
 BALL_MAX_HEALTH :: 100.;
 BALL_DAMAGE_SPEED :: #run 4. * BALL_INITIAL_SPEED;
 BALL_INITIAL_SPEED :: #run 5. * PADDLE_EXTENTS.x / 1.; // 5 paddle lengths in 1 second
 BALL_SPAWN_COUNTDOWN :: 2.;
+
+LASER_THICKNESS :: 5.;
+LASER_THICKNESS_CORE :: 2.;
 
 
 Ai_Player :: struct {
@@ -95,7 +98,7 @@ last_time:  float64; // Seconds
 level : Level;
 player1 : Player;
 player2 : Player;
-player_count : Player_Count = .Two_Player;
+player_count : Player_Count = .One_Player;
 balls : [BALL_COUNT_MAX]Ball;
 
 
@@ -131,8 +134,7 @@ DRAW_MOUSE_IN_GAME_COUNTDOWN :: .5;
 
 user_sfx_volume : float = .1;
 
-time_factor := 1.;
-TIME_FACTOR :: .3;
-WARP_SPEEDUP :: #run 1. / TIME_FACTOR;
-WARP_COUNTDOWN :: .4;
-
+world_time_factor := 1.; // @TODOO remove this, and replce with individual player world factors
+TIME_FACTOR_FAST :: 3.;
+TIME_FACTOR_SLOW :: .1;
+

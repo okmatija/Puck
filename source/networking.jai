@@ -75,6 +75,8 @@ init_client :: (server_address : string, server_port : u16) {
 
     host_type = .CLIENT;
 
+    assert(player_count == .Two_Player); // Update peer count to count-1
+
     success : bool;
 
     // Using 0 here makes Enet use its dynamic throttling algorithm to manage bandwidth

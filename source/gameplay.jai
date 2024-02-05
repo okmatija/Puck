@@ -153,8 +153,7 @@ Player :: struct {
     power1 : u32;
     power2 : u32;
 
-    warp_active := false;
-    warp_countdown := WARP_COUNTDOWN;
+    time_factor := 1.;
 
     lives : [PLAYER_MAX_LIVES]Life;
 
@@ -377,7 +376,7 @@ init_boundary :: () {
     game, game_dy := get_game_extents();
     goal := get_goal_extents();
     goal_corner := .8 * goal.y;
-    edge_middle := BALL_INITIAL_RADIUS * sqrt(2.);
+    edge_middle := BALL_INITIAL_RADIUS * sqrt(2.); // @Volatile
 
     left : *Polyline = array_add(*level.boundary.shape.polylines);
     array_add(*left.points,
@@ -521,7 +520,7 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
     case .Prism;
         init_prism_mesh(mesh, PADDLE_EXTENTS, 1./3.);
     case .Dome;
-        init_dome_mesh(mesh, PADDLE_EXTENTS, 2. * PADDLE_EXTENTS.x, 11);
+        init_dome_mesh(mesh, PADDLE_EXTENTS, 2. * PADDLE_EXTENTS.x, 55);
     }
 
     for * life : lives {

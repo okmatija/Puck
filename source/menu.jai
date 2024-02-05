@@ -146,12 +146,15 @@ settings_menu :: () {
     slider_theme := ui_theme.slider_theme;
     slider_theme.foreground.font = font;
     slider_theme.surface_style = .NUB;
+    slider_theme.decimals = 0;
 
     cursor := CenteredCursor(5.2*k.y);
     r : UI.Rect;
 
     r = NextRect(4*k.x, .75*k.y);
-    UI.slider(r, *user_sfx_volume, 0.0, 1.0, 0.1, *slider_theme, "", " SFX volume");
+    user_sfx_volume_pc := user_sfx_volume * 100.;
+    UI.slider(r, *user_sfx_volume_pc, 0.0, 100.0, 1., *slider_theme, "", "% SFX volume");
+    user_sfx_volume = user_sfx_volume_pc / 100.;
 
     r = NextRect(1.25*k.x, .75*k.y);
     _, _, released := UI.button(r, "Back", *button_theme);
@@ -238,12 +241,11 @@ play_local_game_menu :: () {
         AiSkillDropdown(l, r);
     }
 
-    // @TODOO Player 1 and 2 paddle shapes
-    l, r = NextRect2(2.2*k.x, .5*k.y);
-    PaddleShapeDropdown(l, r);
+    // l, r = NextRect2(2.2*k.x, .5*k.y);
+    // BallShapeDropdown(l, r);
 
     // l, r = NextRect2(2.2*k.x, .5*k.y);
-    // PaddleShapeDropdown(l, r, "P2 Paddle Shape");
+    // PaddleShapeDropdown(l, r);
 
     l, r = NextRect2(2.2*k.x, .5*k.y);
     LevelDropdown(l, r);
@@ -329,8 +331,8 @@ join_network_game_menu :: () {
         }
     }
 
-    l, r = NextRect2(2.2*k.x, .5*k.y);
-    PaddleShapeDropdown(l, r);
+    // l, r = NextRect2(2.2*k.x, .5*k.y);
+    // PaddleShapeDropdown(l, r);
 
     l, r = NextRect2(1.25*k.x, .75*k.y);
     _, _, released := UI.button(l, "Back", *button_theme);
@@ -340,6 +342,8 @@ join_network_game_menu :: () {
     _, _, released = UI.button(r, "Join", *button_theme);
     if released {
         game_menu = .CONNECTING_TO_SERVER_MENU;
+        old_player_count = player_count;
+        player_count = .Two_Player;
         init_client(server_address, server_port);
     }
 
@@ -397,11 +401,11 @@ host_network_game_menu :: () {
         }
     }
 
-    l, r = NextRect2(2.2*k.x, .5*k.y);
-    BallShapeDropdown(l, r);
+    // l, r = NextRect2(2.2*k.x, .5*k.y);
+    // BallShapeDropdown(l, r);
 
-    l, r = NextRect2(2.2*k.x, .5*k.y);
-    PaddleShapeDropdown(l, r);
+    // l, r = NextRect2(2.2*k.x, .5*k.y);
+    // PaddleShapeDropdown(l, r);
 
     l, r = NextRect2(2.2*k.x, .5*k.y);
     LevelDropdown(l, r);
@@ -414,6 +418,8 @@ host_network_game_menu :: () {
     _, _, released = UI.button(r, "Host", *button_theme);
     if released {
         game_menu = .WAITING_FOR_PLAYERS_MENU;
+        old_player_count = player_count;
+        player_count = .Two_Player;
         init_server(server_port);
     }
 
@@ -468,6 +474,7 @@ connecting_to_server_menu :: () {
     _, _, released := UI.button(r, "Cancel", *button_theme);
     if disconnect || released || esc_pressed {
         game_menu = .JOIN_NETWORK_GAME_MENU;
+        player_count = old_player_count;
         deinit_client();
     }
 }
@@ -519,6 +526,7 @@ waiting_for_players_menu :: () {
     _, _, released := UI.button(r, "Cancel", *button_theme);
     if disconnect || released || esc_pressed {
         game_menu = .HOST_NETWORK_GAME_MENU;
+        player_count = old_player_count;
         deinit_server();
     }
 
@@ -569,3 +577,5 @@ paddle_shape : Paddle_Shape = .Dome;
 level_id : Level_Id = .Spinning_Box;
 
 settings_back_target_menu : Game_Menu = .MAIN_MENU;
+
+old_player_count : Player_Count;

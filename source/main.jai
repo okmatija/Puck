@@ -66,7 +66,7 @@ main :: () {
         current_time = seconds_since_init();
         current_dt = cast(float) (current_time - last_time);
 
-        current_dt *= time_factor;
+        current_dt *= world_time_factor;
 
         if current_dt > DT_MAX current_dt = DT_MAX;
         last_time = current_time;
@@ -266,6 +266,27 @@ handle_inputs :: () {
 
         UI.getrect_handle_event(event);
     }
+
+    // Snippets from the modules/Input/examples/input_test.jai
+    /*
+    Input :: #import "Input";
+
+    for Input.input_button_states {
+        if it & .DOWN {
+            if it_index >= 0x20 && it_index < 0x7F {
+                value: u8 = cast(u8) it_index;
+                str: string;
+                str.data = *value;
+                str.count = 1;
+                append(*held_keys, str);
+            }
+        }
+    }
+
+    draw_text(the_font, color,    20, 20 + FONT_HEIGHT*2, "mouse_delta_x: %", Input.mouse_delta_x);
+    draw_text(the_font, color,    20, 20 + FONT_HEIGHT*1, "mouse_delta_y: %", Input.mouse_delta_y);
+    draw_text(the_font, color,    20, 20 + FONT_HEIGHT*0, "mouse_delta_z: %", Input.mouse_delta_z);
+    */
 }
 
 init_fonts :: () {
@@ -333,6 +354,7 @@ init_sounds :: (window : *Window_Type) {
 #import "Thread";
 #import "Window_Creation";
 #import "Math";
+#import "Sloppy_Math"; // For max_of_type/min_of_type
 #import "Random";
 #import "File";
 Sound :: #import "Sound_Player";
