@@ -4,8 +4,10 @@
 * TODO Added controls menu
 * TODO Make explosions affect the paddles to make it harder to aim if someone blows up next to you
 * TODO Experiment with lives put on spring but then falling back to the grid shape. This way explosions would look cooler and could have collateral damage
+* Fixed cases when the aiming lasers rendered but the ball would not actually collide with the paddle
+* Added jai compiler version text, to help with building old versions for posterity
 
-# Version 0.4.0, WIP
+# Version 0.4.0, 05 February 2024
 
 * Changed hearts to a row of red boxes (aka "lives") behind each player
 * Changed ball colors to match the players, when balls matching your color hit your lives, they heal them rather than inflicting damage

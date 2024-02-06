@@ -259,16 +259,13 @@ init_player_physics :: (using player : *Player) {
 
         case .Dome;
 
-            // @TODOOO We must change to using a circle for the player and discard collisions below the bottom of the paddle!
-            // add_fixture_from_mesh(body, mesh, Player_Category, Player_Mask);
-
             radius := 2. * PADDLE_EXTENTS.x;
+            extents := PADDLE_EXTENTS;
+            delta_y := sqrt(radius*radius - extents.x*extents.x);
 
             circle_shape : b2CircleShape;
             b2CircleShape.Constructor(*circle_shape);
             circle_shape.m_radius = radius;
-            extents := PADDLE_EXTENTS;
-            delta_y := sqrt(radius*radius - extents.x*extents.x);
             circle_shape.m_p.y = -delta_y - PADDLE_EXTENTS.y;
 
             circle_fixture_user_data : b2FixtureUserData;
@@ -354,6 +351,25 @@ add_fixture_from_mesh :: (body : *b2Body, mesh : Mesh, category_bits : u16, mask
         b2Body.CreateFixture(body, *fixture_def);
     }
 }
+
+// See the default implementation of b2ContactFilter::ShouldCollide to understand categories/masks(/groups):
+/*
+// Return true if contact calculations should be performed between these two shapes.
+// If you implement your own collision filter you may want to build from this implementation.
+bool b2ContactFilter::ShouldCollide(b2Fixture* fixtureA, b2Fixture* fixtureB)
+{
+	const b2Filter& filterA = fixtureA->GetFilterData();
+	const b2Filter& filterB = fixtureB->GetFilterData();
+
+	if (filterA.groupIndex == filterB.groupIndex && filterA.groupIndex != 0)
+	{
+		return filterA.groupIndex > 0;
+	}
+
+	bool collide = (filterA.maskBits & filterB.categoryBits) != 0 && (filterA.categoryBits & filterB.maskBits) != 0;
+	return collide;
+}
+*/
 
 // @Cleanup make these #type,isa?
 

@@ -55,7 +55,8 @@ menu :: () {
     }
 
 
-    text_w := Simp.prepare_text(version_font, PONG_VERSION);
+    compiler_version := stop_at_any(EXPECTED_COMPILER_VERSION_INFO, ","); // @FIXME This should be the ACTUAL version
+    text_w := Simp.prepare_text(version_font, tprint("% (built using %)", PONG_VERSION, compiler_version));
     scale := 0.2;
     Simp.draw_prepared_text(version_font,
         10,

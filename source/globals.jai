@@ -1,4 +1,4 @@
-PONG_VERSION :: "Version 0.4.0";
+PONG_VERSION :: "Version 0.5.0";
 DEBUG_DRAW :: false;
 DEBUG_DRAW_BOX2D :: false;
 

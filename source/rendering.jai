@@ -315,13 +315,18 @@ draw_aim_lasers :: () {
         origin := output.point + ball.radius * output.normal;
 
         allowed := false;
-        if player.index == {
-        case .P1;
-            // @FIXME this isn't quite the right condition
-            allowed = origin.y > -get_game_extents().y;
-        case .P2;
-            // @FIXME this isn't quite the right condition
-            allowed = origin.y < get_game_extents().y;
+        {
+            radius := 2. * PADDLE_EXTENTS.x;
+            extents := PADDLE_EXTENTS;
+            delta_y := sqrt(radius*radius - extents.x*extents.x);
+            offset_y := delta_y / radius * ball.radius;
+
+            if player.index == {
+            case .P1;
+                allowed = origin.y > -get_game_extents().y + offset_y;
+            case .P2;
+                allowed = origin.y < get_game_extents().y - offset_y;
+            }
         }
 
         if hit && allowed {
