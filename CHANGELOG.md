@@ -4,6 +4,7 @@ When releasing a new version remember to add a git tag...!
 
 * Added limit to time warping and made it gradually recharge when unused
 * Added visualization showing remaining amount of time warping
+* Explosions now damage lives and apply impulses to balls within their radius
 * Fixed cases when the aiming lasers rendered but the ball would not actually collide with the paddle
 * Added jai compiler version text, to help with building old versions for posterity
 * TODO Add a countdown to start the game
