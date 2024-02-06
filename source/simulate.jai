@@ -144,11 +144,15 @@ simulate :: () {
                 impulse := position - explosion.position;
                 dist2 := normalize(*impulse);
 
+                // add_debug_disk(.{center=explosion.position, radius=explosion.radius, color=RED});
+
                 if dist2 < pow(explosion.radius, 2) {
                     ref_impulse := BALL_DENSITY * PI * BALL_INITIAL_RADIUS * BALL_INITIAL_RADIUS;
                     ref_impulse *= BALL_INITIAL_SPEED * BALL_INITIAL_SPEED;
                     impulse *= 1. * ref_impulse;
                     apply_linear_impulse_to_center(ball.body, impulse); 
+
+                    // add_debug_segment(.{start=position, end=position + impulse, color=RED, thickness=4});
                 }
             }
 

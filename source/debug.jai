@@ -1,17 +1,3 @@
-printd :: ($a : string, loc := #caller_location) #expand {
-    v := #insert a;
-    s := a;
-    s.count -= 1;
-    print("%:% % = %\n", loc.fully_pathed_filename, loc. line_number, s, v);
-}
-
-
-
-
-
-
-
-
 draw_body :: (body : *b2Body, color : Vector4) #deprecated "Render using mesh/transform data instead, this function only works on the server" {
     if body == null {
         log_error("draw_body only works on the servers, called from %", host_type);
@@ -200,19 +186,46 @@ debug_explosion_animation :: () {
 
 debug_draw : Debug_Draw;
 
-add_debug_segment :: (segment : Debug_Segment) {
+add_debug_segment :: (shape_ : Debug_Segment) {
     #if DEBUG_DRAW {
-        array_add(*debug_draw.segments, segment);
+        shape := shape_;
+        shape.__ttl_max = shape.ttl;
+        array_add(*debug_draw.segments, shape);
+    }
+}
+
+add_debug_disk :: (shape_ : Debug_Disk) {
+    #if DEBUG_DRAW {
+        shape := shape_;
+        shape.__ttl_max = shape.ttl;
+        array_add(*debug_draw.disks, shape);
     }
 }
 
 Debug_Draw :: struct {
     segments : [..]Debug_Segment;
+    disks : [..]Debug_Disk;
+}
+
+Debug_Shape :: struct {
+    color : Vector4;
+
+    ttl := 2.;
+    // Internal state
+    __ttl_max : float;
 }
 
 Debug_Segment :: struct {
+    using #as base : Debug_Shape;
+
     start : Vector2;
     end : Vector2;
-    color : Vector4;
     thickness : float = 4.;
+}
+
+Debug_Disk :: struct {
+    using #as base : Debug_Shape;
+
+    center : Vector2;
+    radius : float;
 }

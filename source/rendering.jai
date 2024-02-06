@@ -214,10 +214,31 @@ render_one_frame :: () {
 
 
     if DEBUG_DRAW {
-        for debug_draw.segments {
-            draw_segment(it.start, it.end, it.color, it.thickness);
+        get_color :: (shape : *Debug_Shape) -> Vector4 {
+            use_color := shape.color;
+            t := shape.ttl / shape.__ttl_max;
+            use_color.w = lerp(0, 1., pow(t, 5));
+            return use_color;
         }
-        array_reset(*debug_draw.segments);
+
+        for * debug_draw.segments {
+            draw_segment(it.start, it.end, get_color(it), it.thickness);
+            countdown(*it.ttl);
+            if it.ttl <= 0 remove;
+        }
+
+        for * debug_draw.disks {
+            mesh : Mesh;
+            mesh_deinit(mesh);
+            init_circle_mesh(*mesh, it.radius, 32);
+            transform : b2Transform;
+            b2Transform.Constructor(*transform);
+            b2Transform.Set(*transform, it.center, 0.);
+            draw_mesh(mesh, transform, get_color(it));
+
+            countdown(*it.ttl);
+            if it.ttl <= 0 remove;
+        }
     }
 }
 
