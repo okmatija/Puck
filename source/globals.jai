@@ -17,7 +17,7 @@ BALL_FRICTION :: 0.0; // @Hack? We did the balls don't spin so that the predicte
 BALL_RESTITUTION :: 1.0;
 BALL_COUNT_MAX :: 4;
 BALL_MAX_HEALTH :: 100.;
-BALL_DAMAGE_SPEED :: #run 4. * BALL_INITIAL_SPEED;
+BALL_DAMAGE_SPEED :: #run 2. * BALL_INITIAL_SPEED;
 BALL_INITIAL_SPEED :: #run 5. * PADDLE_EXTENTS.x / 1.; // 5 paddle lengths in 1 second
 BALL_SPAWN_COUNTDOWN :: 2.;
 

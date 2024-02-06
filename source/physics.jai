@@ -318,6 +318,21 @@ kinetic_energy :: (body : *b2Body) -> float {
     return .5 * mass_data.mass * dot_product(velocity, velocity) + .5 * mass_data.I * omega * omega;
 }
 
+get_angular_velocity :: (body : *b2Body) -> float {
+    return b2Body.GetAngularVelocity(body);
+}
+
+get_linear_velocity :: (body : *b2Body) -> Vector2 {
+    return b2Body.GetLinearVelocity(body).*;
+}
+
+get_position :: (body : *b2Body) -> Vector2 {
+    return b2Body.GetPosition(body).*;
+}
+
+apply_linear_impulse_to_center :: (body : *b2Body, impulse : Vector2, wake := true) {
+    b2Body.ApplyLinearImpulseToCenter(body, impulse, wake);
+}
 
 ray_cast_callback : b2RayCastCallback;
 ray_cast_callback_data : Ray_Cast_Callback_Data;

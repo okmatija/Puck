@@ -135,9 +135,39 @@ simulate :: () {
     }
 
     // Update explosions
-    for ball_explosions {
-        countdown(*it.countdown);
-        if it.countdown <= 0 {
+    for explosion : ball_explosions {
+        if explosion.countdown == Explosion.EXPLOSION_DURATION {
+
+            // Apply impulses
+            for :LiveBalls ball : balls {
+                position := get_position(ball.body);
+                impulse := position - explosion.position;
+                dist2 := normalize(*impulse);
+
+                if dist2 < pow(explosion.radius, 2) {
+                    ref_impulse := BALL_DENSITY * PI * BALL_INITIAL_RADIUS * BALL_INITIAL_RADIUS;
+                    ref_impulse *= BALL_INITIAL_SPEED * BALL_INITIAL_SPEED;
+                    impulse *= 1. * ref_impulse;
+                    apply_linear_impulse_to_center(ball.body, impulse); 
+                }
+            }
+
+            // Apply damage
+            apply_damage :: (using player : *Player, explosion : Explosion) {
+                for * lives {
+                    dist2 := length_squared(get_position(it.body) - explosion.position);
+                    if dist2 < pow(explosion.radius, 2) {
+                        it.health -= LIFE_MAX_HEALTH;
+                        Clamp(*it.health, 0., LIFE_MAX_HEALTH); // @Cleanup Not needed?
+                    }
+                }
+            }
+            apply_damage(*player1, explosion);
+            apply_damage(*player2, explosion);
+        }
+
+        countdown(*explosion.countdown);
+        if explosion.countdown <= 0 {
             remove;
         }
     }
@@ -284,7 +314,6 @@ contact_listener_begin_contact :: (this: *b2ContactListener, contact: *b2Contact
         b_kind : Entity.Kind = ifx b_data && b_data.pointer then (cast(*Entity)b_data.pointer).kind else .Unknown;
 
 
-        // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
         maybe_explode_ball :: (kind : Entity.Kind, speed2 : float, data : *b2BodyUserData) {
             if kind == .Ball && speed2 > BALL_DAMAGE_SPEED*BALL_DAMAGE_SPEED {
                 ball := cast(*Ball)data.pointer;
@@ -295,10 +324,12 @@ contact_listener_begin_contact :: (this: *b2ContactListener, contact: *b2Contact
                 if ball.health < 0. {
                     // ball.SetEnabled(false); // Disable the collision
                     ball.live = false;
-                    explosion := Explosion.{position=b2Body.GetPosition(ball.body), radius=ball.radius, color=ball.color};
-                    array_add(*ball_explosions, explosion);
 
-                    // @TODOOOO explosions should apply forces around where they occur, so a tactic could be do get them to explode near the opponent
+                    explosion : Explosion;
+                    explosion.position = get_position(ball.body);
+                    explosion.radius = 4. * ball.radius;
+                    explosion.color = ball.color;
+                    array_add(*ball_explosions, explosion);
 
                     stream := Sound.make_stream(*sound_ball_explode, .GENERAL_SFX);
                     stream.rate_scale = random_get_within_range(0.7, 1.22);

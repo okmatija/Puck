@@ -113,13 +113,15 @@ render_one_frame :: () {
         use_color := lerp(BLACK, it.color, t);
         use_color.w = lerp(0., 1., t);
 
-        use_radius := 0.;
-        t_peak := .9;
-        if t < t_peak {
-            use_radius = lerp(r, 3.*r, t/t_peak);
-        } else {
-            use_radius = lerp(3.*r, 0., (t-t_peak)/(1.-t_peak));
-        }
+        // use_radius := 0.;
+        // t_peak := .9;
+        // if t < t_peak {
+        //     use_radius = lerp(r, 3.*r, t/t_peak);
+        // } else {
+        //     use_radius = lerp(3.*r, 0., (t-t_peak)/(1.-t_peak));
+        // }
+
+        use_radius := lerp(0., r, t*t*t);
 
         circle : Mesh;
         init_circle_mesh(*circle, use_radius, 32);
