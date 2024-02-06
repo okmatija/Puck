@@ -353,6 +353,7 @@ init_sounds :: (window : *Window_Type) {
 #import "stb_vorbis";
 #import "Thread";
 #import "Window_Creation";
+#import "Print_Vars";
 #import "Math";
 #import "Sloppy_Math"; // For max_of_type/min_of_type
 #import "Random";

@@ -313,9 +313,9 @@ read_network_events_this_frame :: () {
 
     debug :: false;
     #if debug {
-        // if host_type == .CLIENT printv(host_service_start_time);
+        // if host_type == .CLIENT print_vars(host_service_start_time);
         if network_events_this_frame {
-            if host_type == .SERVER printv(host_service_start_time);
+            if host_type == .SERVER print_vars(host_service_start_time);
 
             read_network_events_this_frame_debug_count -= 1;
             if read_network_events_this_frame_debug_count < 0 {
