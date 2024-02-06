@@ -1,11 +1,16 @@
+When releasing a new version remember to add a git tag...!
+
 # Version 0.5.0
 
+* Added limit to time warping and made it gradually recharge when unused
+* Added visualization showing remaining amount of time warping
+* Fixed cases when the aiming lasers rendered but the ball would not actually collide with the paddle
+* Added jai compiler version text, to help with building old versions for posterity
+* TODO Add a countdown to start the game
 * TODO Moved time warp to U and Q
 * TODO Added controls menu
 * TODO Make explosions affect the paddles to make it harder to aim if someone blows up next to you
 * TODO Experiment with lives put on spring but then falling back to the grid shape. This way explosions would look cooler and could have collateral damage
-* Fixed cases when the aiming lasers rendered but the ball would not actually collide with the paddle
-* Added jai compiler version text, to help with building old versions for posterity
 
 # Version 0.4.0, 05 February 2024
 

@@ -36,17 +36,6 @@ simulate :: () {
 
             paddle_speed := PADDLE_SPEED;
 
-            if down {
-                time_factor = .1;
-            } else if up {
-                if player_count == .One_Player {
-                    // @TODO Implement speed up warps for multiplayer (need per-player physics worlds...)
-                    time_factor = 3.;
-                }
-            } else {
-                time_factor = 1.;
-            }
-
             accel := (paddle_speed / (3 * current_dt));
             decel := (paddle_speed / (1 * current_dt));
 
@@ -87,42 +76,6 @@ simulate :: () {
 
     apply_impulse_to_move_player(*player1);
     apply_impulse_to_move_player(*player2);
-
-    if player1.time_factor == TIME_FACTOR_SLOW ||
-       player2.time_factor == TIME_FACTOR_SLOW {
-        if world_time_factor == 1. {
-            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            stream.rate_scale = .5;
-            stream.user_volume_scale = user_sfx_volume;
-            Sound.start_playing(stream);
-        }
-
-        world_time_factor = TIME_FACTOR_SLOW;
-    } else if player1.time_factor == TIME_FACTOR_FAST ||
-              player2.time_factor == TIME_FACTOR_FAST {
-        if world_time_factor != TIME_FACTOR_FAST {
-            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            // stream.rate_scale = -.8;
-            // stream.user_volume_scale = user_sfx_volume;
-            // Sound.start_playing(stream);
-        }
-
-        world_time_factor = TIME_FACTOR_FAST;
-    } else {
-        if world_time_factor == TIME_FACTOR_SLOW {
-            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            stream.rate_scale = -.8;
-            stream.user_volume_scale = user_sfx_volume;
-            Sound.start_playing(stream);
-        } else if world_time_factor == TIME_FACTOR_FAST {
-            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            // stream.rate_scale = .3;
-            // stream.user_volume_scale = user_sfx_volume;
-            // Sound.start_playing(stream);
-        }
-
-        world_time_factor = 1.;
-    }
 
     // If there are any dead balls revive one after the spawn countdown
     for * :DeadBalls ball : balls {
@@ -189,6 +142,77 @@ simulate :: () {
         }
     }
 
+    // @Think not sure we really need the pre_step/post_step distinction...
+
+    pre_step_update_player :: (using player : *Player) {
+        if (down && time_factor == 1. && warp_duration_remaining > WARP_START_THRESHOLD) ||
+           (down && time_factor == .1 && warp_duration_remaining > 0.) {
+            time_factor = .1;
+        } else if up {
+            if player_count == .One_Player {
+                // @TODO Implement speed up warps for multiplayer (need per-player physics worlds...)
+                time_factor = 3.;
+            }
+        } else {
+            time_factor = 1.;
+        }
+    }
+
+    pre_step_update_player(*player1);
+    pre_step_update_player(*player2);
+
+    if player1.time_factor == TIME_FACTOR_SLOW ||
+       player2.time_factor == TIME_FACTOR_SLOW {
+        if world_time_factor == 1. {
+            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            stream.rate_scale = .5;
+            stream.user_volume_scale = user_sfx_volume;
+            Sound.start_playing(stream);
+        }
+
+        world_time_factor = TIME_FACTOR_SLOW;
+
+    } else if player1.time_factor == TIME_FACTOR_FAST ||
+              player2.time_factor == TIME_FACTOR_FAST {
+        if world_time_factor != TIME_FACTOR_FAST {
+            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            // stream.rate_scale = -.8;
+            // stream.user_volume_scale = user_sfx_volume;
+            // Sound.start_playing(stream);
+        }
+
+        world_time_factor = TIME_FACTOR_FAST;
+    } else {
+        if world_time_factor == TIME_FACTOR_SLOW {
+            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            stream.rate_scale = -.8;
+            stream.user_volume_scale = user_sfx_volume;
+            Sound.start_playing(stream);
+        } else if world_time_factor == TIME_FACTOR_FAST {
+            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+            // stream.rate_scale = .3;
+            // stream.user_volume_scale = user_sfx_volume;
+            // Sound.start_playing(stream);
+        }
+
+        world_time_factor = 1.;
+
+    }
+
+    update_warp_duration_remaining :: (player : *Player) {
+        // Update the countdowns accounting for the world_time_factor so that they discharge/recharge in wall-clock time
+        if player.time_factor == 1. {
+            countdown(*player.warp_duration_remaining, -1./world_time_factor);
+            Clamp(*player.warp_duration_remaining, 0., player.WARP_DURATION_MAX);
+        } else if player.time_factor == TIME_FACTOR_SLOW {
+            countdown(*player.warp_duration_remaining, 1./world_time_factor);
+        }
+    }
+    update_warp_duration_remaining(*player1);
+    update_warp_duration_remaining(*player2);
+
+
+
     // Old code to increment the score
     //for * :LiveBalls ball : balls {
     //    center := b2Body.GetPosition(ball.body).*;
@@ -209,7 +233,7 @@ simulate :: () {
     b2World.Step(world, current_dt, 6, 2);
 
     // Update the transforms used for rendering
-    update_player :: (player : *Player) {
+    post_step_update_player :: (player : *Player) {
         player.transform = b2Body.GetTransform(player.body);
         for * player.lives {
             it.transform = b2Body.GetTransform(it.body);
@@ -223,8 +247,8 @@ simulate :: () {
         }
     }
 
-    update_player(*player1);
-    update_player(*player2);
+    post_step_update_player(*player1);
+    post_step_update_player(*player2);
 
     for * balls {
         it.transform = b2Body.GetTransform(it.body);

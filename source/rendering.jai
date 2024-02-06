@@ -133,6 +133,62 @@ render_one_frame :: () {
     draw_aim_lasers();
 
 
+    // Draw warp bars
+    draw_warp_bar :: (using player : Player) {
+
+        anchor : Vector2;
+        if player.index == .P1 {
+            anchor = .{-PADDLE_EXTENTS.x / 2., -get_game_extents().y - 2*get_goal_extents().y - 2*PADDLE_EXTENTS.y};
+        } else if player.index == .P2 {
+            anchor = .{-PADDLE_EXTENTS.x / 2.,  get_game_extents().y + 2*get_goal_extents().y + 1*PADDLE_EXTENTS.y};
+        }
+
+        // Remaining duration section
+        {
+            t := warp_duration_remaining / WARP_DURATION_MAX;
+            max := PADDLE_EXTENTS.x;
+            lo := world_to_screen(anchor);
+            hi := world_to_screen(anchor + .{lerp(0., max, t), PADDLE_EXTENTS.y});
+            Simp.immediate_quad(lo.x, lo.y, hi.x, hi.y, YELLOW);
+        }
+
+        // No start allowed section
+        {
+            t := min(warp_duration_remaining, WARP_START_THRESHOLD) / WARP_START_THRESHOLD;
+            max := PADDLE_EXTENTS.x * (WARP_START_THRESHOLD / WARP_DURATION_MAX);
+            lo := world_to_screen(anchor);
+            hi := world_to_screen(anchor + .{lerp(0., max, t), PADDLE_EXTENTS.y});
+            Simp.immediate_quad(lo.x, lo.y, hi.x, hi.y, BLUE);
+        }
+
+        // Border and hour glass notch
+        {
+            min, max := anchor, anchor + PADDLE_EXTENTS;
+            draw_segment(.{min.x, min.y}, .{max.x, min.y}, GREY_65, 2.);
+            draw_segment(.{max.x, min.y}, .{max.x, max.y}, GREY_65, 2.);
+            draw_segment(.{max.x, max.y}, .{min.x, max.y}, GREY_65, 2.);
+            draw_segment(.{min.x, max.y}, .{min.x, min.y}, GREY_65, 2.);
+
+            notch : [3]Vector3;
+
+            avg := (min + max) / 2.;
+            len := PADDLE_EXTENTS;
+
+            notch[0] = .{xy=world_to_screen(.{avg.x - .15 * len.x, max.y}), z=10.};
+            notch[1] = .{xy=world_to_screen(.{avg.x + .15 * len.x, max.y}), z=10.};
+            notch[2] = .{xy=world_to_screen(.{avg.x, max.y - .35 * len.y}), z=10.};
+            Simp.immediate_triangle(notch[0], notch[1], notch[2], GREY_65, GREY_65, GREY_65);
+
+            notch[0] = .{xy=world_to_screen(.{avg.x - .2 * len.x, min.y}), z=10.};
+            notch[1] = .{xy=world_to_screen(.{avg.x + .2 * len.x, min.y}), z=10.};
+            notch[2] = .{xy=world_to_screen(.{avg.x, min.y + .35 * len.y}), z=10.};
+            Simp.immediate_triangle(notch[0], notch[1], notch[2], GREY_65, GREY_65, GREY_65);
+        }
+    }
+    draw_warp_bar(player1);
+    draw_warp_bar(player2);
+
+
     // Only draw the cursor if the mouse recently moved (the cursor is useful to resize the window)
     {
         current_mouse_x, current_mouse_y := get_client_mouse_pos(window);
@@ -211,14 +267,14 @@ draw_mesh :: (mesh : Mesh, transform : b2Transform, color : Vector4) {
 }
 
 // SEGMENT_THICKNESS in simp units aka pixels
-draw_segment :: (start : Vector2, end : Vector2, color : Vector4, SEGMENT_THICKNESS : float = .1) {
+draw_segment :: (start_world : Vector2, end_world : Vector2, color : Vector4, SEGMENT_THICKNESS : float = .1) {
     Simp.set_shader_for_color(true);
 
-    n := unit_vector(end - start);
+    n := unit_vector(end_world - start_world);
     n.x, n.y = n.y, -n.x; // Rotate the unit direction by 90 degrees
 
-    s := world_to_screen(start);
-    e := world_to_screen(end);
+    s := world_to_screen(start_world);
+    e := world_to_screen(end_world);
     q0 := s + n * .5 * SEGMENT_THICKNESS;
     q3 := s - n * .5 * SEGMENT_THICKNESS;
     q2 := e - n * .5 * SEGMENT_THICKNESS;

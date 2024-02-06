@@ -6,11 +6,13 @@ Pong/BlockBreaker/RocketLeague/JBlows billiards game
 
 # General
 
+[ ] Have explosions of any kind do damage to an area, so you can't just sit and protect a life
 [ ] Fix issue where the incoming laser passes through obstructions
 [ ] Fix issue where the incoming laser is shown when the ball just misses the paddle
 [ ] Fix issue where if the balls always miss both paddles, the results are not symmetric for P1/P2
 [ ] Fix crash when you leave a game with an empty level
 [ ] Add friction to the bottom of the paddle
+
 [ ] Have a speed up as well as a slow down? Maybe this would also need a world for things moving toward P1 and toward P2?
 [ ] Warp should be limited, maybe a fixed amount for the whole game, and you get more by exploding your own ball? e.g., to sacrifice something you get something
 [ ] Balls should not spin, use SetAngularDamping function to stop that

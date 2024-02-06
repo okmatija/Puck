@@ -153,7 +153,11 @@ Player :: struct {
     power1 : u32;
     power2 : u32;
 
+    // Time warp stuff
     time_factor := 1.;
+    warp_duration_remaining := WARP_DURATION_MAX;
+    WARP_DURATION_MAX :: 1.5;
+    WARP_START_THRESHOLD :: #run WARP_DURATION_MAX / 3.;
 
     lives : [PLAYER_MAX_LIVES]Life;
 
@@ -539,9 +543,10 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
 
 
 
-countdown :: (value_pointer: *float) {
+// If rate_multiplier < 0. then this will be a count up
+countdown :: (value_pointer: *float, rate_multiplier := 1.) {
     value := value_pointer.*;
-    value -= current_dt;
+    value -= rate_multiplier * current_dt;
     if value < 0 {
         value = 0; // @Think Does this give consistent countdowns?
     }
