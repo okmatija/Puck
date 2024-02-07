@@ -438,7 +438,7 @@ draw_aim_lasers :: () {
             ray_cast_callback_data.ignore_body = ball.body;
             b2World.RayCast(world, *ray_cast_callback, origin, origin + game_radius*unit_out);
 
-            use_color_out, use_color_out_core := RED, player.color;
+            use_color_out, use_color_out_core := player.color, player.color;
             use_color_out.w = laser_alpha;
             use_color_out_core.w = laser_alpha;
 
