@@ -78,8 +78,8 @@ init_ball_physics :: (ball : *Ball) {
 
     fixture_def : b2FixtureDef;
     b2FixtureDef.Constructor(*fixture_def);
-    fixture_def.filter.categoryBits = Ball_Category;
-    fixture_def.filter.maskBits = Ball_Mask;
+    fixture_def.filter.categoryBits = BALL_CATEGORY;
+    fixture_def.filter.maskBits = BALL_MASK;
     if #complete ball.shape == {
     case .Circle;
         fixture_def.shape = *circle_shape;
@@ -117,7 +117,7 @@ init_obstructions_physics :: () {
         body := b2World.CreateBody(world, *body_def);
         level.obstructions.body = body;
 
-        add_fixture_from_mesh(level.obstructions.body, level.obstructions.mesh, Boundary_Category, Boundary_Mask);
+        add_fixture_from_mesh(level.obstructions.body, level.obstructions.mesh, BOUNDARY_CATEGORY, BOUNDARY_MASK);
 
         joint_def : b2PrismaticJointDef;
         b2PrismaticJointDef.Constructor(*joint_def);
@@ -146,8 +146,8 @@ init_boundary_physics :: () {
 
     fixture_def : b2FixtureDef;
     b2FixtureDef.Constructor(*fixture_def);
-    fixture_def.filter.categoryBits = Boundary_Category;
-    fixture_def.filter.maskBits = Boundary_Mask;
+    fixture_def.filter.categoryBits = BOUNDARY_CATEGORY;
+    fixture_def.filter.maskBits = BOUNDARY_MASK;
     fixture_def.shape = *edge_shape;
     fixture_def.density = 0.;
     fixture_def.friction = WALL_FRICTION;
@@ -198,7 +198,7 @@ init_player_physics :: (using player : *Player) {
         }
         life.body = b2World.CreateBody(world, *body_def);
 
-        add_fixture_from_mesh(life.body, life.mesh, Life_Category, Life_Mask);
+        add_fixture_from_mesh(life.body, life.mesh, LIFE_CATEGORY, LIFE_MASK);
     }
 
     body_def : b2BodyDef;
@@ -232,8 +232,8 @@ init_player_physics :: (using player : *Player) {
 
                 fixture_def : b2FixtureDef;
                 b2FixtureDef.Constructor(*fixture_def);
-                fixture_def.filter.categoryBits = Player_Category;
-                fixture_def.filter.maskBits = Player_Mask;
+                fixture_def.filter.categoryBits = PLAYER_CATEGORY;
+                fixture_def.filter.maskBits = PLAYER_MASK;
                 fixture_def.shape = *polygon_shape;
                 fixture_def.density = PADDLE_DENSITY;
                 fixture_def.friction = PADDLE_FRICTION;
@@ -250,8 +250,8 @@ init_player_physics :: (using player : *Player) {
 
                 fixture_def : b2FixtureDef;
                 b2FixtureDef.Constructor(*fixture_def);
-                fixture_def.filter.categoryBits = Player_Category;
-                fixture_def.filter.maskBits = Player_Mask;
+                fixture_def.filter.categoryBits = PLAYER_CATEGORY;
+                fixture_def.filter.maskBits = PLAYER_MASK;
                 fixture_def.shape = *polygon_shape;
                 fixture_def.density = PADDLE_DENSITY;
                 fixture_def.friction = PADDLE_FRICTION;
@@ -276,8 +276,8 @@ init_player_physics :: (using player : *Player) {
 
             fixture_def : b2FixtureDef;
             b2FixtureDef.Constructor(*fixture_def);
-            fixture_def.filter.categoryBits = Player_Category;
-            fixture_def.filter.maskBits = Player_Mask;
+            fixture_def.filter.categoryBits = PLAYER_CATEGORY;
+            fixture_def.filter.maskBits = PLAYER_MASK;
             fixture_def.userData = xx circle_fixture_user_data;
             fixture_def.shape = *circle_shape;
             fixture_def.density = PADDLE_DENSITY;
@@ -295,7 +295,7 @@ init_player_physics :: (using player : *Player) {
             for * bottom_mesh.vertices {
                 it.y -= bottom_extents.y;
             }
-            add_fixture_from_mesh(body, bottom_mesh, Player_Category, Player_Mask);
+            add_fixture_from_mesh(body, bottom_mesh, PLAYER_CATEGORY, PLAYER_MASK);
     }
 
 
@@ -419,14 +419,16 @@ bool b2ContactFilter::ShouldCollide(b2Fixture* fixtureA, b2Fixture* fixtureB)
 // @Cleanup make these #type,isa?
 
 // Box2D collision categories (I am a...)
-Player_Category : u16 : 0x0001;
-Ball_Category : u16 : 0x0002;
-Life_Category : u16 : 0x0004;
-Boundary_Category : u16 : 0x0008;
+PLAYER_CATEGORY : u16 : 0x0001;
+BALL_CATEGORY : u16 : 0x0002;
+LIFE_CATEGORY : u16 : 0x0004;
+BOUNDARY_CATEGORY : u16 : 0x0008;
+PLAYER_JOINT_CATEGORY : u16 : 0x0010;
 
 // Box2D collision masks (I will collide with...)
-Player_Mask : u16 : #run 0xFFFF ^ Boundary_Category;
-Ball_Mask : u16 : 0xFFFF; // Everything
-Life_Mask : u16 : Ball_Category;
-Boundary_Mask : u16 : Ball_Category;
+EVERYTHING_MASK : u16 : 0xFFFF;
+PLAYER_MASK : u16 : #run EVERYTHING_MASK ^ BOUNDARY_CATEGORY;
+BALL_MASK : u16 : EVERYTHING_MASK;
+LIFE_MASK : u16 : BALL_CATEGORY;
+BOUNDARY_MASK : u16 : BALL_CATEGORY;
 
