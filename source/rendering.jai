@@ -8,9 +8,9 @@ GREY_50 :: Vector4.{.5,.5,.5,1};
 GREY_65 :: Vector4.{.65,.65,.65,1};
 GREY_70 :: Vector4.{.7,.7,.7,1};
 
-PLAYER1_COLOR :: Vector4.{1., .3, .2, 1.};
-PLAYER2_COLOR :: Vector4.{.5, 0., 1., 1.};
-LIFE_COLOR ::    Vector4.{.7, 0., .2, 1.};
+PLAYER1_COLOR :: Vector4.{1.0, 0.3, 0.2, 1.0};
+PLAYER2_COLOR :: Vector4.{0.5, 0.2, 0.7, 1.0};
+LIFE_COLOR ::    Vector4.{0.7, 0.0, 0.2, 1.0};
 
 BOUNDARY_COLOR :: Vector4.{0., .3, 0., 1.};
 BOUNDARY_COLOR_NO_COLLISION :: Vector4.{0., .3, 0., .2};
@@ -313,8 +313,8 @@ draw_game_background :: () {
         Simp.immediate_quad(.{0, 0}, .{xx window_width, 0}, .{xx window_width, xx window_height}, .{0, xx window_height},
             .{.6, .5, .5, 1},
             .{.6, .5, .5, 1},
-            .{.3, .5, .9, 1},
-            .{.3, .5, .9, 1},
+            .{.3, .5, .7, 1},
+            .{.3, .5, .7, 1},
             );
     } else {
         Simp.set_shader_for_images(*sky_map);
