@@ -210,6 +210,13 @@ render_one_frame :: () {
     if DEBUG_DRAW_BOX2D {
         // Draws the physics/collision geometry
         b2World.DebugDraw(world);
+
+        // Draws joints (ported from dynamics/b2_joint.cpp)
+        joint : *b2Joint = b2World.GetJointList(world);
+        while joint {
+            draw_joint(world_debug_draw, joint);
+            joint = b2Joint.GetNext(joint);
+        }
     }
 
 

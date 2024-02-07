@@ -31,6 +31,48 @@ create_box2d_debug_draw_using_simp :: (transform: (Vector2)->Vector3) -> *b2Draw
     return draw;
 }
 
+// Draws joints (ported from dynamics/b2_joint.cpp)
+draw_joint :: (draw : *b2Draw, using joint : *b2Joint) {
+    xf1 : *b2Transform = b2Body.GetTransform(m_bodyA);
+    xf2 : *b2Transform = b2Body.GetTransform(m_bodyB);
+    x1 : b2Vec2 = xf1.p; // == b2Body.GetPosition(m_bodyA);
+    x2 : b2Vec2 = xf2.p; // == b2Body.GetPosition(m_bodyB);
+    // These are in world (not body-local) coordinates
+    p1 : b2Vec2 = joint.vtable.GetAnchorA(joint);
+    p2 : b2Vec2 = joint.vtable.GetAnchorB(joint);
+
+    color := b2Color.{0.5, 0.8, 0.8, 1.0};
+
+    if m_type == {
+    case .e_distanceJoint;
+        draw_segment(draw, *p1, *p2, *color);
+
+    case .e_pulleyJoint;
+        pulley : *b2PulleyJoint = cast(*b2PulleyJoint)joint;
+        s1 : b2Vec2 = b2PulleyJoint.GetGroundAnchorA(pulley);
+        s2 : b2Vec2 = b2PulleyJoint.GetGroundAnchorB(pulley);
+        draw_segment(draw, *s1, *p1, *color);
+        draw_segment(draw, *s2, *p2, *color);
+        draw_segment(draw, *s1, *s2, *color);
+
+    case .e_mouseJoint;
+        c := b2Color.{0.0, 1.0, 0.0, 1.0};
+        draw_point(draw, *p1, 4.0, *c);
+        draw_point(draw, *p2, 4.0, *c);
+
+        c = b2Color.{0.8, 0.8, 0.8, 1.0};
+        draw_segment(draw, *p1, *p2, *c);
+
+    case;
+        color = b2Color.{r=1, a=1};
+        draw_segment(draw, *x1, *p1, *color); // A position to A anchor
+        color = b2Color.{g=1, a=1};
+        draw_segment(draw, *x2, *p2, *color); // B position to B anchor
+        color = b2Color.{b=1, a=1};
+        draw_segment(draw, *p1, *p2, *color); // A to anchor to B anchor
+    }
+}
+
 #scope_file
 
 // The implementations here are ports of the C++ found in box2d/testbed/draw.cpp
