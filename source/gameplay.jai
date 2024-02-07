@@ -137,15 +137,6 @@ Player :: struct {
     color : Vector4;
     transform : b2Transform;
 
-    Prismatic_Joint :: struct {
-        anchor : Vector2;
-        axis : Vector2;
-        lower_translation : float;
-        upper_translation : float;
-    }
-
-    joint : Prismatic_Joint; // Constrains the path of the paddle. Initted using the level id 
-
     left : u32;
     right : u32;
     down : u32;
@@ -419,19 +410,6 @@ init_boundary :: () {
     .{ goal.x - goal_corner, game.y+2*goal.y},
     .{ goal.x,  game.y + 2*goal.y - goal_corner},
     .{ goal.x,  game.y});
-
-    // Let the players disappear into the boundary halfway so you can position
-    // the left/right facing edge of the paddle to a ball moving right/left
-
-    player1.joint.anchor = .{0., -game.y};
-    player1.joint.axis = .{1, 0};
-    player1.joint.lower_translation = -goal.x - PADDLE_EXTENTS.x;
-    player1.joint.upper_translation =  goal.x + PADDLE_EXTENTS.x;
-
-    player2.joint.anchor = .{0., game.y};
-    player2.joint.axis = .{1, 0};
-    player2.joint.lower_translation = -goal.x - PADDLE_EXTENTS.x;
-    player2.joint.upper_translation =  goal.x + PADDLE_EXTENTS.x;
 
     if host_type != .CLIENT {
         init_boundary_physics();

@@ -174,7 +174,6 @@ init_player_physics :: (using player : *Player) {
     user_data.pointer = xx player;
 
     offset, extents, stride := compute_square_grid(get_goal_extents(), LIVES_GRID_COLS, LIVES_GRID_ROWS, .1);
-    anchor := Vector2.{get_goal_extents().x, 2 * get_goal_extents().y + get_game_extents().y};
     
     for row : 0..LIVES_GRID_ROWS-1 for col : 0..LIVES_GRID_COLS-1 {
         life := *lives[col + row * LIVES_GRID_COLS];
@@ -186,6 +185,9 @@ init_player_physics :: (using player : *Player) {
         b2BodyDef.Constructor(*body_def);
         body_def.userData = user_data;
         body_def.type = .b2_staticBody;
+
+        anchor := Vector2.{get_goal_extents().x, 2 * get_goal_extents().y + get_game_extents().y};
+
         if index == {
         case .P1;
             body_def.position = -anchor + offset + extents + Vector2.{stride.x * col, stride.y * row};
@@ -296,14 +298,42 @@ init_player_physics :: (using player : *Player) {
             add_fixture_from_mesh(body, bottom_mesh, Player_Category, Player_Mask);
     }
 
-    // Constrain player movement
-    joint_def : b2PrismaticJointDef;
-    b2PrismaticJointDef.Constructor(*joint_def);
-    b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, joint.anchor, joint.axis);
-    joint_def.lowerTranslation = joint.lower_translation;
-    joint_def.upperTranslation = joint.upper_translation;
-    joint_def.enableLimit = true;
-    b2World.CreateJoint(world, *joint_def);
+
+    // Let the players disappear into the boundary halfway so you can position
+    // the left/right facing edge of the paddle to a ball moving right/left
+
+    game := get_game_extents();
+    goal := get_goal_extents();
+
+    if player.index == {
+    case .P1;
+        anchor := Vector2.{0., -game.y};
+        axis := Vector2.{1, 0};
+        lower_translation := -goal.x - PADDLE_EXTENTS.x;
+        upper_translation :=  goal.x + PADDLE_EXTENTS.x;
+
+        joint_def : b2PrismaticJointDef;
+        b2PrismaticJointDef.Constructor(*joint_def);
+        b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, anchor, axis);
+        joint_def.lowerTranslation = lower_translation;
+        joint_def.upperTranslation = upper_translation;
+        joint_def.enableLimit = true;
+        b2World.CreateJoint(world, *joint_def);
+
+    case .P2;
+        anchor := Vector2.{0., game.y};
+        axis := Vector2.{1, 0};
+        lower_translation := -goal.x - PADDLE_EXTENTS.x;
+        upper_translation :=  goal.x + PADDLE_EXTENTS.x;
+
+        joint_def : b2PrismaticJointDef;
+        b2PrismaticJointDef.Constructor(*joint_def);
+        b2PrismaticJointDef.Initialize(*joint_def, level.boundary.body, body, anchor, axis);
+        joint_def.lowerTranslation = lower_translation;
+        joint_def.upperTranslation = upper_translation;
+        joint_def.enableLimit = true;
+        b2World.CreateJoint(world, *joint_def);
+    }
 }
 
 
