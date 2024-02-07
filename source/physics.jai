@@ -3,14 +3,12 @@ init_world :: () {
     world = New(b2World); // @Leak
     b2World.Constructor(world, Vector2.{0., 0.});
 
-    world_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
-    world_debug_draw = create_box2d_debug_draw_using_simp(world_debug_draw_transform);
-    b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.shapeBit);
-    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.jointBit);
-    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.aabbBit);
-    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.pairBit);
-    //b2Draw.AppendFlags(world_debug_draw, xx b2Draw.e_2.centerOfMassBit);
-    b2World.SetDebugDraw(world, world_debug_draw);
+    if DEBUG_DRAW_BOX2D != 0 {
+        world_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
+        world_debug_draw = create_box2d_debug_draw_using_simp(world_debug_draw_transform);
+        b2Draw.SetFlags(world_debug_draw, xx DEBUG_DRAW_BOX2D);
+        b2World.SetDebugDraw(world, world_debug_draw);
+    }
 
     contact_listener.vtable = New(b2ContactListener_VTable); // @Leak
     contact_listener.vtable.BeginContact = contact_listener_begin_contact;

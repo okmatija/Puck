@@ -1,6 +1,12 @@
 PONG_VERSION :: "Version 0.5.0";
 DEBUG_DRAW :: false;
-DEBUG_DRAW_BOX2D :: false;
+DEBUG_DRAW_BOX2D :: 0
+// | b2Draw.e_2.shapeBit
+// | b2Draw.e_2.jointBit
+// | b2Draw.e_2.aabbBit
+// | b2Draw.e_2.pairBit
+// | b2Draw.e_2.centerOfMassBit
+;
 
 // Default to 1080p
 WINDOW_WIDTH_INITIAL :: 1920;
