@@ -211,12 +211,14 @@ render_one_frame :: () {
         // Draws the physics/collision geometry, this is a no-op if b2World.SetDebugDraw was not called
         b2World.DebugDraw(world);
 
-        //// An alternative way to draw joints (ported from dynamics/b2_joint.cpp)
-        //joint : *b2Joint = b2World.GetJointList(world);
-        //while joint {
-        //   draw_joint(world_debug_draw, joint);
-        //   joint = b2Joint.GetNext(joint);
-        //}
+        if DEBUG_DRAW_BOX2D & b2Draw.jointBit {
+            // An alternative way to draw joints (ported from dynamics/b2_joint.cpp)
+            joint : *b2Joint = b2World.GetJointList(world);
+            while joint {
+            draw_joint(world_debug_draw, joint);
+            joint = b2Joint.GetNext(joint);
+            }
+        }
     }
 
 

@@ -44,10 +44,10 @@ draw_joint :: (draw : *b2Draw, using joint : *b2Joint) {
     color := b2Color.{0.5, 0.8, 0.8, 1.0};
 
     if m_type == {
-    case .e_distanceJoint;
+    case .distanceJoint;
         draw_segment(draw, *p1, *p2, *color);
 
-    case .e_pulleyJoint;
+    case .pulleyJoint;
         pulley : *b2PulleyJoint = cast(*b2PulleyJoint)joint;
         s1 : b2Vec2 = b2PulleyJoint.GetGroundAnchorA(pulley);
         s2 : b2Vec2 = b2PulleyJoint.GetGroundAnchorB(pulley);
@@ -55,7 +55,7 @@ draw_joint :: (draw : *b2Draw, using joint : *b2Joint) {
         draw_segment(draw, *s2, *p2, *color);
         draw_segment(draw, *s1, *s2, *color);
 
-    case .e_mouseJoint;
+    case .mouseJoint;
         c := b2Color.{0.0, 1.0, 0.0, 1.0};
         draw_point(draw, *p1, 4.0, *c);
         draw_point(draw, *p2, 4.0, *c);
