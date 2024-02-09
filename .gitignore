@@ -1,6 +1,8 @@
 *.exe
 *.pdb
 
+data/unused/
+
 # Ignore the Jai build folder files
 .build/
 
