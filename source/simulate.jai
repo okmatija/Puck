@@ -431,12 +431,14 @@ contact_listener_pre_solve :: (this: *b2ContactListener, contact: *b2Contact, ol
         if player && ball {
             using world_manifold : b2WorldManifold;
             b2Contact.GetWorldManifold(contact, *world_manifold);
-            y_crit := get_game_extents().y;
+
             if player.index == .P1 {
-                if points[0].y < -y_crit || points[1].y < -y_crit {
+                y_crit := get_position(player.body).y - PADDLE_EXTENTS.y;
+                if points[0].y < y_crit || points[1].y < y_crit {
                     b2Contact.SetEnabled(contact, false);
                 }
             } else if player.index == .P2 {
+                y_crit := get_position(player.body).y + PADDLE_EXTENTS.y;
                 if points[0].y >  y_crit || points[1].y >  y_crit {
                     b2Contact.SetEnabled(contact, false);
                 }

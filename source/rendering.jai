@@ -320,10 +320,10 @@ draw_segment :: (start_world : Vector2, end_world : Vector2, color : Vector4, SE
 draw_game_background :: () {
     #if true {
         Simp.immediate_quad(.{0, 0}, .{xx window_width, 0}, .{xx window_width, xx window_height}, .{0, xx window_height},
-            .{.6, .5, .5, 1},
-            .{.6, .5, .5, 1},
             .{.3, .5, .7, 1},
             .{.3, .5, .7, 1},
+            .{.6, .5, .5, 1},
+            .{.6, .5, .5, 1},
             );
     } else {
         Simp.set_shader_for_images(*sky_map);
