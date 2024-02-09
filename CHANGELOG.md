@@ -6,6 +6,7 @@ When releasing a new version remember to add a git tag...!
 * TODO Moved time warp to U and Q
 * TODO Added controls menu
 * TODO Experiment with lives put on spring but then falling back to the grid shape. This way explosions would look cooler and could have collateral damage
+* TODO Make explosions affect the paddles to make it harder to aim if someone blows up next to you
 
 # Version 0.5.0
 
@@ -18,14 +19,15 @@ Controls:
 
 Changes in this version:
 * Added separate physics worlds for each player
-* TODO Fix the obstructions in time e.g., central spinning obstructions need to behave differently in different worlds
-* Added limit to time warping and made it gradually recharge when unused
-* Added visualization showing remaining amount of time warping
-* Explosions now damage lives and apply impulses to balls within their radius
-* Fixed cases when the aiming lasers rendered but the ball would not actually collide with the paddle
-* Added jai compiler version text, to help with building old versions for posterity
-* TODO Make explosions affect the paddles to make it harder to aim if someone blows up next to you
-* Non-local multiplayer is broken, the focus was on game design
+* Added visualization showing the remaining amount of time warping, it recharges over time
+* Fixed a bug where the aiming lasers rendered but the ball would not actually collide with the paddle
+* Removed the healing property of balls matching the player color. All balls damage all lives.
+* Changed ball color so it indicates which physics world the ball currently lives in
+* Changed ball explosions so they damage lives and apply impulses to other balls within the explosion radius
+* Changed the colors of the players/background a bit
+* Changed the game aspect ratio to make it more suitable for playing on phones
+* Changed all lives to spawn with the same health, but maybe it was better when the ones near the edges were weaker..?
+* Non-local multiplayer is broken, oops, the focus was on game design and I didn't maintain it
 
 # Version 0.4.0, 05 February 2024
 

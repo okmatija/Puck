@@ -114,7 +114,7 @@ last_time:  float64; // Seconds
 level : Level;
 player1 : Player;
 player2 : Player;
-player_count : Player_Count = .One_Player;
+player_count : Player_Count = .Two_Player;
 balls : [BALL_COUNT_MAX]Ball;
 
 
