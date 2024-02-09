@@ -400,7 +400,8 @@ contact_listener_begin_contact :: (this: *b2ContactListener, contact: *b2Contact
             life := cast(*Life)a_data.pointer;
             ball := cast(*Ball)b_data.pointer;
             if life. player_index == ball.player_index {
-                life.health += LIFE_MAX_HEALTH / 2.;
+                //life.health += LIFE_MAX_HEALTH / 2.; // @TODO :MatchingColorHeals Remove this, it was too complicated. It was kinda neat to have healing balls but not actually that fun in practice, its a casual game!
+                life.health -= LIFE_MAX_HEALTH / 2.;
             } else {
                 life.health -= LIFE_MAX_HEALTH / 2.;
             }
@@ -411,7 +412,8 @@ contact_listener_begin_contact :: (this: *b2ContactListener, contact: *b2Contact
             life := cast(*Life)b_data.pointer;
             ball := cast(*Ball)a_data.pointer;
             if life. player_index == ball.player_index {
-                life.health += LIFE_MAX_HEALTH / 2.;
+                //life.health += LIFE_MAX_HEALTH / 2.; // :MatchingColorHeals 
+                life.health -= LIFE_MAX_HEALTH / 2.;
             } else {
                 life.health -= LIFE_MAX_HEALTH / 2.;
             }

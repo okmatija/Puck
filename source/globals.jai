@@ -151,6 +151,6 @@ DRAW_MOUSE_IN_GAME_COUNTDOWN :: .5;
 
 user_sfx_volume : float = .1;
 
-TIME_FACTOR_FAST :: 3.;
-TIME_FACTOR_SLOW :: .1;
+TIME_FACTOR_FAST :: 3.0;
+TIME_FACTOR_SLOW :: 0.1;
 

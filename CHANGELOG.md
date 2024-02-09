@@ -1,18 +1,31 @@
 When releasing a new version remember to add a git tag...!
 
+# Version 0.6.0
+
+* TODO Add a countdown to start the game
+* TODO Moved time warp to U and Q
+* TODO Added controls menu
+* TODO Experiment with lives put on spring but then falling back to the grid shape. This way explosions would look cooler and could have collateral damage
+
 # Version 0.5.0
 
+Objective:
+Destroy all your opponents little red boxes.
+
+Controls:
+* J/L: move player 1 paddle left/right; I/K: speed up/down time in player 1's world
+* A/D: move player 2 paddle left/right; W/S: speed up/down time in player 2's world
+
+Changes in this version:
+* Added separate physics worlds for each player
 * TODO Fix the obstructions in time e.g., central spinning obstructions need to behave differently in different worlds
 * Added limit to time warping and made it gradually recharge when unused
 * Added visualization showing remaining amount of time warping
 * Explosions now damage lives and apply impulses to balls within their radius
 * Fixed cases when the aiming lasers rendered but the ball would not actually collide with the paddle
 * Added jai compiler version text, to help with building old versions for posterity
-* TODO Add a countdown to start the game
-* TODO Moved time warp to U and Q
-* TODO Added controls menu
 * TODO Make explosions affect the paddles to make it harder to aim if someone blows up next to you
-* TODO Experiment with lives put on spring but then falling back to the grid shape. This way explosions would look cooler and could have collateral damage
+* Non-local multiplayer is broken, the focus was on game design
 
 # Version 0.4.0, 05 February 2024
 

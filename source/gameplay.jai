@@ -108,7 +108,7 @@ Ball :: struct {
     using #as base : Entity;
     base.kind = .Ball;
 
-    player_index : Player_Index;
+    player_index : Player_Index; // @TODO Remove this?
     live : bool; // Orthogonal to health, since we might want to disable a ball without changing its health
     health : float = BALL_MAX_HEALTH;
 
@@ -148,7 +148,7 @@ Player :: struct {
     // Time warp stuff
     time_factor := 1.;
     warp_duration_remaining := WARP_DURATION_MAX;
-    WARP_DURATION_MAX :: 1.5;
+    WARP_DURATION_MAX :: 2.0;
     WARP_START_THRESHOLD :: #run WARP_DURATION_MAX / 3.;
 
     lives : [PLAYER_MAX_LIVES]Life;
@@ -311,10 +311,10 @@ init_game :: (init_game_state : Init_Game_State) {
             case;
                 if it_index % 2 == 0 {
                     ball.player_index = .P1;
-                    ball.color = player1.color;
+                    ball.color = YELLOW; //player1.color;
                 } else {
                     ball.player_index = .P2;
-                    ball.color = player2.color;
+                    ball.color = YELLOW; //player2.color;
                 }
                 ball.radius = BALL_INITIAL_RADIUS;
                 init_ball(ball, init_game_state.ball_shape);
@@ -501,11 +501,11 @@ init_player :: (using player : *Player, player_index : Player_Index, player_padd
         life := *lives[col + row * LIVES_GRID_COLS];
         life.player_index = player_index;
         if row == 2 {
-            if col < 6 || col > LIVES_GRID_COLS-7 {
-                life.health = LIFE_MAX_HEALTH / 2.;
-            } else {
+            // if col < 6 || col > LIVES_GRID_COLS-7 {
+            //     life.health = LIFE_MAX_HEALTH / 2.;
+            // } else {
                 life.health = LIFE_MAX_HEALTH;
-            }
+            // }
         } else {
             life.health = 0.;
         }

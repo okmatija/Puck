@@ -94,16 +94,21 @@ render_one_frame :: () {
                 world_to_screen(b2Mul(it.transform, it.mesh.vertices[4])),
                 Vector4.{1,1,1,1});
         } else {
-            use_color := lerp(BLACK, it.color, it.health / BALL_MAX_HEALTH);
+
+            use_color := ifx b2Body.GetWorld(it.active_body) == worlds[0] then player1.color else player2.color;
             draw_mesh(it.mesh, it.transform, use_color);
 
-            for t : it.mesh.triangles {
-                start := b2Mul(it.transform, it.mesh.vertices[t.b]);
-                end :=   b2Mul(it.transform, it.mesh.vertices[t.c]);
-                edge_color := YELLOW;
-                edge_color.w = .7;
-                draw_segment(start, end, edge_color, 2);
-            }
+            // mesh : Mesh;
+            // defer mesh_deinit(mesh);
+            // init_circle_mesh(mesh, it.radius*.4, 32);
+            // draw_mesh(mesh, it.transform, YELLOW);
+
+            // edge_color := lerp(BLACK, it.color, it.health / BALL_MAX_HEALTH);
+            // for t : it.mesh.triangles {
+            //     start := b2Mul(it.transform, it.mesh.vertices[t.b]);
+            //     end :=   b2Mul(it.transform, it.mesh.vertices[t.c]);
+            //     draw_segment(start, end, edge_color, 2);
+            // }
         }
     }
 
@@ -364,12 +369,22 @@ draw_score :: () {
     }
 }
 
+// @TODOO Remove all the physics references from this file (implement a compile-time check for this..!)
 draw_aim_lasers :: (world : *b2World) {
-    for :LiveBalls ball : balls {
-        if host_type == .SERVER && ball.player_index != .P1 continue;
-        if host_type == .CLIENT && ball.player_index != .P2 continue;
+    for player_index : 0..1 for :LiveBalls ball : balls {
 
-        player := ifx ball.player_index == .P1 then *player1 else *player2;
+        player := ifx player_index == 0 then *player1 else *player2;
+
+        // Do not draw lasers for the opponent
+        if player_count == .One_Player && player.index != .P1 continue;
+        if host_type == .SERVER && player.index != .P1 continue;
+        if host_type == .CLIENT && player.index != .P2 continue;
+
+        // Don't draw lasers from balls in the other world
+        if player.index == .P1 && b2Body.GetWorld(ball.active_body) == worlds[1] then continue;
+        if player.index == .P2 && b2Body.GetWorld(ball.active_body) == worlds[0] then continue;
+
+        // player := ifx ball.player_index == .P1 then *player1 else *player2;
 
         // @Cleanup Get this from the ball
         ball_shape : b2CircleShape;
