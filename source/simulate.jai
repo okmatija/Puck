@@ -92,45 +92,32 @@ simulate :: () {
         countdown(ball_spawn_countdown);
 
         if ball_spawn_countdown.* <= 0.  {
+            ball_spawn_countdown.* = BALL_SPAWN_COUNTDOWN;
             ball.live = true;
             ball.health = BALL_MAX_HEALTH;
 
-            // nocommit Use ball_update_active_body
-            if ball.shape == .Circle {
-                if #complete ball.player_index == {
-                case .P1;
-                    ball.active_body = ball.body[0];
-                    b2Body.SetEnabled(ball.body[0], true);
-                    b2Body.SetEnabled(ball.body[1], false);
+            if #complete ball.player_index == {
+            case .P1;
 
-                    b2Body.SetTransform(ball.active_body, .{get_game_extents().x - ball.radius, -ball.radius}, 0);
-                    ball_velocity := BALL_INITIAL_SPEED * unit_vector(Vector2.{-1., -1.});
-                    b2Body.SetLinearVelocity(ball.active_body, ball_velocity);
-                    b2Body.SetAngularVelocity(ball.active_body, 0.);
-                case .P2;
-                    ball.active_body = ball.body[1];
-                    b2Body.SetEnabled(ball.body[0], false);
-                    b2Body.SetEnabled(ball.body[1], true);
+                ball.active_body = ball.body[0];
+                ball_update_active_body(ball,
+                    position=.{get_game_extents().x - ball.radius, -ball.radius},
+                    angle=0.0,
+                    linear_velocity=BALL_INITIAL_SPEED * unit_vector(Vector2.{-1., -1.}),
+                    angular_velocity=0.0);
 
-                    b2Body.SetTransform(ball.active_body, .{-get_game_extents().x + ball.radius, ball.radius}, 0);
-                    ball_velocity := BALL_INITIAL_SPEED * unit_vector(Vector2.{1., 1.});
-                    b2Body.SetLinearVelocity(ball.active_body, ball_velocity);
-                    b2Body.SetAngularVelocity(ball.active_body, 0.);
-                case .UNKNOWN;
-                    assert(false);
-                }
-            } else {
-                // nocommit Update to handle multiple worlds
-                // d :: #run 3*BALL_INITIAL_RADIUS;
-                // offsets : [4]Vector2 : .[.{d, 0}, .{0, d}, .{-d, 0}, .{0, -d}];
+            case .P2;
 
-                // ball.active_body = ball.body[0];
-                // b2Body.SetTransform(ball.active_body, offsets[it_index], 0);
-                // b2Body.SetLinearVelocity(ball.active_body, .{0., 0.});
-                // b2Body.SetAngularVelocity(ball.active_body, 30);
+                ball.active_body = ball.body[1];
+                ball_update_active_body(ball,
+                    position=.{-get_game_extents().x + ball.radius, ball.radius},
+                    angle=0.0,
+                    linear_velocity=BALL_INITIAL_SPEED * unit_vector(Vector2.{1., 1.}),
+                    angular_velocity=0.0);
+                
+            case .UNKNOWN;
+                assert(false);
             }
-
-            ball_spawn_countdown.* = BALL_SPAWN_COUNTDOWN;
         }
 
         // break; // Just spawn one new ball
@@ -283,38 +270,15 @@ simulate :: () {
 
     // Move balls between worlds
     for * :LiveBalls ball : balls {
+
         transform := get_transform(ball.active_body);
         linear_velocity := get_linear_velocity(ball.active_body);
         angular_velocity := get_angular_velocity(ball.active_body);
+        position := transform.p;
+        angle := b2Rot.GetAngle(*transform.q);
 
-        // nocommit Use ball_update_active_body
-        if transform.p.y < 0. {
-            if ball.active_body != ball.body[0] {
-                ball.active_body = ball.body[0];
-                b2Body.SetEnabled(ball.body[0], true);
-                b2Body.SetEnabled(ball.body[1], false);
-
-                position := transform.p;
-                angle := b2Rot.GetAngle(*transform.q);
-
-                b2Body.SetTransform(ball.active_body, position, angle);
-                b2Body.SetLinearVelocity(ball.active_body, linear_velocity);
-                b2Body.SetAngularVelocity(ball.active_body, angular_velocity);
-            } 
-        } else {
-            if ball.active_body != ball.body[1] {
-                ball.active_body = ball.body[1];
-                b2Body.SetEnabled(ball.body[0], false);
-                b2Body.SetEnabled(ball.body[1], true);
-
-                position := transform.p;
-                angle := b2Rot.GetAngle(*transform.q);
-
-                b2Body.SetTransform(ball.active_body, position, angle);
-                b2Body.SetLinearVelocity(ball.active_body, linear_velocity);
-                b2Body.SetAngularVelocity(ball.active_body, angular_velocity);
-            } 
-        }
+        ball.active_body = ifx position.y < 0. then ball.body[0] else ball.body[1];
+        ball_update_active_body(ball, position, angle, linear_velocity, angular_velocity);
     }
 
     // Update the transforms used for rendering
@@ -509,25 +473,21 @@ contact_listener_destructor :: (this: *b2ContactListener, flags: Msvc_Destructor
 
 #scope_file
 
-ball_update_active_body :: (ball : *Ball, transform : b2Transform, linear_velocity : Vector2, angular_velocity : float) {
+ball_update_active_body :: (ball : *Ball, position : Vector2, angle : float, linear_velocity : Vector2, angular_velocity : float) {
     for * ball.body {
         if ball.active_body == it.* {
-            b2Body.SetEnabled(it.*, true); // nocommit check .live here???
-
-            position := transform.p;
-            angle := b2Rot.GetAngle(*transform.q);
+            b2Body.SetEnabled(it.*, true); // @Think Do we need to check .live here???
             b2Body.SetTransform(ball.active_body, position, angle);
             b2Body.SetLinearVelocity(ball.active_body, linear_velocity);
             b2Body.SetAngularVelocity(ball.active_body, angular_velocity);
-
         } else {
             b2Body.SetEnabled(it.*, false);
         }
     }
 }
 
-// nocommit Update this code to handle multiple worlds
 /*
+// @TODO Update this code to handle multiple worlds
 simulate_attractor_balls :: (power : float) {
     for * :LiveBalls ball, ball_index : balls {
         center := b2Body.GetPosition(ball.body).*;
