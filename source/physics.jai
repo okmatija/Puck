@@ -212,6 +212,7 @@ init_player_physics :: (using player : *Player) {
         body_def.angle = PI;
     }
     body = b2World.CreateBody(world, *body_def);
+    b2Body.SetFixedRotation(body, true);
 
     b2Body.SetSleepingAllowed(body, false);
 

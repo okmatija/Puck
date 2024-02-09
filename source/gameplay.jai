@@ -185,7 +185,7 @@ Life :: struct {
 
 // Tight bbox of the playable area. Half-width/height in meters
 get_game_extents :: () -> Vector2, float {
-    extents := Vector2.{10., 10.};
+    extents := Vector2.{10., 15.};
     return extents, .75 * extents.y;
 }
 
