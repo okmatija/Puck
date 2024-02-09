@@ -6,6 +6,10 @@ Pong/BlockBreaker/RocketLeague/JBlows billiards game
 
 # General
 
+[ ] Maryna suggests making the dome circles visible somehow, that could actually look pretty cool...
+[ ] make charge button and jump on next collision? make balls get damaged by impulses/energy so its possible to destroy the ball if you hit it too hard or if you hit a damaged ball too hard?
+[ ] Just have a three letter joining code and broadcast UPD to the entire network
+[ ] Show the balls loading into the game area
 [ ] Have explosions of any kind do damage to an area, so you can't just sit and protect a life
 [ ] Fix issue where the incoming laser passes through obstructions
 [ ] Fix issue where the incoming laser is shown when the ball just misses the paddle
