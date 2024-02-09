@@ -120,8 +120,9 @@ init_ball_physics :: (ball : *Ball, world : *b2World) {
 deinit_obstructions_physics :: (world : *b2World) {
     assert(host_type == .SERVER || host_type == .LOCAL);
 
-    if level.obstructions.body {
-        b2World.DestroyBody(world, level.obstructions.body);
+    obstructions := ifx world == worlds[0] then *level.obstructions[0] else *level.obstructions[1];
+    if obstructions.body {
+        b2World.DestroyBody(world, obstructions.body);
     }
 }
 
@@ -139,9 +140,11 @@ init_obstructions_physics :: (world : *b2World) {
         b2BodyDef.Constructor(*body_def);
         body_def.type = .b2_kinematicBody;
         body := b2World.CreateBody(world, *body_def);
-        level.obstructions.body = body;
 
-        add_fixture_from_mesh(level.obstructions.body, level.obstructions.mesh, BOUNDARY_CATEGORY, BOUNDARY_MASK);
+        obstructions := ifx world == worlds[0] then *level.obstructions[0] else *level.obstructions[1];
+        obstructions.body = body;
+
+        add_fixture_from_mesh(obstructions.body, obstructions.mesh, BOUNDARY_CATEGORY, BOUNDARY_MASK);
 
         joint_def : b2PrismaticJointDef;
         b2PrismaticJointDef.Constructor(*joint_def);

@@ -149,7 +149,7 @@ Game_State :: struct {
             transform : b2Transform;
         }
 
-        obstructions : Obstruction_State;
+        obstructions : [2]Obstruction_State;
     }
 
     player1_state : Player_State;
@@ -201,7 +201,9 @@ get_level_state :: () -> Game_State.Level_State {
 
     result : Game_State.Level_State;
     if level.level_id != .Empty {
-        result.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
+        for 0..1 {
+            result.obstructions[it].transform = b2Body.GetTransform(level.obstructions[it].body);
+        }
     }
 
     return result;
@@ -230,7 +232,9 @@ set_game_state :: (state : Game_State) {
     player2.score = state.player2_state.score;
 
     if level.level_id != .Empty {
-        level.obstructions.transform = state.level_state.obstructions.transform;
+        for 0..1 {
+            level.obstructions[it].transform = state.level_state.obstructions[it].transform;
+        }
     }
 
     for state.ball_state {

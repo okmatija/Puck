@@ -304,8 +304,10 @@ simulate :: () {
         for * balls {
             it.transform = b2Body.GetTransform(it.active_body);
         }
-        if level.obstructions.body {
-            level.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
+        for 0..1 {
+            if level.obstructions[it].body {
+                level.obstructions[it].transform = b2Body.GetTransform(level.obstructions[it].body);
+            }
         }
     }
 

@@ -46,7 +46,12 @@ render_one_frame :: () {
 
 
     if level.level_id != .Empty {
-        draw_mesh(level.obstructions.mesh, level.obstructions.transform, level.obstructions.color);
+        for 0..1 {
+            obstructions := *level.obstructions[it];
+            use_color := ifx it == 0 then player1.color else player2.color;
+            use_color.w = .9;
+            draw_mesh(obstructions.mesh, obstructions.transform, use_color);
+        }
     }
 
     // Debug the game size rect

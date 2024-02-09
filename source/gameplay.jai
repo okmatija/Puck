@@ -100,7 +100,7 @@ Boundary :: struct {
 
 Level :: struct {
     level_id : Level_Id;
-    obstructions : Obstruction;
+    obstructions : [2]Obstruction;
     boundary : Boundary;
 }
 
@@ -291,7 +291,8 @@ init_game :: (init_game_state : Init_Game_State) {
     
     level.level_id = init_game_state.level_id;
     init_boundary(); // Must come before players since they are constrained relative to the level boundary
-    init_obstructions();
+    init_obstructions(0);
+    init_obstructions(1);
 
     init_player(*player1, .P1, init_game_state.p1_paddle_shape);
     init_player(*player2, .P2, init_game_state.p2_paddle_shape);
@@ -424,7 +425,9 @@ deinit_obstructions :: () {
     }
 }
 
-init_obstructions :: () {
+init_obstructions :: (index : int) {
+    obstructions := *level.obstructions[index];
+
     if #complete level.level_id == {
     case .Empty;
         // Do nothing
@@ -434,11 +437,11 @@ init_obstructions :: () {
         transform : b2Transform;
         b2Transform.Constructor(*transform);
 
-        level.obstructions.color = BOUNDARY_COLOR_NO_COLLISION;
-        level.obstructions.color.w = 1.;
+        obstructions.color = BOUNDARY_COLOR_NO_COLLISION;
+        obstructions.color.w = 1.;
 
         // @Think Why is this needed with -release?? @CompilerBug??
-        mesh_reset(*level.obstructions.mesh);
+        mesh_reset(*obstructions.mesh);
 
         mesh : Mesh;
         defer mesh_deinit(mesh);
@@ -448,18 +451,18 @@ init_obstructions :: () {
         // init_circle_mesh(mesh, 2*PADDLE_EXTENTS.y, 32);
         b2Transform.Set(*transform, .{}, PI);
         mesh_transform(*mesh, transform);
-        mesh_merge(*level.obstructions.mesh, mesh);
+        mesh_merge(*obstructions.mesh, mesh);
 } else {
         init_prism_mesh(mesh, extents, 0.);
         b2Transform.Set(*transform, .{0,  8*PADDLE_EXTENTS.y}, PI);
         mesh_transform(*mesh, transform);
-        mesh_merge(*level.obstructions.mesh, mesh);
+        mesh_merge(*obstructions.mesh, mesh);
 
         mesh_reset(*mesh);
         init_prism_mesh(mesh, extents, 0.);
         b2Transform.Set(*transform, .{0, -8*PADDLE_EXTENTS.y}, 0.);
         mesh_transform(*mesh, transform);
-        mesh_merge(*level.obstructions.mesh, mesh);
+        mesh_merge(*obstructions.mesh, mesh);
 
         // Close off the parallels
         //mesh_reset(*mesh);
@@ -468,13 +471,12 @@ init_obstructions :: () {
         //mesh_transform(*mesh, transform);
         //b2Transform.Set(*transform, .{0, 0}, PI/2.);
         //mesh_transform(*mesh, transform);
-        //mesh_merge(*level.obstructions.mesh, mesh);
+        //mesh_merge(*obstructions.mesh, mesh);
 }
     }
 
     if host_type != .CLIENT {
-        init_obstructions_physics(worlds[0]);
-        init_obstructions_physics(worlds[1]);
+        init_obstructions_physics(ifx index == 0 then worlds[0] else worlds[1]);
     }
 }
 
