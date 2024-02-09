@@ -85,7 +85,7 @@ simp : *Simp.Immediate_State;
 HALF_PI :: #run .5 * PI;
 
 // @Think Should be configurable in Box2D_Debug_Draw?
-CIRCLE_SEGMENTS :: 16;
+CIRCLE_SEGMENTS :: 64;
 CIRCLE_INCREMENT :: #run TAU / CIRCLE_SEGMENTS;
 POINT_CIRCLE_SEGMENTS :: 4;
 POINT_CIRCLE_INCREMENT :: #run TAU / POINT_CIRCLE_SEGMENTS;
