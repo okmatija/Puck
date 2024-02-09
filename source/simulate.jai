@@ -267,28 +267,31 @@ simulate :: () {
     b2World.Step(world, current_dt, 6, 2);
 
     // Update the transforms used for rendering
-    post_step_update_player :: (player : *Player) {
-        player.transform = b2Body.GetTransform(player.body);
-        for * player.lives {
-            it.transform = b2Body.GetTransform(it.body);
-        }
+    {
+        post_step_update_player :: (player : *Player) {
+            player.transform = b2Body.GetTransform(player.body);
+            for * player.lives {
+                it.transform = b2Body.GetTransform(it.body);
+            }
 
-        // Disable all lives that died
-        for * life : player.lives {
-            if life.health <= 0. {
-                b2Body.SetEnabled(life.body, false);
+            // Disable all lives that died
+            for * life : player.lives {
+                if life.health <= 0. {
+                    b2Body.SetEnabled(life.body, false);
+                }
             }
         }
-    }
 
-    post_step_update_player(*player1);
-    post_step_update_player(*player2);
+        post_step_update_player(*player1);
+        post_step_update_player(*player2);
 
-    for * balls {
-        it.transform = b2Body.GetTransform(it.body);
-    }
-    if level.obstructions.body {
-        level.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
+        // Collect data to send to clients
+        for * balls {
+            it.transform = b2Body.GetTransform(it.body);
+        }
+        if level.obstructions.body {
+            level.obstructions.transform = b2Body.GetTransform(level.obstructions.body);
+        }
     }
 
     check_winning_condition();
