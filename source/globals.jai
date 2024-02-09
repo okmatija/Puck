@@ -1,12 +1,22 @@
 PONG_VERSION :: "Version 0.5.0";
+
 DEBUG_DRAW :: false;
-DEBUG_DRAW_BOX2D :: 0
+
+DEBUG_DRAW_BOX2D_FLAGS : [2]b2Draw.e_2 : .[
+0 // World 1
 // | b2Draw.shapeBit
 // | b2Draw.jointBit
 // | b2Draw.aabbBit
 // | b2Draw.pairBit
 // | b2Draw.centerOfMassBit
-;
+,
+0 // World 2
+// | b2Draw.shapeBit
+// | b2Draw.jointBit
+// | b2Draw.aabbBit
+// | b2Draw.pairBit
+// | b2Draw.centerOfMassBit
+];
 
 // Default to 1080p
 WINDOW_WIDTH_INITIAL :: 1920;
@@ -108,9 +118,10 @@ player_count : Player_Count = .One_Player;
 balls : [BALL_COUNT_MAX]Ball;
 
 
-world : *b2World;
-contact_listener : b2ContactListener;
-world_debug_draw : *b2Draw;
+worlds : [2]*b2World;
+world_debug_draws : [2]*b2Draw;
+
+contact_listener : b2ContactListener; // @Leak We need one for each world
 
 host_type : Host_Type = .UNKNOWN;
 server : Server;
@@ -140,7 +151,6 @@ DRAW_MOUSE_IN_GAME_COUNTDOWN :: .5;
 
 user_sfx_volume : float = .1;
 
-world_time_factor := 1.; // @TODOO remove this, and replce with individual player world factors
 TIME_FACTOR_FAST :: 3.;
 TIME_FACTOR_SLOW :: .1;
 

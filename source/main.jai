@@ -66,8 +66,6 @@ main :: () {
         current_time = seconds_since_init();
         current_dt = cast(float) (current_time - last_time);
 
-        current_dt *= world_time_factor;
-
         if current_dt > DT_MAX current_dt = DT_MAX;
         last_time = current_time;
 
@@ -86,6 +84,7 @@ main :: () {
             }
         }
 
+        // @Incomplete Handle sounds from different worlds here?
         Sound.update(current_dt);
 
         is_network_game := host_type == .CLIENT || host_type == .SERVER;

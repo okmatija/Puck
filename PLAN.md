@@ -134,6 +134,8 @@ Pong/BlockBreaker/RocketLeague/JBlows billiards game
 
 # Physics
 
+[ ] Make the bindings strip the b2 prefix
+
 iforce2d tutorials suggest I should collect all begin contact events and issue sounds afterwards:
 
 "Collisions between entities in the world will be detected during the b2World::Step() function that we call every time step. As we saw in the topic on worlds, the b2World::Step function advances the simulation, moving all the bodies around and so on. As soon as a collision is detected, the program flow will be given to your callback function to do something, and then goes back to b2World::Step to continue with more processing. It's important to note that since your callback is being called right in the middle of the stepping process, you shouldn't do anything to change the scene right away - there may be more collisions occuring in the same time step." -- https://www.iforce2d.net/b2dtut/collision-callbacks

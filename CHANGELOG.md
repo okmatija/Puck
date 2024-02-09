@@ -2,6 +2,7 @@ When releasing a new version remember to add a git tag...!
 
 # Version 0.5.0
 
+* TODO Fix the obstructions in time e.g., central spinning obstructions need to behave differently in different worlds
 * Added limit to time warping and made it gradually recharge when unused
 * Added visualization showing remaining amount of time warping
 * Explosions now damage lives and apply impulses to balls within their radius

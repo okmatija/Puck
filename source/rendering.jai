@@ -132,7 +132,8 @@ render_one_frame :: () {
         draw_mesh(circle, transform, use_color);
     }
 
-    draw_aim_lasers();
+    draw_aim_lasers(worlds[0]);
+    draw_aim_lasers(worlds[1]);
 
 
     // Draw warp bars
@@ -207,19 +208,21 @@ render_one_frame :: () {
         }
     }
 
-    {
+    debug_draw_world :: (index : int) {
         // Draws the physics/collision geometry, this is a no-op if b2World.SetDebugDraw was not called
-        b2World.DebugDraw(world);
+        b2World.DebugDraw(worlds[index]);
 
-        if DEBUG_DRAW_BOX2D & b2Draw.jointBit {
+        if DEBUG_DRAW_BOX2D_FLAGS[index] & b2Draw.jointBit {
             // An alternative way to draw joints (ported from dynamics/b2_joint.cpp)
-            joint : *b2Joint = b2World.GetJointList(world);
+            joint : *b2Joint = b2World.GetJointList(worlds[index]);
             while joint {
-            draw_joint(world_debug_draw, joint);
-            joint = b2Joint.GetNext(joint);
+                draw_joint(world_debug_draws[index], joint);
+                joint = b2Joint.GetNext(joint);
             }
         }
     }
+    debug_draw_world(0);
+    debug_draw_world(1);
 
 
     if DEBUG_DRAW {
@@ -356,7 +359,7 @@ draw_score :: () {
     }
 }
 
-draw_aim_lasers :: () {
+draw_aim_lasers :: (world : *b2World) {
     for :LiveBalls ball : balls {
         if host_type == .SERVER && ball.player_index != .P1 continue;
         if host_type == .CLIENT && ball.player_index != .P2 continue;
@@ -394,8 +397,8 @@ draw_aim_lasers :: () {
         b2Transform.Set(*shift, .{0, -delta_y}, 0.);
         input.transformA = b2Mul(input.transformA, shift);
 
-        input.transformB = b2Body.GetTransform(ball.body).*;
-        input.translationB = 100. * unit_vector(b2Body.GetLinearVelocity(ball.body));
+        input.transformB = b2Body.GetTransform(ball.active_body).*;
+        input.translationB = 100. * unit_vector(b2Body.GetLinearVelocity(ball.active_body));
 
         output : b2ShapeCastOutput;
 
@@ -419,7 +422,7 @@ draw_aim_lasers :: () {
 
         if hit && allowed {
 
-            dir_in := origin - b2Body.GetPosition(ball.body);
+            dir_in := origin - b2Body.GetPosition(ball.active_body);
             dir_out := -reflect_vector(dir_in, output.normal);
 
             unit_in := unit_vector(dir_in);
@@ -432,12 +435,12 @@ draw_aim_lasers :: () {
             use_color_in.w = laser_alpha;
             use_color_in_core.w = laser_alpha;
 
-            center := b2Body.GetPosition(ball.body).*;
+            center := b2Body.GetPosition(ball.active_body).*;
             draw_segment(origin, center + ball.radius * unit_in, use_color_in, LASER_THICKNESS);
             draw_segment(origin, center + ball.radius * unit_in, use_color_in_core, LASER_THICKNESS_CORE);
 
             ray_cast_callback_data = .{}; // Clear previous result
-            ray_cast_callback_data.ignore_body = ball.body;
+            ray_cast_callback_data.ignore_body = ball.active_body;
             b2World.RayCast(world, *ray_cast_callback, origin, origin + game_radius*unit_out);
 
             use_color_out, use_color_out_core := player.color, player.color;

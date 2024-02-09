@@ -181,7 +181,7 @@ get_ball_state :: (using ball : Ball) -> Game_State.Ball_State {
 
     result : Game_State.Ball_State;
     result.live = live;
-    result.transform = b2Body.GetTransform(body); // Could get transform from the ball since simulate updates it there
+    result.transform = ball.transform;
     result.color = ball.color;
     return result;
 }

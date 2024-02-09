@@ -123,7 +123,8 @@ Ball :: struct {
 
     // We get the transform from the physics simulation via this pointer
     // Note: The body shape is collision geometry not render geometry
-    body : *b2Body; // Physics. This is not initialized or used by clients!
+    active_body : *b2Body; // Just points into body array, do not free
+    body : [2]*b2Body; // Physics. This is not initialized or used by clients!
 }
 
 Player :: struct {
@@ -240,29 +241,24 @@ check_winning_condition :: () {
     }
 }
 
-deinit_player :: (player : *Player) {
-    player.score = 0;
-    mesh_deinit(player.mesh);
-    if host_type != .CLIENT {
-        b2World.DestroyBody(world, player.body);
-
-        for life : player.lives {
-            mesh_deinit(life.mesh);
-            b2World.DestroyBody(world, life.body);
-        }
-    }
-}
-
 deinit_game :: () {
     // We can call deinit_game before game was initted if the client connects but disconnects before
     if game_mode != .NOT_STARTED {
-        deinit_level();
-        deinit_player(*player1);
-        deinit_player(*player2);
+
+        // In game entities the reverse order to initialization
+
         for * ball : balls {
             deinit_ball(ball);
         }
-        free(world_debug_draw);
+
+        deinit_player(*player2);
+        deinit_player(*player1);
+
+        deinit_obstructions();
+        deinit_boundary();
+        
+        deinit_world(1);
+        deinit_world(0);
     }
 
     // Make sure to deinit the client/server after deinitting the game above, to do that properly we need to know the host_type which is set to UNKNOWN below
@@ -284,14 +280,18 @@ init_game :: (init_game_state : Init_Game_State) {
     assert(game_mode == .NOT_STARTED);
 
     if host_type != .CLIENT {
-        init_world();
+        init_world(0);
+        init_world(1);
     }
 
     // Reset any AI players
     ai_player = Ai_Player.{};
 
     player_count = init_game_state.player_count;
-    init_level(init_game_state.level_id); // Must come before players since they are constrained relative to the level boundary
+    
+    level.level_id = init_game_state.level_id;
+    init_boundary(); // Must come before players since they are constrained relative to the level boundary
+    init_obstructions();
 
     init_player(*player1, .P1, init_game_state.p1_paddle_shape);
     init_player(*player2, .P2, init_game_state.p2_paddle_shape);
@@ -323,24 +323,14 @@ init_game :: (init_game_state : Init_Game_State) {
     game_mode = .PLAYING;
 }
 
-deinit_level :: () {
-    deinit_polyline_soup(*level.boundary.shape);
-
-    if host_type != .CLIENT {
-        if level.obstructions.body {
-            b2World.DestroyBody(world, level.obstructions.body);
-        }
-        b2World.DestroyBody(world, level.boundary.body);
-    }
-}
-
 deinit_ball :: (ball : *Ball) {
     log_verbose("deinit_ball");
 
     mesh_deinit(ball.mesh);
 
     if host_type != .CLIENT {
-        b2World.DestroyBody(world, ball.body);
+        deinit_ball_physics(ball, worlds[0]);
+        deinit_ball_physics(ball, worlds[1]);
     }
 }
 
@@ -357,10 +347,20 @@ init_ball :: (using ball : *Ball, initial_shape : Ball_Shape) {
     }
 
     if host_type != .CLIENT {
-        init_ball_physics(ball);
+        init_ball_physics(ball, worlds[0]);
+        init_ball_physics(ball, worlds[1]);
     }
 
     // play_sound(sound_start_game); // @todo find a nicer sound for this!
+}
+
+deinit_boundary :: () {
+    deinit_polyline_soup(*level.boundary.shape);
+
+    if host_type != .CLIENT {
+        deinit_boundary_physics(worlds[0]);
+        deinit_boundary_physics(worlds[1]);
+    }
 }
 
 init_boundary :: () {
@@ -412,7 +412,15 @@ init_boundary :: () {
     .{ goal.x,  game.y});
 
     if host_type != .CLIENT {
-        init_boundary_physics();
+        init_boundary_physics(worlds[0]);
+        init_boundary_physics(worlds[1]);
+    }
+}
+
+deinit_obstructions :: () {
+    if host_type != .CLIENT {
+        deinit_obstructions_physics(worlds[0]);
+        deinit_obstructions_physics(worlds[1]);
     }
 }
 
@@ -465,18 +473,23 @@ init_obstructions :: () {
     }
 
     if host_type != .CLIENT {
-        init_obstructions_physics();
+        init_obstructions_physics(worlds[0]);
+        init_obstructions_physics(worlds[1]);
     }
 }
 
-init_level :: (level_id : Level_Id) {
-    level.level_id = level_id;
 
-    init_boundary();
-    init_obstructions();
+deinit_player :: (player : *Player) {
+    player.score = 0;
+    mesh_deinit(player.mesh);
+    if host_type != .CLIENT {
+        deinit_player_physics(player);
+    }
 }
 
 init_player :: (using player : *Player, player_index : Player_Index, player_paddle_shape : Paddle_Shape) {
+
+    player.* = Player.{};
 
     index = player_index;
     color = ifx index == .P1 then PLAYER1_COLOR else PLAYER2_COLOR;

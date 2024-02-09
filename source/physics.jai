@@ -1,27 +1,32 @@
+deinit_world :: (index : int) {
+    free(world_debug_draws[index]);
+    free(worlds[index]);
+}
 
-init_world :: () {
-    world = New(b2World); // @Leak
-    b2World.Constructor(world, Vector2.{0., 0.});
+// @FIXMEEE WE stop the old contact_listener and ray_cast_callback here, also they are not freed
+init_world :: (index : int) {
+    worlds[index] = New(b2World); // @Leak
+    b2World.Constructor(worlds[index], Vector2.{0., 0.});
 
-    if DEBUG_DRAW_BOX2D != 0 {
-        world_debug_draw_transform :: (world : Vector2) -> Vector3 { return .{xy=world_to_screen(world)}; }
-        world_debug_draw = create_box2d_debug_draw_using_simp(world_debug_draw_transform);
-        b2Draw.SetFlags(world_debug_draw, xx DEBUG_DRAW_BOX2D);
-        b2World.SetDebugDraw(world, world_debug_draw);
-    }
-
+    // Setup contact listener which is used for game simulation e.g., plays sounds, filters collisions etc
     contact_listener.vtable = New(b2ContactListener_VTable); // @Leak
     contact_listener.vtable.BeginContact = contact_listener_begin_contact;
     contact_listener.vtable.EndContact = contact_listener_end_contact;
     contact_listener.vtable.PreSolve = contact_listener_pre_solve;
     contact_listener.vtable.PostSolve = contact_listener_post_solve;
     contact_listener.vtable.Destructor = contact_listener_destructor;
-    b2World.SetContactListener(world, *contact_listener);
+    b2World.SetContactListener(worlds[index], *contact_listener);
 
     // Setup ray cast callback used to render lasers for aiming
     ray_cast_callback.vtable = New(b2RayCastCallback_VTable); // @Leak
     ray_cast_callback.vtable.ReportFixture = ray_cast_report_fixture;
     ray_cast_callback.vtable.Destructor = ray_cast_callback_destructor;
+
+    // Setup debug drawing stuff
+    world_debug_draw_transform :: (p_world : Vector2) -> Vector3 { return .{xy=world_to_screen(p_world)}; }
+    world_debug_draws[index] = create_box2d_debug_draw_using_simp(world_debug_draw_transform);
+    b2Draw.SetFlags(world_debug_draws[index], xx DEBUG_DRAW_BOX2D_FLAGS[index]);
+    b2World.SetDebugDraw(worlds[index], world_debug_draws[index]);
 }
 
 ray_cast_report_fixture :: (this: *b2RayCastCallback, fixture: *b2Fixture, point: *b2Vec2, normal: *b2Vec2, fraction: float) -> float #cpp_method {
@@ -47,9 +52,18 @@ ray_cast_callback_destructor :: (this: *b2RayCastCallback, flags: Msvc_Destructo
 
 
 
+deinit_ball_physics :: (ball : *Ball, world : *b2World) {
+    assert(host_type == .SERVER || host_type == .LOCAL);
 
+    body : **b2Body;
+    if world == worlds[0] then body = *ball.body[0];
+    else if world == worlds[1] then body = *ball.body[1];
+    else assert(false);
 
-init_ball_physics :: (ball : *Ball) {
+    b2World.DestroyBody(world, body.*);
+}
+
+init_ball_physics :: (ball : *Ball, world : *b2World) {
     assert(host_type == .SERVER || host_type == .LOCAL);
 
     user_data : b2BodyUserData;
@@ -62,9 +76,15 @@ init_ball_physics :: (ball : *Ball) {
     body_def.bullet=true; // Balls can move very fast!
     body_def.userData = user_data;
 
-    ball.body = b2World.CreateBody(world, *body_def);
+    body : **b2Body;
+    if world == worlds[0] then body = *ball.body[0];
+    else if world == worlds[1] then body = *ball.body[1];
+    else assert(false);
 
-    b2Body.SetSleepingAllowed(ball.body, false);
+    body.* = b2World.CreateBody(world, *body_def);
+    ball.active_body = body.*; // Arbitrary
+
+    b2Body.SetSleepingAllowed(body.*, false);
 
     circle_shape : b2CircleShape;
     b2CircleShape.Constructor(*circle_shape);
@@ -90,16 +110,22 @@ init_ball_physics :: (ball : *Ball) {
         fixture_def.friction = BALL_FRICTION;
         fixture_def.restitution = BALL_RESTITUTION;
     }
-    b2Body.CreateFixture(ball.body, *fixture_def);
+    b2Body.CreateFixture(body.*, *fixture_def);
 
-    b2Body.SetEnabled(ball.body, false);
+    b2Body.SetEnabled(body.*, false);
 }
 
 
 
+deinit_obstructions_physics :: (world : *b2World) {
+    assert(host_type == .SERVER || host_type == .LOCAL);
 
+    if level.obstructions.body {
+        b2World.DestroyBody(world, level.obstructions.body);
+    }
+}
 
-init_obstructions_physics :: () {
+init_obstructions_physics :: (world : *b2World) {
     assert(host_type == .SERVER || host_type == .LOCAL);
 
     if #complete level.level_id == {
@@ -128,9 +154,13 @@ init_obstructions_physics :: () {
 
 
 
+deinit_boundary_physics :: (world : *b2World) {
+    assert(host_type == .SERVER || host_type == .LOCAL);
 
+    b2World.DestroyBody(world, level.boundary.body);
+}
 
-init_boundary_physics :: () {
+init_boundary_physics :: (world : *b2World) {
     assert(host_type == .SERVER || host_type == .LOCAL);
 
     body_def : b2BodyDef;
@@ -161,9 +191,27 @@ init_boundary_physics :: () {
 
 
 
+deinit_player_physics :: (using player : *Player) {
+    assert(host_type == .SERVER || host_type == .LOCAL);
+
+    world : *b2World;
+    if player.index == .P1 then world = worlds[0];
+    if player.index == .P2 then world = worlds[1];
+
+    b2World.DestroyBody(world, player.body);
+
+    for life : player.lives {
+        mesh_deinit(life.mesh);
+        b2World.DestroyBody(world, life.body);
+    }
+}
 
 init_player_physics :: (using player : *Player) {
     assert(host_type == .SERVER || host_type == .LOCAL);
+
+    world : *b2World;
+    if player.index == .P1 then world = worlds[0];
+    if player.index == .P2 then world = worlds[1];
 
     game_extents := get_game_extents();
 
@@ -359,11 +407,15 @@ get_position :: (body : *b2Body) -> Vector2 {
     return b2Body.GetPosition(body).*;
 }
 
+get_transform :: (body : *b2Body) -> b2Transform {
+    return b2Body.GetTransform(body).*;
+}
+
 apply_linear_impulse_to_center :: (body : *b2Body, impulse : Vector2, wake := true) {
     b2Body.ApplyLinearImpulseToCenter(body, impulse, wake);
 }
 
-ray_cast_callback : b2RayCastCallback;
+ray_cast_callback : b2RayCastCallback; // @Leak We need one for each world
 ray_cast_callback_data : Ray_Cast_Callback_Data;
 Ray_Cast_Callback_Data :: struct {
     fixture: *b2Fixture;
