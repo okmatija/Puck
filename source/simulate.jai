@@ -242,6 +242,9 @@ simulate :: () {
     b2World.Step(worlds[0], player1.time_factor * current_dt, 6, 2);
     b2World.Step(worlds[1], player2.time_factor * current_dt, 6, 2);
 
+    // Compute aiming laser trajectories
+    compute_lasers();
+
     // Move balls between worlds
     for * :LiveBalls ball : balls {
 
@@ -253,6 +256,10 @@ simulate :: () {
 
         ball.active_body = ifx position.y < 0. then ball.body[0] else ball.body[1];
         ball_update_active_body(ball, position, angle, linear_velocity, angular_velocity);
+
+        ball.color = ifx b2Body.GetWorld(ball.active_body) == worlds[0]
+            then player1.color
+            else player2.color;
     }
 
     // Update the transforms used for rendering
@@ -489,3 +496,106 @@ simulate_attractor_balls :: (power : float) {
     }
 }
 */
+
+compute_lasers :: () {
+    for player_index : 0..1 {
+        array_reset(*trajectory[player_index]);
+
+        for :LiveBalls ball : balls {
+
+            player := ifx player_index == 0 then *player1 else *player2;
+
+            // Do not draw lasers for the opponent in some cases
+            if player_count == .One_Player && player.index != .P1 continue;
+            if host_type == .SERVER && player.index != .P1 continue;
+            if host_type == .CLIENT && player.index != .P2 continue;
+
+            // Don't draw lasers from balls in the other world
+            if player.index == .P1 && b2Body.GetWorld(ball.active_body) == worlds[1] then continue;
+            if player.index == .P2 && b2Body.GetWorld(ball.active_body) == worlds[0] then continue;
+
+            // player := ifx ball.player_index == .P1 then *player1 else *player2;
+
+            // @Cleanup Get this from the ball
+            ball_shape : b2CircleShape;
+            b2CircleShape.Constructor(*ball_shape);
+            ball_shape.m_radius = BALL_INITIAL_RADIUS;
+
+            // @Cleanup Get this from the player?
+            paddle_shape : b2CircleShape;
+            b2CircleShape.Constructor(*paddle_shape);
+            paddle_shape.m_radius = 2. * PADDLE_EXTENTS.x;
+
+            dpa : b2DistanceProxy;
+            b2DistanceProxy.Constructor(*dpa);
+            b2DistanceProxy.Set(*dpa, *paddle_shape, 0);
+
+            dpb : b2DistanceProxy;
+            b2DistanceProxy.Constructor(*dpb);
+            b2DistanceProxy.Set(*dpb, *ball_shape, 0);
+
+            input : b2ShapeCastInput;
+            input.proxyA = dpa;
+            input.proxyB = dpb;
+            input.transformA = b2Body.GetTransform(player.body).*;
+
+            radius := 2. * PADDLE_EXTENTS.x;
+            extents := PADDLE_EXTENTS;
+            delta_y := sqrt(radius*radius - extents.x*extents.x) + PADDLE_EXTENTS.y;
+            shift : b2Transform;
+            b2Transform.Constructor(*shift);
+            b2Transform.Set(*shift, .{0, -delta_y}, 0.);
+            input.transformA = b2Mul(input.transformA, shift);
+
+            input.transformB = b2Body.GetTransform(ball.active_body).*;
+            input.translationB = 100. * unit_vector(b2Body.GetLinearVelocity(ball.active_body));
+
+            output : b2ShapeCastOutput;
+
+            hit := b2ShapeCast(*output, *input);
+            origin := output.point + ball.radius * output.normal;
+
+            allowed := false;
+            {
+                radius := 2. * PADDLE_EXTENTS.x;
+                extents := PADDLE_EXTENTS;
+                delta_y := sqrt(radius*radius - extents.x*extents.x);
+                offset_y := delta_y / radius * ball.radius;
+
+                if player.index == {
+                case .P1;
+                    allowed = origin.y > -get_game_extents().y + offset_y;
+                case .P2;
+                    allowed = origin.y < get_game_extents().y - offset_y;
+                }
+            }
+
+            if hit && allowed {
+                dir_in := origin - b2Body.GetPosition(ball.active_body);
+                dir_out := -reflect_vector(dir_in, output.normal);
+
+                unit_in := unit_vector(dir_in);
+                unit_out := unit_vector(dir_out);
+                game_radius := 2 * length(get_game_extents());
+
+                center := b2Body.GetPosition(ball.active_body).*;
+                
+                segment_in : Trajectory_Segment;
+                segment_in.position_start = origin;
+                segment_in.position_end = center + ball.radius * unit_in;
+                array_add(*trajectory[player_index], segment_in);
+
+                ray_cast_callback_data = .{}; // Clear previous result
+                ray_cast_callback_data.ignore_body = ball.active_body;
+                b2World.RayCast(worlds[player_index], *ray_cast_callback, origin, origin + game_radius*unit_out);
+
+                if ray_cast_callback_data.fraction {
+                    segment_out : Trajectory_Segment;
+                    segment_out.position_start = origin;
+                    segment_out.position_end = origin + ray_cast_callback_data.fraction * game_radius * unit_out;
+                    array_add(*trajectory[player_index], segment_out);
+                }
+            } // hit && allowed
+        } // for balls
+    } // for players
+}

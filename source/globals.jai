@@ -154,3 +154,11 @@ user_sfx_volume : float = .1;
 TIME_FACTOR_FAST :: 3.0;
 TIME_FACTOR_SLOW :: 0.1;
 
+Trajectory_Segment :: struct {
+    position_start : Vector2;
+    position_end : Vector2;
+    //color_start : Vector4;
+    //color_end : Vector2;
+}
+
+trajectory : [2][..]Trajectory_Segment;

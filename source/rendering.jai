@@ -95,8 +95,7 @@ render_one_frame :: () {
                 Vector4.{1,1,1,1});
         } else {
 
-            use_color := ifx b2Body.GetWorld(it.active_body) == worlds[0] then player1.color else player2.color;
-            draw_mesh(it.mesh, it.transform, use_color);
+            draw_mesh(it.mesh, it.transform, it.color);
 
             // mesh : Mesh;
             // defer mesh_deinit(mesh);
@@ -220,6 +219,10 @@ render_one_frame :: () {
 
     debug_draw_world :: (index : int) {
         // Draws the physics/collision geometry, this is a no-op if b2World.SetDebugDraw was not called
+        if host_type == .CLIENT {
+            return;
+        }
+
         b2World.DebugDraw(worlds[index]);
 
         if DEBUG_DRAW_BOX2D_FLAGS[index] & b2Draw.jointBit {
@@ -371,106 +374,34 @@ draw_score :: () {
 
 // @TODOO Remove all the physics references from this file (implement a compile-time check for this..!)
 draw_aim_lasers :: (world : *b2World) {
-    for player_index : 0..1 for :LiveBalls ball : balls {
-
+    for player_index : 0..1 {
         player := ifx player_index == 0 then *player1 else *player2;
 
-        // Do not draw lasers for the opponent
-        if player_count == .One_Player && player.index != .P1 continue;
-        if host_type == .SERVER && player.index != .P1 continue;
-        if host_type == .CLIENT && player.index != .P2 continue;
-
-        // Don't draw lasers from balls in the other world
-        if player.index == .P1 && b2Body.GetWorld(ball.active_body) == worlds[1] then continue;
-        if player.index == .P2 && b2Body.GetWorld(ball.active_body) == worlds[0] then continue;
-
-        // player := ifx ball.player_index == .P1 then *player1 else *player2;
-
-        // @Cleanup Get this from the ball
-        ball_shape : b2CircleShape;
-        b2CircleShape.Constructor(*ball_shape);
-        ball_shape.m_radius = BALL_INITIAL_RADIUS;
-
-        // @Cleanup Get this from the player?
-        paddle_shape : b2CircleShape;
-        b2CircleShape.Constructor(*paddle_shape);
-        paddle_shape.m_radius = 2. * PADDLE_EXTENTS.x;
-
-        dpa : b2DistanceProxy;
-        b2DistanceProxy.Constructor(*dpa);
-        b2DistanceProxy.Set(*dpa, *paddle_shape, 0);
-
-        dpb : b2DistanceProxy;
-        b2DistanceProxy.Constructor(*dpb);
-        b2DistanceProxy.Set(*dpb, *ball_shape, 0);
-
-        input : b2ShapeCastInput;
-        input.proxyA = dpa;
-        input.proxyB = dpb;
-        input.transformA = b2Body.GetTransform(player.body).*;
-
-        radius := 2. * PADDLE_EXTENTS.x;
-        extents := PADDLE_EXTENTS;
-        delta_y := sqrt(radius*radius - extents.x*extents.x) + PADDLE_EXTENTS.y;
-        shift : b2Transform;
-        b2Transform.Constructor(*shift);
-        b2Transform.Set(*shift, .{0, -delta_y}, 0.);
-        input.transformA = b2Mul(input.transformA, shift);
-
-        input.transformB = b2Body.GetTransform(ball.active_body).*;
-        input.translationB = 100. * unit_vector(b2Body.GetLinearVelocity(ball.active_body));
-
-        output : b2ShapeCastOutput;
-
-        hit := b2ShapeCast(*output, *input);
-        origin := output.point + ball.radius * output.normal;
-
-        allowed := false;
-        {
-            radius := 2. * PADDLE_EXTENTS.x;
-            extents := PADDLE_EXTENTS;
-            delta_y := sqrt(radius*radius - extents.x*extents.x);
-            offset_y := delta_y / radius * ball.radius;
-
-            if player.index == {
-            case .P1;
-                allowed = origin.y > -get_game_extents().y + offset_y;
-            case .P2;
-                allowed = origin.y < get_game_extents().y - offset_y;
-            }
+        if trajectory[player_index].count == 0 {
+            continue;
         }
 
-        if hit && allowed {
+        segment0 := *trajectory[player_index][0];
+        length0 := length(segment0.position_end - segment0.position_start);
+        laser_alpha := lerp(0., 1., pow(length0, 10.));
 
-            dir_in := origin - b2Body.GetPosition(ball.active_body);
-            dir_out := -reflect_vector(dir_in, output.normal);
+        for trajectory[player_index] {
+            segment := *trajectory[player_index][it_index];
 
-            unit_in := unit_vector(dir_in);
-            unit_out := unit_vector(dir_out);
-            game_radius := 2 * length(get_game_extents());
+            if it_index == 0 {
+                use_color_in, use_color_in_core := GREEN, player.color;
+                use_color_in.w = laser_alpha;
+                use_color_in_core.w = laser_alpha;
 
-            laser_alpha := lerp(0., 1., pow(length(dir_in), 10.));
+                draw_segment(segment.position_start, segment.position_end, use_color_in, LASER_THICKNESS);
+                draw_segment(segment.position_start, segment.position_end, use_color_in_core, LASER_THICKNESS_CORE);
+            } else {
+                use_color_out, use_color_out_core := player.color, player.color;
+                use_color_out.w = laser_alpha;
+                use_color_out_core.w = laser_alpha;
 
-            use_color_in, use_color_in_core := GREEN, player.color;
-            use_color_in.w = laser_alpha;
-            use_color_in_core.w = laser_alpha;
-
-            center := b2Body.GetPosition(ball.active_body).*;
-            draw_segment(origin, center + ball.radius * unit_in, use_color_in, LASER_THICKNESS);
-            draw_segment(origin, center + ball.radius * unit_in, use_color_in_core, LASER_THICKNESS_CORE);
-
-            ray_cast_callback_data = .{}; // Clear previous result
-            ray_cast_callback_data.ignore_body = ball.active_body;
-            b2World.RayCast(world, *ray_cast_callback, origin, origin + game_radius*unit_out);
-
-            use_color_out, use_color_out_core := player.color, player.color;
-            use_color_out.w = laser_alpha;
-            use_color_out_core.w = laser_alpha;
-
-            if ray_cast_callback_data.fraction && use_color_in.w > 0.05 {
-                target := origin + ray_cast_callback_data.fraction * game_radius * unit_out;
-                draw_segment(origin, target, use_color_out, LASER_THICKNESS);
-                draw_segment(origin, target, use_color_out_core, LASER_THICKNESS_CORE);
+                draw_segment(segment.position_start, segment.position_end, use_color_out, LASER_THICKNESS);
+                draw_segment(segment.position_start, segment.position_end, use_color_out_core, LASER_THICKNESS_CORE);
             }
         }
     }
