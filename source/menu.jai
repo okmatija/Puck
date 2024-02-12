@@ -108,6 +108,12 @@ game_over_menu :: () {
 }
 
 pause_menu :: () {
+    HIDE_UI :: false; // Set this true to pause without UI overlay---useful to for taking screenshots
+#if HIDE_UI {
+    if  esc_pressed { // @Cleanup only allow esc here for debugging?
+        game_mode = .PLAYING;
+    }
+} else {
     using ui_state := make_ui_state();
 
     button_theme := ui_theme.button_theme;
@@ -134,6 +140,7 @@ pause_menu :: () {
     if released {
         deinit_game();
     }
+}
 }
 
 settings_menu :: () {

@@ -181,8 +181,22 @@ simulate :: () {
            (time_factor != 1.0 && warp_duration_remaining > 0.0) {
 
             if down {
+                //if world_time_factor == 1. {
+                //    stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+                //    stream.rate_scale = .5;
+                //    stream.user_volume_scale = user_sfx_volume;
+                //    Sound.start_playing(stream);
+                //}
+
                 time_factor = 0.1;
             } else if up {
+                //if world_time_factor != TIME_FACTOR_FAST {
+                //    stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
+                //    stream.rate_scale = -.8;
+                //    stream.user_volume_scale = user_sfx_volume;
+                //    Sound.start_playing(stream);
+                //}
+
                 time_factor = 3.0;
             } else {
                 time_factor = 1.0;
@@ -192,48 +206,8 @@ simulate :: () {
             time_factor = 1.0;
         }
     }
-
     pre_step_update_player(*player1);
     pre_step_update_player(*player2);
-
-    /*
-    if player1.time_factor == TIME_FACTOR_SLOW ||
-       player2.time_factor == TIME_FACTOR_SLOW {
-        if world_time_factor == 1. {
-            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            stream.rate_scale = .5;
-            stream.user_volume_scale = user_sfx_volume;
-            Sound.start_playing(stream);
-        }
-
-        world_time_factor = TIME_FACTOR_SLOW;
-
-    } else if player1.time_factor == TIME_FACTOR_FAST ||
-              player2.time_factor == TIME_FACTOR_FAST {
-        if world_time_factor != TIME_FACTOR_FAST {
-            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            // stream.rate_scale = -.8;
-            // stream.user_volume_scale = user_sfx_volume;
-            // Sound.start_playing(stream);
-        }
-
-        world_time_factor = TIME_FACTOR_FAST;
-    } else {
-        if world_time_factor == TIME_FACTOR_SLOW {
-            stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            stream.rate_scale = -.8;
-            stream.user_volume_scale = user_sfx_volume;
-            Sound.start_playing(stream);
-        } else if world_time_factor == TIME_FACTOR_FAST {
-            // stream := Sound.make_stream(*sound_collision1, .GENERAL_SFX);
-            // stream.rate_scale = .3;
-            // stream.user_volume_scale = user_sfx_volume;
-            // Sound.start_playing(stream);
-        }
-
-        world_time_factor = 1.;
-    }
-    */
 
     update_warp_duration_remaining :: (player : *Player) {
         if player.time_factor == 1.0 {
