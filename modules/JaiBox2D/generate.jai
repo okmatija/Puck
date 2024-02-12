@@ -1,6 +1,6 @@
 AT_COMPILE_TIME :: true;
 
-COMPILE :: false; // Enable to compile the library from source before generating bindings
+COMPILE :: true; // Enable to compile the library from source before generating bindings
 COMPILE_DEBUG :: false; // Compile a debug or release version, debug generates a more useful stacktrace if your program crashes in Box2D
 
 // We provide box-2.4.1 souce code you could download a different one, update this path and re-generate the bindings.
