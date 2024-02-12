@@ -9,6 +9,8 @@ Entity :: struct {
     }
 
     kind : Kind;
+
+    // @TODO Put a transform in here!
 }
 
 // @Cleanup Menus should be a state machine using this enum

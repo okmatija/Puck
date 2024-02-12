@@ -4,6 +4,10 @@ A pong game to play at work in breaks
 Starting competitive mobile e-sports!
 Pong/BlockBreaker/RocketLeague/JBlows billiards game
 
+# Mindless cleanup
+
+[ ] Enforce struct_operation naming convention? e.g., player_deinit, player_init etc...
+
 # General
 
 [ ] Maryna suggests making the dome circles visible somehow, that could actually look pretty cool...
@@ -150,6 +154,7 @@ Use sensors
 
 [x] Kinematic obstructions in the play area
 [x] Add dome paddle shape
+[ ] Remove the box health, that was only needed when we had the healing property of balls your own color, with that removed its probably not needed...
 [ ] Portals?
 [ ] Ball can have gravitational attraction to the powerups? And the powerups only attach to that specific ball? 
 [ ] Get 3 boosts which gradually replenish, its useful to reach for ball when its going really fast
