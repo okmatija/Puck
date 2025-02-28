@@ -2,10 +2,7 @@
 
 An unfinished multiplayer airhockey game.
 
-<p float="left">
-  <img src="data/menu_0.5.0.png.png" width="45%" />
-  <img src="data/game_0.5.0.png.png" width="45%" />
-</p>
+![menu](data/menu_0.5.0.png) ![game](data/game_0.5.0.png)
 
 # Feedback
 
