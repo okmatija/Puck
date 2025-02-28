@@ -2,6 +2,11 @@
 
 An unfinished multiplayer airhockey game.
 
+<p float="left">
+  <img src="data/menu_0.5.0.png.png" width="45%" />
+  <img src="data/game_0.5.0.png.png" width="45%" />
+</p>
+
 # Feedback
 
 For the latest version (0.5.0) I got some good feedback about how the game could be improved. Here are my responses.
